@@ -1,0 +1,223 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { exampleProject, blankProject, newEquipment, uid } from '../model/examples';
+import { growTerminal, terminal } from '../model/nodeDefs';
+import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
+import { runLength } from '../engine/calc';
+
+export type View = 'ideal' | 'existing' | 'compare' | 'reports';
+export type ReportTab = 'findings' | 'changes' | 'wires' | 'bom' | 'energy';
+export type Selection = { kind: 'node' | 'wire'; id: string; design: 'ideal' | 'existing' } | null;
+
+export const DEFAULT_LAYERS: LayerSettings = {
+  dc: true,
+  ac: true,
+  negatives: 'full',
+  signal: true,
+  grounding: false,
+  labels: { gauge: true, protection: false, current: false, length: false, vdrop: false, parts: false },
+};
+
+interface State {
+  project: Project;
+  view: View;
+  reportTab: ReportTab;
+  reportDesign: 'ideal' | 'existing';
+  layers: LayerSettings;
+  selection: Selection;
+  /** Bumped to ask the diagram to re-run auto layout. */
+  layoutNonce: number;
+  /** Firestore document id of the boat being edited (undefined = local only). */
+  cloudId?: string;
+  setCloudId(id: string | undefined): void;
+
+  setView(v: View): void;
+  setReportTab(t: ReportTab): void;
+  setReportDesign(d: 'ideal' | 'existing'): void;
+  setLayers(fn: (l: LayerSettings) => LayerSettings): void;
+  select(s: Selection): void;
+  relayout(): void;
+
+  loadProject(p: Project, cloudId?: string): void;
+  newProject(): void;
+  loadExample(): void;
+
+  updateProfile(fn: (p: Project['profile']) => void): void;
+  addEquipment(kind: EquipmentKind): string;
+  updateEquipment(id: string, fn: (e: Equipment) => void): void;
+  removeEquipment(id: string): void;
+  duplicateEquipment(id: string): void;
+
+  setScenario(id: string): void;
+  addScenario(): void;
+  updateScenario(id: string, patch: Partial<Scenario>): void;
+  removeScenario(id: string): void;
+
+  setExisting(d: Design | undefined): void;
+  updateExisting(fn: (d: Design) => void): void;
+  addExistingNode(n: DNode): void;
+  connectExisting(a: WireEnd, b: WireEnd): void;
+  deleteSelection(): void;
+}
+
+const mutate = (p: Project, fn: (p: Project) => void): Project => {
+  const copy: Project = structuredClone(p);
+  fn(copy);
+  return copy;
+};
+
+export const useStore = create<State>()(
+  persist(
+    (set, get) => ({
+      project: exampleProject(),
+      view: 'ideal',
+      reportTab: 'findings',
+      reportDesign: 'ideal',
+      layers: DEFAULT_LAYERS,
+      selection: null,
+      layoutNonce: 0,
+      cloudId: undefined,
+      setCloudId: (cloudId) => set({ cloudId }),
+
+      setView: (view) => set({ view, selection: null }),
+      setReportTab: (reportTab) => set({ reportTab }),
+      setReportDesign: (reportDesign) => set({ reportDesign }),
+      setLayers: (fn) => set({ layers: fn(get().layers) }),
+      select: (selection) => set({ selection }),
+      relayout: () => set({ layoutNonce: get().layoutNonce + 1 }),
+
+      loadProject: (project, cloudId) => set({ project, cloudId, selection: null }),
+      newProject: () => set({ project: blankProject(), cloudId: undefined, selection: null, view: 'ideal' }),
+      loadExample: () => set({ project: exampleProject(), cloudId: undefined, selection: null, view: 'ideal' }),
+
+      updateProfile: (fn) => set({ project: mutate(get().project, (p) => fn(p.profile)) }),
+      addEquipment: (kind) => {
+        const e = newEquipment(kind);
+        set({ project: mutate(get().project, (p) => void p.equipment.push(e)) });
+        return e.id;
+      },
+      updateEquipment: (id, fn) =>
+        set({
+          project: mutate(get().project, (p) => {
+            const e = p.equipment.find((x) => x.id === id);
+            if (e) fn(e);
+          }),
+        }),
+      removeEquipment: (id) =>
+        set({
+          project: mutate(get().project, (p) => {
+            p.equipment = p.equipment.filter((e) => e.id !== id);
+          }),
+          selection: null,
+        }),
+      duplicateEquipment: (id) =>
+        set({
+          project: mutate(get().project, (p) => {
+            const i = p.equipment.findIndex((e) => e.id === id);
+            if (i < 0) return;
+            const c = structuredClone(p.equipment[i]);
+            c.id = uid();
+            c.name = `${c.name} (copy)`;
+            p.equipment.splice(i + 1, 0, c);
+          }),
+        }),
+
+      setScenario: (id) => set({ project: { ...get().project, activeScenario: id }, selection: null }),
+      addScenario: () => {
+        const id = uid('s');
+        set({
+          project: mutate(get().project, (p) => {
+            const cur = p.scenarios.find((s) => s.id === p.activeScenario);
+            p.scenarios.push({ ...(cur ?? {}), id, name: `Scenario ${p.scenarios.length + 1}` });
+            p.activeScenario = id;
+          }),
+        });
+      },
+      updateScenario: (id, patch) =>
+        set({
+          project: mutate(get().project, (p) => {
+            const s = p.scenarios.find((x) => x.id === id);
+            if (!s) return;
+            Object.assign(s, patch);
+            for (const k of Object.keys(s) as (keyof Scenario)[]) if (s[k] === undefined) delete s[k];
+          }),
+        }),
+      removeScenario: (id) =>
+        set({
+          project: mutate(get().project, (p) => {
+            if (p.scenarios.length <= 1) return;
+            p.scenarios = p.scenarios.filter((s) => s.id !== id);
+            if (p.activeScenario === id) p.activeScenario = p.scenarios[0].id;
+          }),
+        }),
+
+      setExisting: (d) => set({ project: { ...get().project, existing: d }, selection: null }),
+      updateExisting: (fn) =>
+        set({
+          project: mutate(get().project, (p) => {
+            if (p.existing) fn(p.existing);
+          }),
+        }),
+      addExistingNode: (n) =>
+        set({
+          project: mutate(get().project, (p) => {
+            p.existing ??= { id: 'existing', name: 'Existing', systemVoltage: p.profile.systemVoltage, nodes: [], wires: [], findings: [] };
+            p.existing.nodes.push(n);
+          }),
+          selection: { kind: 'node', id: n.id, design: 'existing' },
+        }),
+      connectExisting: (a, b) =>
+        set({
+          project: mutate(get().project, (p) => {
+            const d = p.existing;
+            if (!d) return;
+            const na = d.nodes.find((n) => n.id === a.node);
+            const nb = d.nodes.find((n) => n.id === b.node);
+            if (!na || !nb) return;
+            const ta = terminal(na, a.term);
+            const tb = terminal(nb, b.term);
+            const pol = ta?.pol === 'sig' || tb?.pol === 'sig' ? 'sig' : (ta?.pol ?? tb?.pol ?? 'pos');
+            const w: Wire = {
+              id: uid('w'),
+              kind: pol,
+              domain: pol === 'ac' || pol === 'gnd' ? 'ac' : 'dc',
+              from: a,
+              to: b,
+              lengthFt: runLength(p.profile, na.zone || p.profile.batteryZone, nb.zone || p.profile.batteryZone),
+            };
+            d.wires.push(w);
+            // keep a free stud available on growable nodes
+            for (const [n, t] of [[na, a.term], [nb, b.term]] as const) {
+              if (!/^[sb]\d+$/.test(t)) continue;
+              const free = n.terminals.filter((x) => /^[sb]\d+$/.test(x.id) && !d.wires.some((w2) => (w2.from.node === n.id && w2.from.term === x.id) || (w2.to.node === n.id && w2.to.term === x.id)));
+              if (free.length === 0) {
+                const side = terminal(n, t)?.side ?? 'E';
+                const last = n.terminals.find((x) => x.id === t);
+                growTerminal(n, { side, rating: last?.rating, label: last?.rating ? `${last.rating} A` : undefined });
+              }
+            }
+          }),
+        }),
+      deleteSelection: () => {
+        const s = get().selection;
+        if (!s || s.design !== 'existing') return;
+        set({
+          project: mutate(get().project, (p) => {
+            const d = p.existing;
+            if (!d) return;
+            if (s.kind === 'wire') d.wires = d.wires.filter((w) => w.id !== s.id);
+            else {
+              d.nodes = d.nodes.filter((n) => n.id !== s.id);
+              d.wires = d.wires.filter((w) => w.from.node !== s.id && w.to.node !== s.id);
+            }
+          }),
+          selection: null,
+        });
+      },
+    }),
+    {
+      name: 'boatwire:v1',
+      partialize: (s) => ({ project: s.project, layers: s.layers, view: s.view, cloudId: s.cloudId }),
+    },
+  ),
+);
