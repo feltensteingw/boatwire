@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { exampleProject } from '../src/model/examples';
 import { generateIdeal } from '../src/engine/generate';
-import { autoLayout } from '../src/layout/layout';
+import { autoLayout, visibleSubset } from '../src/layout/layout';
 import type { LayerSettings } from '../src/model/types';
 
 const layers: LayerSettings = { dc: true, ac: true, negatives: 'full', signal: true, grounding: false, labels: { gauge: true, protection: true, current: false, length: false, vdrop: false, parts: false } };
@@ -42,5 +42,27 @@ describe('layout', () => {
     const panel = col.nodes.find((n) => n.id === 'dc-panel')!;
     expect(panel.hiddenCircuits).toBe(full.nodes.filter((n) => n.node.type === 'load').length - kinds(col).length);
     expect(col.nodes.some((n) => n.id === 'dc-panel-neg')).toBe(false);
+  });
+  it('hides fuses by drawing wires straight through them', async () => {
+    const p = exampleProject();
+    for (const sc of p.scenarios) {
+      const d = generateIdeal(p, sc);
+      const fuses = d.nodes.filter((n) => n.type === 'fuse');
+      expect(fuses.length).toBeGreaterThan(3);
+      const v = visibleSubset(d, { ...layers, fuses: false });
+      const shown = new Set(v.nodes.map((n) => n.id));
+      // every visible wire connects two visible nodes, ids stay unique and real
+      expect(v.wires.every((w) => shown.has(w.from.node) && shown.has(w.to.node))).toBe(true);
+      expect(new Set(v.wires.map((w) => w.id)).size).toBe(v.wires.length);
+      const realIds = new Set(d.wires.map((w) => w.id));
+      expect(v.wires.every((w) => realIds.has(w.id))).toBe(true);
+      // most fuses fold away, and each folded fuse is recorded on its wire
+      const remaining = v.nodes.filter((n) => n.type === 'fuse').length;
+      expect(remaining).toBeLessThan(fuses.length / 4);
+      const via = v.wires.filter((w) => w.viaFuse).map((w) => w.viaFuse);
+      expect(via.length).toBe(fuses.length - remaining);
+      const l = await autoLayout(d, { ...layers, fuses: false });
+      expect(l.edges.every((e) => e.points && e.points.length >= 2)).toBe(true);
+    }
   });
 });

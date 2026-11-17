@@ -35,7 +35,8 @@ export function wireLabel(d: WireData): string {
   if (L.current && d.amps !== undefined && w.kind !== 'sig' && w.kind !== 'gnd') parts.push(`${d.amps >= 10 ? Math.round(d.amps) : d.amps.toFixed(1)} A`);
   if (L.length && w.kind !== 'sig') parts.push(`${w.lengthFt} ft`);
   if (L.vdrop && w.vdropPct !== undefined && w.kind !== 'neg') parts.push(`${w.vdropPct.toFixed(1)}%`);
-  if (L.protection && d.protection) parts.push(d.protection);
+  // A wire drawn through a hidden fuse always says so, even with fuse labels off.
+  if (d.protection && (L.protection || w.viaFuse)) parts.push(d.protection);
   return parts.join(' · ');
 }
 

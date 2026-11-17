@@ -57,7 +57,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   const fitPending = useRef(true);
   const which = mode === 'auto' ? 'ideal' : 'existing';
 
-  const structural = `${layers.panelLoads}|${layers.dc}|${layers.ac}|${layers.negatives}|${layers.signal}|${layers.grounding}`;
+  const structural = `${layers.panelLoads}|${layers.fuses}|${layers.dc}|${layers.ac}|${layers.negatives}|${layers.signal}|${layers.grounding}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +108,14 @@ function DiagramInner({ design, findings, mode }: Props) {
         const w = le.wire;
         const prot = w.protectedBy ? N.get(w.protectedBy) : undefined;
         const panelT = [w.from, w.to].map((e) => N.get(e.node)?.terminals.find((t) => t.id === e.term && t.rating)).find(Boolean);
-        const protection = panelT?.rating ? `${panelT.rating} A` : prot?.data.rating ? `${prot.data.rating} A` : undefined;
+        const hidden = w.viaFuse ? N.get(w.viaFuse) : undefined;
+        const protection = hidden
+          ? `fuse ${hidden.data.rating ?? '?'} A${hidden.data.fuseClass ? ` ${hidden.data.fuseClass}` : ''}`
+          : panelT?.rating
+            ? `${panelT.rating} A`
+            : prot?.data.rating
+              ? `${prot.data.rating} A`
+              : undefined;
         return {
           id: le.id,
           type: 'wire',

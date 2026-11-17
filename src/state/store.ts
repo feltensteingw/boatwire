@@ -14,6 +14,7 @@ export const DEFAULT_LAYERS: LayerSettings = {
   ac: true,
   negatives: 'full',
   panelLoads: 'show',
+  fuses: true,
   signal: true,
   grounding: false,
   labels: { gauge: true, protection: false, current: false, length: false, vdrop: false, parts: false },

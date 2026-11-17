@@ -89,12 +89,19 @@ export function baseSize(n: DNode): { w: number; h: number } {
 export function visibleSubset(design: Design, layers: LayerSettings) {
   const nodeVisible = (n: DNode) => (n.domain === 'dc' ? layers.dc : layers.ac) || (isBridge(n) && (layers.dc || layers.ac));
   let nodes = design.nodes.filter(nodeVisible);
+  let allWires = design.wires;
+  // Optionally fold inline fuses into their wires: in-wire + fuse + out-wire → one wire.
+  if (layers.fuses === false) {
+    const folded = foldFuses(design);
+    allWires = folded.wires;
+    nodes = nodes.filter((n) => !folded.removed.has(n.id));
+  }
   // Optionally collapse loads fed from DC panel breakers into a per-panel summary.
   const hiddenCircuits = new Map<string, { count: number; amps: number }>();
   if (layers.panelLoads === 'collapse') {
     const byId = new Map(design.nodes.map((n) => [n.id, n]));
     const collapsed = new Set<string>();
-    for (const w of design.wires) {
+    for (const w of allWires) {
       if (w.kind !== 'pos') continue;
       for (const [pe, le] of [[w.from, w.to], [w.to, w.from]] as const) {
         const panel = byId.get(pe.node);
@@ -112,7 +119,7 @@ export function visibleSubset(design: Design, layers: LayerSettings) {
   const ids = new Set(nodes.map((n) => n.id));
   const N = new Map(nodes.map((n) => [n.id, n]));
   const negHidden = new Set<string>();
-  const wires = design.wires.filter((w) => {
+  const wires = allWires.filter((w) => {
     if (!ids.has(w.from.node) || !ids.has(w.to.node)) return false;
     if (w.kind === 'sig') return layers.signal && layers.dc;
     if (w.kind === 'gnd') return w.equipmentGround ? layers.grounding : layers.ac || layers.grounding;
@@ -146,6 +153,39 @@ export function visibleSubset(design: Design, layers: LayerSettings) {
   const droppable = new Set<DNode['type']>(['bus-neg', 'ac-ground-bus', 'helm-switch', 'bms', 'regulator', 'apd', 'shunt']);
   nodes = nodes.filter((n) => used.has(n.id) || !droppable.has(n.type));
   return { nodes, wires, negHidden, hiddenCircuits };
+}
+
+/**
+ * Replace each simple inline fuse (one wire on its input, one on its output) with a single
+ * wire drawn straight through. The merged wire keeps the id and sizing of the conductor the
+ * fuse protects, so selecting it still opens the real wire.
+ */
+export function foldFuses(design: Design) {
+  const removed = new Set<string>();
+  const drop = new Set<string>();
+  const merged: Wire[] = [];
+  const fuses = design.nodes.filter((n) => n.type === 'fuse');
+  for (const f of fuses) {
+    const at = (term: string) => design.wires.filter((w) => !drop.has(w.id) && ((w.from.node === f.id && w.from.term === term) || (w.to.node === f.id && w.to.term === term)));
+    const ins = at('in');
+    const outs = at('out');
+    if (ins.length !== 1 || outs.length !== 1) continue;
+    const [wi, wo] = [ins[0], outs[0]];
+    const far = (w: Wire) => (w.from.node === f.id ? w.to : w.from);
+    const a = far(wi);
+    const b = far(wo);
+    if (a.node === f.id || b.node === f.id) continue;
+    // (A fuse wired straight to another fuse stays visible: its neighbour's wire was already merged.)
+    const main = wo.protectedBy === f.id ? wo : wi.protectedBy === f.id ? wi : wo.lengthFt >= wi.lengthFt ? wo : wi;
+    drop.add(wi.id).add(wo.id);
+    removed.add(f.id);
+    merged.push({ ...main, from: a, to: b, lengthFt: Math.round((wi.lengthFt + wo.lengthFt) * 10) / 10, protectedBy: main.protectedBy ?? f.id, viaFuse: f.id });
+  }
+  if (!removed.size) return { wires: design.wires, removed };
+  // Keep wire order stable: each merged wire takes the slot of the conductor it replaces.
+  const byMain = new Map(merged.map((m) => [m.id, m]));
+  const wires = design.wires.flatMap((w) => (byMain.has(w.id) ? [byMain.get(w.id)!] : drop.has(w.id) ? [] : [w]));
+  return { wires, removed };
 }
 
 function termOf(n: DNode, term: string) {
