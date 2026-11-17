@@ -108,6 +108,8 @@ export interface LayerSettings {
   negatives: 'full' | 'buses' | 'hidden';
   /** Collapse the branch circuits fed from DC panels (lights, fans, fridge…) into a summary on the panel. */
   panelLoads?: 'show' | 'collapse';
+  /** Show inline fuse symbols. Off folds each fuse into its wire (rating stays on the wire label). Undefined = shown. */
+  fuses?: boolean;
   signal: boolean;
   grounding: boolean;
   labels: {
@@ -237,6 +239,8 @@ export interface Wire {
   cable?: string;
   /** Equipment grounding conductor (shown only with the grounding layer). */
   equipmentGround?: boolean;
+  /** Display only: id of a hidden fuse this wire has been drawn through. */
+  viaFuse?: string;
 }
 
 export type Severity = 'error' | 'warning' | 'info';

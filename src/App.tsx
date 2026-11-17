@@ -192,6 +192,9 @@ function LayerBar({ manual }: { manual?: boolean }) {
         <span title="Show the branch circuits fed from the DC panel (lights, fans, fridge…). Off collapses them into a summary on the panel.">
           <Toggle checked={layers.panelLoads !== 'collapse'} label="Panel loads" onChange={(v) => setLayers((l) => ({ ...l, panelLoads: v ? 'show' : 'collapse' }))} />
         </span>
+        <span title="Show inline fuses. Off draws each wire straight through its fuse; the fuse rating stays on the wire label.">
+          <Toggle checked={layers.fuses !== false} label="Fuses" onChange={(v) => setLayers((l) => ({ ...l, fuses: v }))} />
+        </span>
         <Toggle checked={layers.signal} label="Control" onChange={(v) => setLayers((l) => ({ ...l, signal: v }))} />
         <Toggle checked={layers.grounding} label="Equip. grounds" onChange={(v) => setLayers((l) => ({ ...l, grounding: v }))} />
       </div>
@@ -201,7 +204,7 @@ function LayerBar({ manual }: { manual?: boolean }) {
         {lab('current', 'Amps')}
         {lab('length', 'Length')}
         {lab('vdrop', 'V-drop')}
-        {lab('protection', 'Fuse')}
+        {lab('protection', 'Fuse rating')}
         {lab('parts', 'Parts')}
       </div>
       <div className="lgroup end">
