@@ -65,6 +65,7 @@ function Header() {
           <path d="M13 9l-4 7h4l-2 5" fill="none" stroke="var(--w-ac)" strokeWidth="2" strokeLinejoin="round" />
         </svg>
         <span>BoatWire</span>
+        <VersionStamp />
       </div>
       <nav className="views">
         {VIEWS.map((v) => (
@@ -157,6 +158,18 @@ function Header() {
         />
       </div>
     </header>
+  );
+}
+
+const BUILD_TIME = new Date(__APP_BUILD_TIME__);
+
+/** Version + commit + build time, so you can see when a new deploy has landed. */
+function VersionStamp() {
+  const when = BUILD_TIME.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return (
+    <span className="version" title={`Version ${__APP_VERSION__}\nCommit ${__APP_COMMIT__}\nBuilt ${BUILD_TIME.toLocaleString()}`}>
+      v{__APP_VERSION__} · {__APP_COMMIT__} · {when}
+    </span>
   );
 }
 
