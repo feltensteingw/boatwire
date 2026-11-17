@@ -15,6 +15,7 @@ import { Reports, downloadText, toCsv } from './ui/Reports';
 import { Sidebar } from './ui/Sidebar';
 import { Toggle } from './ui/fields';
 import { CloudControls, CloudSync } from './cloud/CloudControls';
+import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 
 const VIEWS: { id: View; label: string }[] = [
   { id: 'ideal', label: 'Ideal design' },
@@ -25,6 +26,7 @@ const VIEWS: { id: View; label: string }[] = [
 
 export default function App() {
   const view = useStore((s) => s.view);
+  useApplyTheme(useStore((s) => s.theme));
   return (
     <div className={`app view-${view}`}>
       <CloudSync />
@@ -85,6 +87,7 @@ function Header() {
         </select>
         <span className="pill">{ideal.systemVoltage} V</span>
       </div>
+      <ThemePicker />
       <CloudControls />
       <div className="file">
         <button onClick={() => setMenu(!menu)}>File ▾</button>
@@ -170,6 +173,21 @@ function VersionStamp() {
     <span className="version" title={`Version ${__APP_VERSION__}\nCommit ${__APP_COMMIT__}\nBuilt ${BUILD_TIME.toLocaleString()}`}>
       v{__APP_VERSION__} · {__APP_COMMIT__} · {when}
     </span>
+  );
+}
+
+function ThemePicker() {
+  const theme = useStore((s) => s.theme);
+  const setTheme = useStore((s) => s.setTheme);
+  const cur = THEMES.find((t) => t.id === theme) ?? THEMES[0];
+  return (
+    <select className="theme-pick" value={theme} onChange={(e) => setTheme(e.target.value as ThemeId)} title={`Colour scheme: ${cur.label} — ${cur.hint}`} aria-label="Colour scheme">
+      {THEMES.map((t) => (
+        <option key={t.id} value={t.id} title={t.hint}>
+          🎨 {t.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
