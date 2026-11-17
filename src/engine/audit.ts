@@ -102,13 +102,29 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
 
   // 6. Alternator on a lithium net needs protection
   for (const alt of design.nodes.filter((n) => n.type === 'alternator')) {
-    const r = nets.get(key(alt.id, 'b'));
-    const lfp = batteries.some((b) => b.data.chemistry === 'lifepo4' && nets.get(key(b.id, 'pos')) === r);
+    const lfp = walk(g, { node: alt.id, term: 'b' }, ['pos']).some((r) => r.node.type === 'battery' && r.node.data.chemistry === 'lifepo4');
     if (!lfp) continue;
     const hasApd = (g.at.get(key(alt.id, 'b')) ?? []).some((w) => g.node.get(w.from.node === alt.id ? w.to.node : w.from.node)?.type === 'apd');
     const hasReg = (g.at.get(key(alt.id, 'field')) ?? []).some((w) => g.node.get(w.from.node === alt.id ? w.to.node : w.from.node)?.type === 'regulator');
     if (!hasApd || !hasReg) {
       add('error', 'alternator-lfp', 'The alternator charges a lithium bank directly without an external regulator and alternator protection device.', 'Charge lithium through a DC-DC charger from a lead-acid start battery, or fit an external regulator plus APD.', [alt.id]);
+    }
+  }
+
+  // 6b. Battery isolators
+  for (const iso of design.nodes.filter((n) => n.type === 'isolator')) {
+    const chems = new Set<string>();
+    for (const t of iso.terminals.filter((x) => x.id.startsWith('out'))) {
+      for (const r of walk(g, { node: iso.id, term: t.id }, ['pos'])) {
+        if (r.node.type === 'battery') chems.add(r.node.data.chemistry === 'lifepo4' ? 'lifepo4' : 'lead');
+      }
+    }
+    if (chems.has('lifepo4')) {
+      add('warning', 'isolator', `${label(iso)} feeds a lithium bank. It gives every bank the alternator's voltage, so lithium can't get its own charge profile, and a BMS disconnect can still spike the alternator.`, 'Charge lithium through a DC-DC charger instead.', [iso.id]);
+    }
+    if (iso.data.isolatorType === 'diode') {
+      const hasReg = design.nodes.some((n) => n.type === 'regulator');
+      if (!hasReg) add('warning', 'isolator', `${label(iso)} is a diode isolator: its ~0.7 V drop leaves the batteries undercharged with a stock regulator.`, 'Use a FET (zero-drop) isolator, an ACR, or a regulator that senses battery voltage after the isolator.', [iso.id]);
     }
   }
 

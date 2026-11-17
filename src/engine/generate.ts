@@ -530,6 +530,14 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
       const altFuseR = protectionFor(altA);
       const altFuseCls = fuseClassFor(altFuseR, { lithium: lfp, mainFeeder: true });
       const altLen = run(EZ, BZ);
+      const split = String(engine.props.chargeSplit ?? 'auto');
+      const wantsIso = split === 'isolator-fet' || split === 'isolator-diode';
+      const useIso = wantsIso && !lfp && !!startBus;
+      if (wantsIso && lfp) {
+        b.find('info', 'isolator', 'Charge splitting is set to a battery isolator, but an isolator cannot give the lithium house bank its own charge profile or protect the alternator from a BMS disconnect.', lfp && !extReg && startBus ? 'The design uses a DC-DC charger instead.' : 'The design uses an external regulator and alternator protection instead.');
+      } else if (wantsIso && !startBus) {
+        b.find('info', 'isolator', 'Charge splitting is set to a battery isolator, but there is only one battery bank, so no isolator is needed.');
+      }
       if (lfp && !extReg && startBus) {
         // Alternator → start battery; DC-DC start → house
         const af = b.add('fuse', 'alt-fuse', 'Alternator output fuse', { zone: startBus.zone, sublabel: fuseLabel(altFuseR, altFuseCls), data: { rating: altFuseR, fuseClass: altFuseCls }, notes: ['charging-source-fuse'] });
@@ -547,10 +555,30 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
         b.wire('pos', [fOut, 'out'], [posBus, b.stud(posBus)], { amps: dcA, protect: protectionFor(dcA), len: 0.5 });
         b.wire('sig', [engineNode, 'run'], [dcdc, 'run'], { amps: 0, len: crankLen });
       } else {
-        // Alternator → house bus directly
-        const af = b.add('fuse', 'alt-fuse', 'Alternator output fuse', { zone: BZ, sublabel: fuseLabel(altFuseR, altFuseCls), data: { rating: altFuseR, fuseClass: altFuseCls }, notes: ['charging-source-fuse'] });
-        const [aw] = b.pair([[alt, 'b'], [af, 'in']], [[alt, 'neg'], [negBus, b.stud(negBus)]], { amps: altA, protect: altFuseR, len: altLen, engine: true, protectedBy: af.id, notes: ['charging-source-fuse'] });
-        b.wire('pos', [af, 'out'], [posBus, b.stud(posBus)], { amps: altA, protect: altFuseR, len: 0.5, gauge: aw.gauge });
+        if (useIso && startBus) {
+          // Alternator → isolator → each bank through its own fuse (banks never bridged)
+          const diode = split === 'isolator-diode';
+          const isoR = nextStandard(altA * 1.25, [70, 120, 160, 200, 250, 350]);
+          const iso = b.add('isolator', 'alt-isolator', diode ? 'Diode battery isolator' : 'FET battery isolator', {
+            zone: BZ,
+            sublabel: `${isoR} A · ${diode ? '~0.7 V drop' : 'near-zero drop'}`,
+            data: { rating: isoR, isolatorType: diode ? 'diode' : 'fet', part: `${diode ? 'Diode' : 'MOSFET (zero-drop)'} battery isolator, 1 input / 2 outputs, ${isoR} A` },
+            notes: ['isolator', 'charging-source-fuse'],
+          });
+          const [aw] = b.pair([[alt, 'b'], [iso, 'in']], [[alt, 'neg'], [negBus, b.stud(negBus)]], { amps: altA, protect: altFuseR, len: altLen, engine: true, notes: ['isolator'] });
+          const outs: [string, DNode, string][] = [['out1', posBus, 'house'], ['out2', startBus, 'start']];
+          for (const [term, bus, which] of outs) {
+            const f = b.add('fuse', `iso-fuse-${which}`, `Isolator fuse (${which} side)`, { zone: bus.zone, col: 5, sublabel: fuseLabel(altFuseR, altFuseCls), data: { rating: altFuseR, fuseClass: altFuseCls }, notes: ['charging-source-fuse'] });
+            b.wire('pos', [iso, term], [f, 'in'], { amps: altA, protect: altFuseR, len: 1.5, gauge: aw.gauge, protectedBy: f.id });
+            b.wire('pos', [f, 'out'], [bus, b.stud(bus)], { amps: altA, protect: altFuseR, len: 0.5, gauge: aw.gauge });
+          }
+          b.wire('neg', [iso, 'neg'], [negBus, b.stud(negBus)], { amps: 1, len: 1.5, gauge: '16' });
+        } else {
+          // Alternator → house bus directly
+          const af = b.add('fuse', 'alt-fuse', 'Alternator output fuse', { zone: BZ, sublabel: fuseLabel(altFuseR, altFuseCls), data: { rating: altFuseR, fuseClass: altFuseCls }, notes: ['charging-source-fuse'] });
+          const [aw] = b.pair([[alt, 'b'], [af, 'in']], [[alt, 'neg'], [negBus, b.stud(negBus)]], { amps: altA, protect: altFuseR, len: altLen, engine: true, protectedBy: af.id, notes: ['charging-source-fuse'] });
+          b.wire('pos', [af, 'out'], [posBus, b.stud(posBus)], { amps: altA, protect: altFuseR, len: 0.5, gauge: aw.gauge });
+        }
         if (lfp) {
           const reg = b.add('regulator', 'alt-reg', 'Smart alternator regulator', { zone: EZ, sublabel: 'Lithium profile, belt/temperature limiting', data: { part: 'External regulator (e.g. Wakespeed WS500 / Balmar MC-618)' }, notes: ['alternator-lfp'] });
           const apd = b.add('apd', 'alt-apd', 'Alternator protection device', { zone: EZ, data: { part: 'Alternator protection device (APD)' }, notes: ['alternator-lfp'] });
@@ -565,8 +593,8 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
           b.wire('sig', [reg, 'field'], [alt, 'field'], { amps: 0, len: 2 });
           b.wire('sig', [reg, 'sense'], [posBus, b.stud(posBus, { pol: 'sig', label: 'sense' })], { amps: 0, len: altLen });
         }
-        // Start battery charging from house
-        if (startBus) {
+        // Start battery charging from house (not needed when an isolator feeds both banks)
+        if (startBus && !useIso) {
           if (lfp) {
             const dcA = V === 12 ? 18 : 12;
             const dcdc = b.add('dcdc', 'start-dcdc', 'DC-DC charger (house → start)', { zone: BZ, sublabel: `${dcA} A`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}` }, notes: ['dcdc'] });

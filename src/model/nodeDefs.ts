@@ -31,6 +31,7 @@ export const NODE_DEFS: Record<NodeType, NodeDef> = {
   'fuse-block': { label: 'Fuse block', domain: 'dc', col: 6, terminals: [['in', 'pos', 'W']], growable: { prefix: 'f', pol: 'pos' }, conducts: true, protective: true, palette: 'Distribution' },
   shunt: { label: 'Battery monitor shunt', domain: 'dc', col: 4, terminals: [['bat', 'neg', 'W', 'BAT−'], ['sys', 'neg', 'E', 'SYS−']], conducts: true, palette: 'Distribution' },
   acr: { label: 'Automatic charging relay (ACR)', domain: 'dc', col: 4, terminals: [['a', 'pos', 'W', 'A'], ['b', 'pos', 'E', 'B'], ['neg', 'neg', 'W', '−']], conducts: true, palette: 'Charging' },
+  isolator: { label: 'Battery isolator (diode / FET)', domain: 'dc', col: 4, terminals: [['in', 'pos', 'W', 'ALT'], ['out1', 'pos', 'E', 'B1'], ['out2', 'pos', 'E', 'B2'], ['neg', 'neg', 'W', '−']], conducts: true, palette: 'Charging' },
   dcdc: { label: 'DC-DC charger', domain: 'dc', col: 4, terminals: [['in', 'pos', 'W', 'IN+'], ['inneg', 'neg', 'W', 'IN−'], ['out', 'pos', 'E', 'OUT+'], ['outneg', 'neg', 'E', 'OUT−'], ['run', 'sig', 'N', 'run']], conducts: false, palette: 'Charging' },
   bms: { label: 'External BMS', domain: 'dc', col: 4, terminals: [['cells', 'sig', 'W', 'cells'], ['atc', 'sig', 'E', 'ATC'], ['atd', 'sig', 'E', 'ATD'], ['ctl', 'sig', 'E', 'ctl']], conducts: false, palette: 'Storage' },
   contactor: { label: 'Contactor / solenoid', domain: 'dc', col: 7, terminals: [['in', 'pos', 'W'], ['out', 'pos', 'E'], ['coil', 'sig', 'N', 'coil']], conducts: true, palette: 'Switching' },

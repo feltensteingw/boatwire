@@ -132,6 +132,15 @@ export function Icon({ n }: { n: DNode }) {
         </g>
       );
       break;
+    case 'isolator':
+      body = (
+        <g {...p}>
+          <path d="M2 16h6M8 16l10-7M8 16l10 7M18 9h12M18 23h12" />
+          <path d="M12 9.5l4 1.2-1.6 3.6zM12 22.5l4-1.2-1.6-3.6z" fill="currentColor" />
+          <path d="M18 6v6M18 20v6" />
+        </g>
+      );
+      break;
     case 'galvanic-isolator':
       body = (
         <g {...p}>
@@ -224,7 +233,7 @@ export function Icon({ n }: { n: DNode }) {
   );
 }
 
-const MULTI_TERM = new Set<DNode['type']>(['mppt', 'dcdc', 'charger', 'inverter', 'inverter-charger', 'shunt', 'acr', 'controller', 'converter', 'alternator', 'engine', 'selector', 'transfer-switch', 'bms', 'regulator', 'apd', 'battery']);
+const MULTI_TERM = new Set<DNode['type']>(['isolator', 'mppt', 'dcdc', 'charger', 'inverter', 'inverter-charger', 'shunt', 'acr', 'controller', 'converter', 'alternator', 'engine', 'selector', 'transfer-switch', 'bms', 'regulator', 'apd', 'battery']);
 
 function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
   const { laid, severity, showParts, manual } = data;

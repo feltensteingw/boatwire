@@ -69,6 +69,7 @@ export function baseSize(n: DNode): { w: number; h: number } {
     case 'converter':
     case 'shunt':
     case 'acr':
+    case 'isolator':
     case 'alternator':
     case 'engine':
     case 'selector':

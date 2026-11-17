@@ -44,6 +44,8 @@ export function passThrough(n: DNode, term: string): string[] {
     return term === 'out' ? same.filter((t) => t.startsWith('in')) : same.filter((t) => t === 'out');
   }
   if (n.type === 'acr') return same.filter((t) => t === 'a' || t === 'b');
+  // Isolator: current flows input → outputs only; outputs are never joined to each other.
+  if (n.type === 'isolator') return term === 'in' ? same.filter((t) => t.startsWith('out')) : term.startsWith('out') ? ['in'] : [];
   return same;
 }
 
@@ -141,6 +143,7 @@ export function positiveNets(g: Graph): Map<string, string> {
   const union = (a: string, b: string) => parent.set(find(a), find(b));
   for (const w of g.design.wires) if (w.kind === 'pos') union(key(w.from.node, w.from.term), key(w.to.node, w.to.term));
   for (const n of g.design.nodes) {
+    if (n.type === 'isolator') continue; // one-way device: each output is its own net
     for (const t of n.terminals) {
       if (t.pol !== 'pos') continue;
       for (const o of passThrough(n, t.id)) union(key(n.id, t.id), key(n.id, o));

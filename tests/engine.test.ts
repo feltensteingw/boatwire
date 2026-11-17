@@ -125,3 +125,55 @@ describe('upgrade plan', () => {
     expect(text).toMatch(/Refrigerator: upsize wire 18/);
   });
 });
+
+describe('battery isolators', () => {
+  const withSplit = (split: string) => {
+    const p = exampleProject();
+    p.equipment.find((e) => e.kind === 'engine')!.props.chargeSplit = split;
+    return p;
+  };
+
+  it('FET isolator replaces the ACR for lead-acid banks and passes audit', () => {
+    const p = withSplit('isolator-fet');
+    const d = generateIdeal(p);
+    expect(d.nodes.some((n) => n.type === 'isolator')).toBe(true);
+    expect(d.nodes.some((n) => n.type === 'acr')).toBe(false);
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+    expect(d.findings.some((f) => f.rule === 'isolator')).toBe(false);
+  });
+
+  it('diode isolator with stock regulator warns about voltage drop', () => {
+    const p = withSplit('isolator-diode');
+    const d = generateIdeal(p);
+    const all = [...d.findings, ...audit(d)];
+    expect(all.filter((f) => f.rule === 'isolator' && f.severity === 'warning')).toHaveLength(1);
+    expect(errorsOf(d, p)).toEqual([]);
+  });
+
+  it('lithium house ignores the isolator choice and keeps the DC-DC charger', () => {
+    const p = withSplit('isolator-fet');
+    const d = generateIdeal(p, p.scenarios[1]);
+    expect(d.nodes.some((n) => n.type === 'isolator')).toBe(false);
+    expect(d.nodes.some((n) => n.id === 'alt-dcdc')).toBe(true);
+    expect(d.findings.some((f) => f.rule === 'isolator' && f.severity === 'info')).toBe(true);
+  });
+
+  it('audit: isolator outputs are not "bridged", but feeding lithium is flagged', () => {
+    const alt = makeNode('alternator', 'alt', 'Alternator', { data: { amps: 90 } });
+    const iso = makeNode('isolator', 'iso', 'Isolator', { data: { isolatorType: 'fet', rating: 120 } });
+    const lfp = makeNode('battery', 'h', 'House', { data: { chemistry: 'lifepo4' } });
+    const agm = makeNode('battery', 's', 'Start', { data: { chemistry: 'agm' } });
+    const f1 = makeNode('fuse', 'f1', 'F1', { data: { rating: 125 } });
+    const f2 = makeNode('fuse', 'f2', 'F2', { data: { rating: 125 } });
+    const w = (id: string, a: [string, string], b: [string, string]) => ({ id, kind: 'pos' as const, domain: 'dc' as const, from: { node: a[0], term: a[1] }, to: { node: b[0], term: b[1] }, lengthFt: 0.5, gauge: '4' });
+    const d: Design = {
+      id: 'x', name: 'x', systemVoltage: 12, findings: [],
+      nodes: [alt, iso, lfp, agm, f1, f2],
+      wires: [w('a', ['alt', 'b'], ['iso', 'in']), w('b', ['iso', 'out1'], ['f1', 'out']), w('c', ['f1', 'in'], ['h', 'pos']), w('d', ['iso', 'out2'], ['f2', 'out']), w('e', ['f2', 'in'], ['s', 'pos'])],
+    };
+    const rules = audit(d).map((f) => f.rule);
+    expect(rules).not.toContain('no-mixed-chemistry');
+    expect(rules).toContain('isolator');
+    expect(rules).toContain('alternator-lfp');
+  });
+});

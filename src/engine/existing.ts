@@ -19,6 +19,11 @@ export function paletteNode(type: NodeType, zone: string): DNode {
     }
   }
   if (type === 'fuse' || type === 'breaker') n.data.rating = 30;
+  if (type === 'isolator') {
+    n.data.rating = 120;
+    n.data.isolatorType = 'diode';
+    n.sublabel = 'Diode';
+  }
   if (type === 'battery') {
     n.data.chemistry = 'agm';
     n.data.ah = 100;
