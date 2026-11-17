@@ -4,6 +4,7 @@ import { exampleProject, blankProject, newEquipment, uid } from '../model/exampl
 import { growTerminal, terminal } from '../model/nodeDefs';
 import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
 import { runLength } from '../engine/calc';
+import type { ThemeId } from '../ui/themes';
 
 export type View = 'ideal' | 'existing' | 'compare' | 'reports';
 export type ReportTab = 'findings' | 'changes' | 'wires' | 'bom' | 'energy';
@@ -26,6 +27,9 @@ interface State {
   reportTab: ReportTab;
   reportDesign: 'ideal' | 'existing';
   layers: LayerSettings;
+  /** Colour scheme; 'auto' follows the operating system light/dark setting. */
+  theme: ThemeId;
+  setTheme(t: ThemeId): void;
   selection: Selection;
   /** Bumped to ask the diagram to re-run auto layout. */
   layoutNonce: number;
@@ -76,6 +80,8 @@ export const useStore = create<State>()(
       reportTab: 'findings',
       reportDesign: 'ideal',
       layers: DEFAULT_LAYERS,
+      theme: 'auto',
+      setTheme: (theme) => set({ theme }),
       selection: null,
       layoutNonce: 0,
       cloudId: undefined,
@@ -219,7 +225,7 @@ export const useStore = create<State>()(
     }),
     {
       name: 'boatwire:v1',
-      partialize: (s) => ({ project: s.project, layers: s.layers, view: s.view, cloudId: s.cloudId }),
+      partialize: (s) => ({ project: s.project, layers: s.layers, view: s.view, cloudId: s.cloudId, theme: s.theme }),
     },
   ),
 );

@@ -44,7 +44,8 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  /* before the app sets data-theme (first paint) */
+  :root:not([data-theme]) {
     --bg: #0e141a;
     --panel: #151d25;
     --panel-2: #19232c;
@@ -75,6 +76,197 @@
     --bus-neg: #c9d1d9;
     color-scheme: dark;
   }
+}
+
+/* ---------------------------------------------------------------- colour schemes */
+:root[data-theme='dark'] {
+  --bg: #0e141a;
+  --panel: #151d25;
+  --panel-2: #19232c;
+  --canvas: #0f161d;
+  --border: #26333f;
+  --border-2: #334452;
+  --text: #e3e9ef;
+  --muted: #9aa8b5;
+  --faint: #6d7c89;
+  --navy: #0a1f33;
+  --navy-2: #12304d;
+  --accent: #4fb3c4;
+  --accent-soft: #15323a;
+  --grid: #22303c;
+  --mini: #3a4a58;
+  --w-pos: #ff5a52;
+  --w-neg: #c9d1d9;
+  --w-ac: #f2a93b;
+  --w-gnd: #4cc06a;
+  --w-sig: #7b93ff;
+  --err-bg: #3a1716;
+  --warn-bg: #3a2a10;
+  --info-bg: #13283b;
+  --sym-bg: #18222c;
+  --sym-border: #4a5b6a;
+  --sym-equip: #9cc7e6;
+  --bus-pos: #ff5a52;
+  --bus-neg: #c9d1d9;
+  color-scheme: dark;
+}
+
+/* Nautical chart: warm paper, sepia ink, chart blues */
+:root[data-theme='chart'] {
+  --bg: #ece5d3;
+  --panel: #f8f3e6;
+  --panel-2: #f2ecdc;
+  --canvas: #faf6ea;
+  --border: #d8cdb2;
+  --border-2: #c4b693;
+  --text: #2e2618;
+  --muted: #6b5d44;
+  --faint: #9a8b6c;
+  --navy: #1d3557;
+  --navy-2: #2a4a72;
+  --accent: #2b6f8f;
+  --accent-soft: #dcebee;
+  --grid: #d9ccab;
+  --mini: #c9b98f;
+  --w-pos: #b8261f;
+  --w-neg: #2e2618;
+  --w-ac: #c47a00;
+  --w-gnd: #2f7d3a;
+  --w-sig: #3956c8;
+  --err-bg: #f7e1d9;
+  --warn-bg: #f6e8c8;
+  --info-bg: #e2ebef;
+  --sym-bg: #fdfaf1;
+  --sym-border: #a8987a;
+  --sym-equip: #1d3557;
+  --bus-pos: #b8261f;
+  --bus-neg: #2e2618;
+  --shadow: 0 1px 2px rgba(60, 45, 20, 0.1), 0 2px 8px rgba(60, 45, 20, 0.08);
+  color-scheme: light;
+}
+
+/* Night watch: dim reds only for the chrome, so the nav station doesn't ruin night vision.
+   Wire colours keep their meaning but are dimmed. */
+:root[data-theme='night'] {
+  --bg: #080404;
+  --panel: #110707;
+  --panel-2: #160909;
+  --canvas: #0b0505;
+  --border: #2a1210;
+  --border-2: #3d1a17;
+  --text: #d98c84;
+  --muted: #a5655e;
+  --faint: #7a4640;
+  --navy: #160606;
+  --navy-2: #2a0d0b;
+  --accent: #e0574b;
+  --accent-soft: #2c0f0d;
+  --grid: #24100e;
+  --mini: #3d1a17;
+  --w-pos: #e04a3f;
+  --w-neg: #9c7a76;
+  --w-ac: #c98a3a;
+  --w-gnd: #5f9466;
+  --w-sig: #8a7ad8;
+  --err: #ff6b5e;
+  --err-bg: #2e0d0b;
+  --warn: #d79a4a;
+  --warn-bg: #2a170a;
+  --info: #b98a86;
+  --info-bg: #1e0e0d;
+  --ok: #7aa36f;
+  --sym-bg: #130808;
+  --sym-border: #4a211d;
+  --sym-equip: #e08a80;
+  --bus-pos: #e04a3f;
+  --bus-neg: #9c7a76;
+  --bus-gnd: #5f9466;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+:root[data-theme='night'] .header,
+:root[data-theme='night'] .header button,
+:root[data-theme='night'] .header select {
+  color: #d98c84;
+  border-color: rgba(217, 140, 132, 0.25);
+}
+
+/* Blueprint: white linework on blue */
+:root[data-theme='blueprint'] {
+  --bg: #0b3157;
+  --panel: #0e3a66;
+  --panel-2: #10416f;
+  --canvas: #0f4476;
+  --border: #2a5f93;
+  --border-2: #3f74a8;
+  --text: #eef5ff;
+  --muted: #b3cbe6;
+  --faint: #86a6c9;
+  --navy: #082544;
+  --navy-2: #0e3a66;
+  --accent: #7fd3ff;
+  --accent-soft: #154e82;
+  --grid: #2b5f92;
+  --mini: #4f80b3;
+  --w-pos: #ff8f85;
+  --w-neg: #eef5ff;
+  --w-ac: #ffd166;
+  --w-gnd: #8be0a4;
+  --w-sig: #c2b8ff;
+  --err: #ff9a8f;
+  --err-bg: #3b2a4a;
+  --warn: #ffd166;
+  --warn-bg: #2e3f4f;
+  --info: #9fd8ff;
+  --info-bg: #123f6a;
+  --ok: #8be0a4;
+  --sym-bg: #0f4476;
+  --sym-border: #a9cbef;
+  --sym-equip: #ffffff;
+  --bus-pos: #ff8f85;
+  --bus-neg: #eef5ff;
+  --bus-gnd: #8be0a4;
+  --shadow: 0 1px 3px rgba(0, 10, 30, 0.4);
+  color-scheme: dark;
+}
+
+/* High contrast: pure black on white, strong borders, saturated wire colours */
+:root[data-theme='contrast'] {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f2f2f2;
+  --canvas: #ffffff;
+  --border: #000000;
+  --border-2: #000000;
+  --text: #000000;
+  --muted: #1a1a1a;
+  --faint: #3d3d3d;
+  --navy: #000000;
+  --navy-2: #222222;
+  --accent: #0040c0;
+  --accent-soft: #dde6ff;
+  --grid: #b0b0b0;
+  --mini: #606060;
+  --w-pos: #d00000;
+  --w-neg: #000000;
+  --w-ac: #b85c00;
+  --w-gnd: #006b24;
+  --w-sig: #0030d0;
+  --err: #b00000;
+  --err-bg: #ffe0e0;
+  --warn: #7a4300;
+  --warn-bg: #fff0c8;
+  --info: #003c8f;
+  --info-bg: #e0ecff;
+  --ok: #006b24;
+  --sym-bg: #ffffff;
+  --sym-border: #000000;
+  --sym-equip: #000000;
+  --bus-pos: #d00000;
+  --bus-neg: #000000;
+  --bus-gnd: #006b24;
+  --shadow: none;
+  color-scheme: light;
 }
 
 * {
@@ -217,6 +409,14 @@ h4 {
 @media (max-width: 900px) {
   .brand .version {
     display: none;
+  }
+}
+.theme-pick {
+  max-width: 170px;
+}
+@media (max-width: 1100px) {
+  .theme-pick {
+    max-width: 40px;
   }
 }
 .views {
@@ -570,6 +770,20 @@ table.zones td:nth-child(3) {
 .react-flow__minimap {
   background: var(--panel);
   border: 1px solid var(--border);
+  --xy-minimap-mask-background-color: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+/* Night watch: no bright white anywhere */
+:root[data-theme='night'] .signin {
+  background: #2a0d0b !important;
+  color: #d98c84 !important;
+  border-color: #4a211d !important;
+}
+:root[data-theme='night'] .signin svg {
+  opacity: 0.45;
+}
+:root[data-theme='night'] .pill {
+  background: #6a2a1a;
+  color: #f0b0a0;
 }
 
 /* ---------------------------------------------------------------- symbols */
