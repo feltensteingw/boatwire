@@ -206,6 +206,19 @@ h4 {
   font-size: 16px;
   letter-spacing: 0.02em;
 }
+.brand .version {
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0;
+  opacity: 0.6;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 900px) {
+  .brand .version {
+    display: none;
+  }
+}
 .views {
   display: flex;
   gap: 2px;
