@@ -23,6 +23,9 @@ export interface LaidNode {
   ports: LaidPort[];
   node: DNode;
   negHidden?: boolean;
+  /** Panel only: number of branch circuits collapsed by the "Panel loads" layer. */
+  hiddenCircuits?: number;
+  hiddenAmps?: number;
 }
 
 export interface LaidEdge {
@@ -86,6 +89,26 @@ export function baseSize(n: DNode): { w: number; h: number } {
 export function visibleSubset(design: Design, layers: LayerSettings) {
   const nodeVisible = (n: DNode) => (n.domain === 'dc' ? layers.dc : layers.ac) || (isBridge(n) && (layers.dc || layers.ac));
   let nodes = design.nodes.filter(nodeVisible);
+  // Optionally collapse loads fed from DC panel breakers into a per-panel summary.
+  const hiddenCircuits = new Map<string, { count: number; amps: number }>();
+  if (layers.panelLoads === 'collapse') {
+    const byId = new Map(design.nodes.map((n) => [n.id, n]));
+    const collapsed = new Set<string>();
+    for (const w of design.wires) {
+      if (w.kind !== 'pos') continue;
+      for (const [pe, le] of [[w.from, w.to], [w.to, w.from]] as const) {
+        const panel = byId.get(pe.node);
+        const load = byId.get(le.node);
+        if (panel?.type !== 'dc-panel' || load?.type !== 'load' || pe.term === 'in' || collapsed.has(load.id)) continue;
+        collapsed.add(load.id);
+        const h = hiddenCircuits.get(panel.id) ?? { count: 0, amps: 0 };
+        h.count++;
+        h.amps += Number(load.data.amps ?? 0);
+        hiddenCircuits.set(panel.id, h);
+      }
+    }
+    nodes = nodes.filter((n) => !collapsed.has(n.id));
+  }
   const ids = new Set(nodes.map((n) => n.id));
   const N = new Map(nodes.map((n) => [n.id, n]));
   const negHidden = new Set<string>();
@@ -111,11 +134,18 @@ export function visibleSubset(design: Design, layers: LayerSettings) {
     }
     return layers.dc || (w.domain === 'ac' && layers.ac);
   });
+  // In collapsed view, a negative bus left with only its feeder is a dead end: hide it too.
+  if (layers.panelLoads === 'collapse') {
+    const count = new Map<string, number>();
+    for (const w of wires) for (const e of [w.from, w.to]) count.set(e.node, (count.get(e.node) ?? 0) + 1);
+    const stub = new Set(nodes.filter((n) => n.type === 'bus-neg' && (count.get(n.id) ?? 0) <= 1).map((n) => n.id));
+    for (let i = wires.length - 1; i >= 0; i--) if (stub.has(wires[i].from.node) || stub.has(wires[i].to.node)) wires.splice(i, 1);
+  }
   // drop "connector-only" nodes left with no wires
   const used = new Set(wires.flatMap((w) => [w.from.node, w.to.node]));
   const droppable = new Set<DNode['type']>(['bus-neg', 'ac-ground-bus', 'helm-switch', 'bms', 'regulator', 'apd', 'shunt']);
   nodes = nodes.filter((n) => used.has(n.id) || !droppable.has(n.type));
-  return { nodes, wires, negHidden };
+  return { nodes, wires, negHidden, hiddenCircuits };
 }
 
 function termOf(n: DNode, term: string) {
@@ -126,7 +156,7 @@ const elk = new ELK();
 
 /** Automatic layered layout (used for generated designs). */
 export async function autoLayout(design: Design, layers: LayerSettings): Promise<Layout> {
-  const { nodes, wires, negHidden } = visibleSubset(design, layers);
+  const { nodes, wires, negHidden, hiddenCircuits } = visibleSubset(design, layers);
   const N = new Map(nodes.map((n) => [n.id, n]));
   // ports: one per wire end, side chosen by relative column
   const ports = new Map<string, LaidPort[]>();
@@ -159,7 +189,8 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
     const ps = ports.get(n.id)!;
     const perSide = Math.max(ps.filter((p) => p.side === 'W').length, ps.filter((p) => p.side === 'E').length);
     const header = n.type === 'dc-panel' || n.type === 'ac-panel' || n.type === 'fuse-block' ? 44 : 14;
-    sizes.set(n.id, { w: base.w, h: Math.max(base.h, header + perSide * PORT_GAP + 8) });
+    const chip = hiddenCircuits.has(n.id) ? 26 : 0;
+    sizes.set(n.id, { w: base.w, h: Math.max(base.h, header + perSide * PORT_GAP + 8 + chip) });
   }
 
   const sideName = { W: 'WEST', E: 'EAST', N: 'NORTH', S: 'SOUTH' } as const;
@@ -251,7 +282,8 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
         if (lp.side === 'N') lp.y = 0;
       }
     }
-    laid.push({ id: c.id, x: c.x ?? 0, y: c.y ?? 0, w: c.width ?? 100, h: c.height ?? 50, ports: ps, node: n, negHidden: negHidden.has(c.id) });
+    const hc = hiddenCircuits.get(c.id);
+    laid.push({ id: c.id, x: c.x ?? 0, y: c.y ?? 0, w: c.width ?? 100, h: c.height ?? 50, ports: ps, node: n, negHidden: negHidden.has(c.id), hiddenCircuits: hc?.count, hiddenAmps: hc?.amps });
   }
   const elkEdges = new Map((res.edges ?? []).map((e) => [e.id, e as ElkExtendedEdge]));
   for (const e of edges) {
@@ -263,7 +295,7 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
 
 /** Layout for hand-drawn designs: user positions, one port per terminal. */
 export function manualLayout(design: Design, layers: LayerSettings): Layout {
-  const { nodes, wires, negHidden } = visibleSubset(design, layers);
+  const { nodes, wires, negHidden, hiddenCircuits } = visibleSubset(design, layers);
   const laid: LaidNode[] = nodes.map((n, i) => {
     const base = baseSize(n);
     const bySide: Record<Side, typeof n.terminals> = { W: [], E: [], N: [], S: [] };
@@ -285,7 +317,8 @@ export function manualLayout(design: Design, layers: LayerSettings): Layout {
       });
     }
     const pos = n.pos ?? { x: n.col * 230, y: (i % 8) * 90 };
-    return { id: n.id, x: pos.x, y: pos.y, w, h, ports, node: n, negHidden: negHidden.has(n.id) };
+    const hc = hiddenCircuits.get(n.id);
+    return { id: n.id, x: pos.x, y: pos.y, w, h, ports, node: n, negHidden: negHidden.has(n.id), hiddenCircuits: hc?.count, hiddenAmps: hc?.amps };
   });
   const edges: LaidEdge[] = wires.map((w) => ({ id: w.id, wire: w, source: w.from.node, target: w.to.node, sourcePort: w.from.term, targetPort: w.to.term }));
   return { nodes: laid, edges };

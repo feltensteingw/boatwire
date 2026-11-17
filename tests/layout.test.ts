@@ -28,4 +28,19 @@ describe('layout', () => {
     expect(ac.nodes.some((n) => n.node.type === 'load')).toBe(false);
     expect(ac.nodes.some((n) => n.node.type === 'inverter-charger')).toBe(true);
   });
+  it('collapses DC panel loads into a summary, keeping unswitched and heavy loads', async () => {
+    const p = exampleProject();
+    const d = generateIdeal(p);
+    const full = await autoLayout(d, layers);
+    const col = await autoLayout(d, { ...layers, panelLoads: 'collapse' });
+    const kinds = (l: typeof col) => l.nodes.filter((n) => n.node.type === 'load').map((n) => String(n.node.data.kind));
+    expect(kinds(col)).not.toContain('cabin-lights');
+    expect(kinds(col)).not.toContain('fridge');
+    expect(kinds(col)).toContain('bilge-pump');
+    expect(kinds(col)).toContain('windlass');
+    expect(col.nodes.length).toBeLessThan(full.nodes.length - 10);
+    const panel = col.nodes.find((n) => n.id === 'dc-panel')!;
+    expect(panel.hiddenCircuits).toBe(full.nodes.filter((n) => n.node.type === 'load').length - kinds(col).length);
+    expect(col.nodes.some((n) => n.id === 'dc-panel-neg')).toBe(false);
+  });
 });
