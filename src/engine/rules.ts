@@ -31,6 +31,10 @@ export const RULES: Record<string, RuleInfo> = {
     title: 'Automatic charging relay',
     why: 'An ACR (voltage-sensitive relay) joins start and house banks while charging and separates them when voltage falls, so both get charged without a manual 1-2-Both switch that people forget.',
   },
+  'charge-relay': {
+    title: 'Engine-run charging relay',
+    why: 'A split-charge relay whose coil is powered by the alternator\'s D+ (or the ignition / oil-pressure "engine running" signal). It joins the start and house banks only while the alternator is charging and opens the moment the engine stops, so the house loads can never flatten the start battery. Unlike an ACR it ignores battery voltage, so solar or shore charging will not reach the start battery through it. Use a continuous-duty relay rated above alternator output, fused at both batteries. Not for lithium mixed with lead-acid — use a DC-DC charger.',
+  },
   'isolator': {
     title: 'Battery isolator (diode / FET)',
     why: 'An isolator lets one alternator charge several banks through one-way diodes or MOSFETs, so the banks are never connected to each other and a flat house bank cannot drain the start battery. Diode isolators drop about 0.6–0.8 V, so with a stock regulator that senses at the alternator the batteries are chronically undercharged. Use a FET (zero-drop) isolator or a regulator that senses on the battery side. Isolators give every bank the same voltage, so they are unsuitable for lithium mixed with lead-acid.',
