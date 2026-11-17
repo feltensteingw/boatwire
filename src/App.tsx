@@ -189,6 +189,9 @@ function LayerBar({ manual }: { manual?: boolean }) {
           <option value="buses">Negatives: buses only</option>
           <option value="hidden">Hide negatives</option>
         </select>
+        <span title="Show the branch circuits fed from the DC panel (lights, fans, fridge…). Off collapses them into a summary on the panel.">
+          <Toggle checked={layers.panelLoads !== 'collapse'} label="Panel loads" onChange={(v) => setLayers((l) => ({ ...l, panelLoads: v ? 'show' : 'collapse' }))} />
+        </span>
         <Toggle checked={layers.signal} label="Control" onChange={(v) => setLayers((l) => ({ ...l, signal: v }))} />
         <Toggle checked={layers.grounding} label="Equip. grounds" onChange={(v) => setLayers((l) => ({ ...l, grounding: v }))} />
       </div>

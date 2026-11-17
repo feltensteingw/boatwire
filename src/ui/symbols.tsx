@@ -277,6 +277,11 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
           {n.sublabel && <div className="panel-sub">{n.sublabel}</div>}
         </div>
         {portLabels}
+        {laid.hiddenCircuits ? (
+          <div className="panel-collapsed" title="Branch circuits are collapsed. Turn on “Panel loads” to show them.">
+            {laid.hiddenCircuits} circuits hidden · ~{Math.round(laid.hiddenAmps ?? 0)} A
+          </div>
+        ) : null}
         {severity && <span className={`badge ${severity}`} />}
         {handles}
       </div>

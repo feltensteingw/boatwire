@@ -57,7 +57,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   const fitPending = useRef(true);
   const which = mode === 'auto' ? 'ideal' : 'existing';
 
-  const structural = `${layers.dc}|${layers.ac}|${layers.negatives}|${layers.signal}|${layers.grounding}`;
+  const structural = `${layers.panelLoads}|${layers.dc}|${layers.ac}|${layers.negatives}|${layers.signal}|${layers.grounding}`;
 
   useEffect(() => {
     let cancelled = false;

@@ -106,6 +106,8 @@ export interface LayerSettings {
   dc: boolean;
   ac: boolean;
   negatives: 'full' | 'buses' | 'hidden';
+  /** Collapse the branch circuits fed from DC panels (lights, fans, fridge…) into a summary on the panel. */
+  panelLoads?: 'show' | 'collapse';
   signal: boolean;
   grounding: boolean;
   labels: {
