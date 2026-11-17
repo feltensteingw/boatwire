@@ -201,7 +201,7 @@ export interface Change {
 }
 
 const INFRA: DNode['type'][] = [
-  'fuse', 'switch', 'shunt', 'acr', 'dcdc', 'bms', 'contactor', 'apd', 'regulator', 'mppt', 'controller', 'dump-load',
+  'fuse', 'switch', 'shunt', 'acr', 'isolator', 'dcdc', 'bms', 'contactor', 'apd', 'regulator', 'mppt', 'controller', 'dump-load',
   'elci', 'galvanic-isolator', 'selector', 'transfer-switch', 'ac-panel', 'ac-ground-bus', 'dc-panel', 'fuse-block',
   'bus-pos', 'bus-neg', 'converter', 'bilge-switch', 'breaker',
 ];

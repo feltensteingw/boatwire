@@ -133,6 +133,7 @@ export type NodeType =
   | 'fuse-block'
   | 'shunt'
   | 'acr'
+  | 'isolator' // diode / FET battery isolator (one-way)
   | 'dcdc'
   | 'bms'
   | 'contactor'

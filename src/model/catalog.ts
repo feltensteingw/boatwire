@@ -122,13 +122,19 @@ export const CATALOG: CatalogItem[] = [
     category: 'engine',
     glyph: 'ENG',
     zone: 'engine',
-    props: { starterAmps: 150, alternatorAmps: 90, regulator: 'internal' },
+    props: { starterAmps: 150, alternatorAmps: 90, regulator: 'internal', chargeSplit: 'auto' },
     defs: [
       { key: 'starterAmps', label: 'Starter current (at 12 V)', type: 'number', unit: 'A', min: 0, help: 'Typical 30–50 hp diesel: 120–200 A at 12 V. Halved automatically for 24 V.' },
       { key: 'alternatorAmps', label: 'Alternator output', type: 'number', unit: 'A', min: 0 },
       { key: 'regulator', label: 'Alternator regulation', type: 'select', options: [
         { value: 'internal', label: 'Internal regulator (stock)' },
         { value: 'external', label: 'External smart regulator' },
+      ] },
+      { key: 'chargeSplit', label: 'Charge splitting', type: 'select', help: 'How one alternator charges several banks without bridging them. Automatic picks an ACR for lead-acid and a DC-DC charger for lithium.', options: [
+        { value: 'auto', label: 'Automatic (recommended)' },
+        { value: 'acr', label: 'ACR / voltage-sensitive relay' },
+        { value: 'isolator-fet', label: 'FET isolator (zero-drop)' },
+        { value: 'isolator-diode', label: 'Diode isolator' },
       ] },
     ],
   },

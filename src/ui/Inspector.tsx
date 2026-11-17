@@ -134,7 +134,24 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
           <Field label="Location">
             <Select value={node.zone} options={zones} onChange={(v) => edit((n) => void (n.zone = v))} />
           </Field>
-          {['fuse', 'breaker', 'switch', 'elci', 'contactor', 'acr', 'dcdc', 'converter'].includes(node.type) && (
+          {node.type === 'isolator' && (
+            <Field label="Isolator type">
+              <Select
+                value={String(data.isolatorType ?? 'diode')}
+                options={[
+                  { value: 'diode', label: 'Diode (~0.7 V drop)' },
+                  { value: 'fet', label: 'FET / MOSFET (zero-drop)' },
+                ]}
+                onChange={(v) =>
+                  edit((n) => {
+                    n.data.isolatorType = v;
+                    n.sublabel = v === 'fet' ? 'FET' : 'Diode';
+                  })
+                }
+              />
+            </Field>
+          )}
+          {['fuse', 'breaker', 'switch', 'elci', 'contactor', 'acr', 'dcdc', 'converter', 'isolator'].includes(node.type) && (
             <Field label="Rating">
               <NumInput value={data.rating} unit="A" onChange={(v) => edit((n) => void (n.data.rating = v))} />
             </Field>

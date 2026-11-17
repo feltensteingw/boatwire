@@ -31,6 +31,10 @@ export const RULES: Record<string, RuleInfo> = {
     title: 'Automatic charging relay',
     why: 'An ACR (voltage-sensitive relay) joins start and house banks while charging and separates them when voltage falls, so both get charged without a manual 1-2-Both switch that people forget.',
   },
+  'isolator': {
+    title: 'Battery isolator (diode / FET)',
+    why: 'An isolator lets one alternator charge several banks through one-way diodes or MOSFETs, so the banks are never connected to each other and a flat house bank cannot drain the start battery. Diode isolators drop about 0.6–0.8 V, so with a stock regulator that senses at the alternator the batteries are chronically undercharged. Use a FET (zero-drop) isolator or a regulator that senses on the battery side. Isolators give every bank the same voltage, so they are unsuitable for lithium mixed with lead-acid.',
+  },
   'dcdc': {
     title: 'DC-DC charger between banks',
     why: 'Lithium and lead-acid need different charge voltages and must not be paralleled directly. A DC-DC charger gives the target bank the correct profile and limits current so the alternator is not overloaded.',
