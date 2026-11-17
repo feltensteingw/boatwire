@@ -16,12 +16,14 @@ import { Sidebar } from './ui/Sidebar';
 import { Toggle } from './ui/fields';
 import { CloudControls, CloudSync } from './cloud/CloudControls';
 import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
+import { TipLayer } from './ui/Tips';
+import { HelpButton, HelpGuide, HelpLink } from './ui/Help';
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: 'ideal', label: 'Ideal design' },
-  { id: 'existing', label: 'Existing boat' },
-  { id: 'compare', label: 'Compare' },
-  { id: 'reports', label: 'Reports' },
+const VIEWS: { id: View; label: string; tip: string }[] = [
+  { id: 'ideal', label: 'Ideal design', tip: 'The best-practice wiring for your equipment list, drawn automatically. Change equipment on the left and it redraws instantly.' },
+  { id: 'existing', label: 'Existing boat', tip: 'Draw how your boat is wired today. BoatWire checks it against the rules and builds an upgrade plan toward the ideal design.' },
+  { id: 'compare', label: 'Compare', tip: 'What-if scenarios side by side: 12 V vs 24 V, lead-acid vs lithium, bigger banks. See how cable sizes, fuses, weight and cost change.' },
+  { id: 'reports', label: 'Reports', tip: 'Design check, upgrade plan, wire schedule, bill of materials and energy budget. Printable and downloadable as CSV.' },
 ];
 
 export default function App() {
@@ -30,6 +32,8 @@ export default function App() {
   return (
     <div className={`app view-${view}`}>
       <CloudSync />
+      <TipLayer />
+      <HelpGuide />
       <Header />
       <div className="main">
         <Sidebar />
@@ -71,26 +75,27 @@ function Header() {
       </div>
       <nav className="views">
         {VIEWS.map((v) => (
-          <button key={v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)}>
+          <button key={v.id} className={view === v.id ? 'on' : ''} onClick={() => setView(v.id)} data-tip={v.tip}>
             {v.label}
           </button>
         ))}
       </nav>
       <div className="scen">
         <span className="hint">Scenario</span>
-        <select value={project.activeScenario} onChange={(e) => setScenario(e.target.value)}>
+        <select data-tip="Which what-if version of the boat to draw. Scenarios can change system voltage, house battery chemistry and capacity without touching your equipment list. Manage them under Compare." value={project.activeScenario} onChange={(e) => setScenario(e.target.value)}>
           {project.scenarios.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
             </option>
           ))}
         </select>
-        <span className="pill">{ideal.systemVoltage} V</span>
+        <span className="pill" data-tip="DC system voltage of the scenario being shown.">{ideal.systemVoltage} V</span>
       </div>
       <ThemePicker />
+      <HelpButton />
       <CloudControls />
       <div className="file">
-        <button onClick={() => setMenu(!menu)}>File ▾</button>
+        <button onClick={() => setMenu(!menu)} data-tip="New boat, example boat, open / save a project file, and export the diagram or reports.">File ▾</button>
         {menu && (
           <div className="menu" onMouseLeave={() => setMenu(false)}>
             <button
@@ -170,7 +175,7 @@ const BUILD_TIME = new Date(__APP_BUILD_TIME__);
 function VersionStamp() {
   const when = BUILD_TIME.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return (
-    <span className="version" title={`Version ${__APP_VERSION__}\nCommit ${__APP_COMMIT__}\nBuilt ${BUILD_TIME.toLocaleString()}`}>
+    <span className="version" data-tip={`Version ${__APP_VERSION__}\nCommit ${__APP_COMMIT__}\nBuilt ${BUILD_TIME.toLocaleString()}`}>
       v{__APP_VERSION__} · {__APP_COMMIT__} · {when}
     </span>
   );
@@ -181,7 +186,7 @@ function ThemePicker() {
   const setTheme = useStore((s) => s.setTheme);
   const cur = THEMES.find((t) => t.id === theme) ?? THEMES[0];
   return (
-    <select className="theme-pick" value={theme} onChange={(e) => setTheme(e.target.value as ThemeId)} title={`Colour scheme: ${cur.label} — ${cur.hint}`} aria-label="Colour scheme">
+    <select className="theme-pick" value={theme} onChange={(e) => setTheme(e.target.value as ThemeId)} data-tip={`Colour scheme: ${cur.label}. ${cur.hint}.`} aria-label="Colour scheme">
       {THEMES.map((t) => (
         <option key={t.id} value={t.id} title={t.hint}>
           🎨 {t.label}
@@ -206,45 +211,51 @@ function LayerBar({ manual }: { manual?: boolean }) {
   const setLayers = useStore((s) => s.setLayers);
   const relayout = useStore((s) => s.relayout);
   const L = layers.labels;
-  const lab = (k: keyof typeof L, label: string) => (
-    <Toggle checked={L[k]} label={label} onChange={(v) => setLayers((l) => ({ ...l, labels: { ...l.labels, [k]: v } }))} />
+  const lab = (k: keyof typeof L, label: string, tip: string) => (
+    <Toggle checked={L[k]} label={label} tip={tip} onChange={(v) => setLayers((l) => ({ ...l, labels: { ...l.labels, [k]: v } }))} />
   );
   return (
     <div className="layerbar">
       <div className="lgroup">
         <span className="lg-title">Show</span>
-        <Toggle checked={layers.dc} label="DC" onChange={(v) => setLayers((l) => ({ ...l, dc: v, ac: !v && !l.ac ? true : l.ac }))} />
-        <Toggle checked={layers.ac} label="AC" onChange={(v) => setLayers((l) => ({ ...l, ac: v, dc: !v && !l.dc ? true : l.dc }))} />
-        <select value={layers.negatives} onChange={(e) => setLayers((l) => ({ ...l, negatives: e.target.value as typeof l.negatives }))} title="Negative conductors">
+        <Toggle checked={layers.dc} label="DC" tip="Show the 12 / 24 V battery system: batteries, buses, panels, chargers and DC loads." onChange={(v) => setLayers((l) => ({ ...l, dc: v, ac: !v && !l.ac ? true : l.ac }))} />
+        <Toggle checked={layers.ac} label="AC" tip="Show the 120 / 230 V mains system: shore power, generator, inverter, AC panel and outlets." onChange={(v) => setLayers((l) => ({ ...l, ac: v, dc: !v && !l.dc ? true : l.dc }))} />
+        <select value={layers.negatives} onChange={(e) => setLayers((l) => ({ ...l, negatives: e.target.value as typeof l.negatives }))} data-tip={'How to draw the negative (return) wires.\nAll: every negative wire.\nBuses only: hide the many short load returns, keep the main ones.\nHide: positives only, the cleanest view.'}>
           <option value="full">All negatives</option>
           <option value="buses">Negatives: buses only</option>
           <option value="hidden">Hide negatives</option>
         </select>
-        <span title="Show the branch circuits fed from the DC panel (lights, fans, fridge…). Off collapses them into a summary on the panel.">
-          <Toggle checked={layers.panelLoads !== 'collapse'} label="Panel loads" onChange={(v) => setLayers((l) => ({ ...l, panelLoads: v ? 'show' : 'collapse' }))} />
-        </span>
-        <span title="Show inline fuses. Off draws each wire straight through its fuse; the fuse rating stays on the wire label.">
-          <Toggle checked={layers.fuses !== false} label="Fuses" onChange={(v) => setLayers((l) => ({ ...l, fuses: v }))} />
-        </span>
-        <Toggle checked={layers.signal} label="Control" onChange={(v) => setLayers((l) => ({ ...l, signal: v }))} />
-        <Toggle checked={layers.grounding} label="Equip. grounds" onChange={(v) => setLayers((l) => ({ ...l, grounding: v }))} />
+        <Toggle
+          checked={layers.panelLoads !== 'collapse'}
+          label="Panel loads"
+          tip="Show the branch circuits fed from the DC panel (lights, fans, fridge…). Off collapses them into a count on the panel for a simpler view."
+          onChange={(v) => setLayers((l) => ({ ...l, panelLoads: v ? 'show' : 'collapse' }))}
+        />
+        <Toggle
+          checked={layers.fuses !== false}
+          label="Fuses"
+          tip="Show inline fuses. Off draws each wire straight through its fuse; the fuse rating stays on the wire label."
+          onChange={(v) => setLayers((l) => ({ ...l, fuses: v }))}
+        />
+        <Toggle checked={layers.signal} label="Control" tip="Show low-current control and sensing wires (dashed blue): BMS signals, regulator sense leads, relay triggers, helm switches." onChange={(v) => setLayers((l) => ({ ...l, signal: v }))} />
+        <Toggle checked={layers.grounding} label="Equip. grounds" tip="Show the green AC safety-ground wires to each AC appliance and the bond to DC negative." onChange={(v) => setLayers((l) => ({ ...l, grounding: v }))} />
       </div>
       <div className="lgroup">
         <span className="lg-title">Labels</span>
-        {lab('gauge', 'Wire size')}
-        {lab('current', 'Amps')}
-        {lab('length', 'Length')}
-        {lab('vdrop', 'V-drop')}
-        {lab('protection', 'Fuse rating')}
-        {lab('parts', 'Parts')}
+        {lab('gauge', 'Wire size', 'Label each wire with its conductor size in AWG (e.g. 10, 2/0). AC cables show as e.g. 10/3.')}
+        {lab('current', 'Amps', 'Label each wire with the current it is designed to carry.')}
+        {lab('length', 'Length', 'Label each wire with its estimated one-way run length in feet (from the zones on the Boat & zones tab).')}
+        {lab('vdrop', 'V-drop', 'Label each wire with its voltage drop at full current. Critical circuits must stay under 3%, others under 10%.')}
+        {lab('protection', 'Fuse rating', 'Label each wire with the rating of the fuse or breaker protecting it.')}
+        {lab('parts', 'Parts', 'Show a suggested part type under each component.')}
       </div>
       <div className="lgroup end">
         {!manual && (
-          <button onClick={relayout} title="Re-run automatic layout">
+          <button onClick={relayout} data-tip="Re-run the automatic layout, e.g. after dragging things around.">
             Re-arrange
           </button>
         )}
-        <button className="link" onClick={() => setLayers(() => DEFAULT_LAYERS)}>
+        <button className="link" onClick={() => setLayers(() => DEFAULT_LAYERS)} data-tip="Put all Show and Labels options back to their defaults.">
           Reset
         </button>
       </div>
@@ -287,7 +298,9 @@ function ExistingView() {
     return (
       <div className="empty big">
         <h2>Draw the system you have now</h2>
-        <p>Map your boat's current wiring, then BoatWire checks it against the rules and builds an upgrade plan to reach the ideal design.</p>
+        <p>
+          Map your boat's current wiring, then BoatWire checks it against the rules and builds an upgrade plan to reach the ideal design. <HelpLink topic="existing" />
+        </p>
         <div className="starts">
           <button
             className="start"
@@ -336,6 +349,7 @@ function ExistingView() {
         <div className="toolbar">
           <select
             value=""
+            data-tip="Add a generic component (fuse, switch, bus bar, panel…) to your drawing. Click it afterwards to set its rating."
             onChange={(e) => {
               if (!e.target.value) return;
               const n = paletteNode(e.target.value as NodeType, project.profile.batteryZone);
@@ -357,6 +371,7 @@ function ExistingView() {
           <select
             value=""
             disabled={!missingEq.length}
+            data-tip="Place an item from your equipment list that is not on the drawing yet."
             onChange={(e) => {
               const eq = project.equipment.find((x) => x.id === e.target.value);
               if (!eq) return;
@@ -374,6 +389,7 @@ function ExistingView() {
             ))}
           </select>
           <button
+            data-tip="Tidy the drawing automatically. Your wires are kept; only positions change."
             onClick={async () => {
               const pos = await arrangePositions(existing);
               updateExisting((d) => d.nodes.forEach((n) => (n.pos = pos[n.id] ?? n.pos)));
@@ -384,6 +400,7 @@ function ExistingView() {
           <span className="spacer" />
           <button
             className={`status ${errs ? 'bad' : warns ? 'meh' : 'good'}`}
+            data-tip="Problems found in your current wiring. Click for the prioritized upgrade plan."
             onClick={() => {
               setReportTab('changes');
               setView('reports');
@@ -393,6 +410,7 @@ function ExistingView() {
           </button>
           <button
             className="link danger"
+            data-tip="Delete this drawing and start over. Your equipment list is not affected."
             onClick={() => {
               if (window.confirm('Discard the existing-system drawing?')) setExisting(undefined);
             }}

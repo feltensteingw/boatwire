@@ -15,10 +15,10 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="seg">
-        <button className={tab === 'equipment' ? 'on' : ''} onClick={() => setTab('equipment')}>
+        <button className={tab === 'equipment' ? 'on' : ''} onClick={() => setTab('equipment')} data-tip="Everything aboard that uses or makes power. The ideal design is generated from this list.">
           Equipment
         </button>
-        <button className={tab === 'boat' ? 'on' : ''} onClick={() => setTab('boat')}>
+        <button className={tab === 'boat' ? 'on' : ''} onClick={() => setTab('boat')} data-tip="Boat name, system voltage, AC standard, and where things are aboard (used to work out cable lengths).">
           Boat &amp; zones
         </button>
       </div>
@@ -37,6 +37,7 @@ function EquipmentList() {
       <div className="eq-add">
         <select
           value=""
+          data-tip="Add batteries, the engine, chargers, solar, AC sources, or any DC / AC appliance. Typical values are filled in; click the item to adjust them."
           onChange={(e) => {
             if (!e.target.value) return;
             const id = addEquipment(e.target.value as EquipmentKind);
@@ -55,7 +56,7 @@ function EquipmentList() {
           ))}
         </select>
       </div>
-      <div className="budget">
+      <div className="budget" data-tip={'Energy budget.\nAh/day used: what all loads consume in a typical day.\nUsable: the share of the house bank you can safely use (about 50% lead-acid, 80% lithium).\nRecommended: enough for about two days without charging.'}>
         <div>
           <b>{Math.round(budget.totalAhPerDay)}</b> Ah/day used
         </div>
@@ -108,7 +109,7 @@ export function EquipmentRow({ e, open, onToggle }: { e: Equipment; open: boolea
   const c = CATALOG_BY_KIND[e.kind];
   return (
     <div className={`eq-row ${open ? 'open' : ''}`}>
-      <button className="eq-head" onClick={onToggle}>
+      <button className="eq-head" onClick={onToggle} data-tip={open ? 'Click to close' : 'Click to edit size, location and usage'}>
         <span className="eq-glyph">{c?.glyph}</span>
         <span className="eq-name">{e.name}</span>
         <span className="eq-sum">{summary(e)}</span>
@@ -134,10 +135,10 @@ export function EquipmentEditor({
   const c = CATALOG_BY_KIND[e.kind];
   return (
     <div className="eq-edit">
-      <Field label="Name">
+      <Field label="Name" help="Shown on the diagram and in reports.">
         <TextInput value={e.name} onChange={(v) => update(e.id, (x) => void (x.name = v))} />
       </Field>
-      <Field label="Location">
+      <Field label="Location" help="Where it is aboard. Sets the cable length from the batteries or panel, and so the wire size.">
         <Select value={e.zone} options={zones.map((z) => ({ value: z.id, label: z.name }))} onChange={(v) => update(e.id, (x) => void (x.zone = v))} />
       </Field>
       {c?.defs
@@ -166,22 +167,22 @@ function BoatPanel() {
   const zoneOpts = profile.zones.map((z) => ({ value: z.id, label: z.name }));
   return (
     <div className="boat">
-      <Field label="Boat name">
+      <Field label="Boat name" help="Used on the diagram, reports and file names.">
         <TextInput value={profile.name} onChange={(v) => up((p) => void (p.name = v))} />
       </Field>
-      <Field label="Length overall">
+      <Field label="Length overall" help="Boat length, for reference.">
         <NumInput value={profile.lengthFt} unit="ft" onChange={(v) => up((p) => void (p.lengthFt = v))} />
       </Field>
-      <Field label="DC system voltage" help="Scenarios can override this to compare designs.">
+      <Field label="DC system voltage" help="The battery system voltage. 24 V halves the current, so cables are much smaller, which helps with big inverters, windlasses and thrusters. 12 V-only gear then needs a converter. Scenarios can override this to compare.">
         <Select<SystemVoltage> value={profile.systemVoltage} options={[{ value: 12, label: '12 V' }, { value: 24, label: '24 V' }]} onChange={(v) => up((p) => void (p.systemVoltage = v))} />
       </Field>
-      <Field label="AC standard">
+      <Field label="AC standard" help="Mains power standard: 120 V / 60 Hz (North America) or 230 V / 50 Hz (Europe and most elsewhere). Sets AC cable sizes and breaker ratings.">
         <Select value={profile.acStandard} options={Object.entries(AC_STANDARDS).map(([k, v]) => ({ value: k as 'us120' | 'eu230', label: v.label }))} onChange={(v) => up((p) => void (p.acStandard = v))} />
       </Field>
-      <Field label="Battery / main bus location">
+      <Field label="Battery / main bus location" help="Where the batteries and main bus bars are. Every battery-fed cable length is measured from here.">
         <Select value={profile.batteryZone} options={zoneOpts} onChange={(v) => up((p) => void (p.batteryZone = v))} />
       </Field>
-      <Field label="Main panel location">
+      <Field label="Main panel location" help="Where the main DC/AC distribution panel is. Branch circuit lengths are measured from here.">
         <Select value={profile.panelZone} options={zoneOpts} onChange={(v) => up((p) => void (p.panelZone = v))} />
       </Field>
       <h4>Zones</h4>
@@ -190,8 +191,8 @@ function BoatPanel() {
         <thead>
           <tr>
             <th>Zone</th>
-            <th title="Feet aft of the bow">Aft (ft)</th>
-            <th title="Extra vertical / routing distance">Rise (ft)</th>
+            <th data-tip="Distance aft of the bow, in feet.">Aft (ft)</th>
+            <th data-tip="Extra vertical or routing distance, in feet (e.g. ~50 ft up to a masthead).">Rise (ft)</th>
             <th />
           </tr>
         </thead>
@@ -208,7 +209,7 @@ function BoatPanel() {
                 <input type="number" value={z.rise} onChange={(e) => up((p) => void (p.zones[i].rise = +e.target.value))} />
               </td>
               <td>
-                <button className="icon" title="Remove zone" onClick={() => up((p) => void p.zones.splice(i, 1))}>
+                <button className="icon" data-tip="Remove zone" onClick={() => up((p) => void p.zones.splice(i, 1))}>
                   ×
                 </button>
               </td>
@@ -216,7 +217,7 @@ function BoatPanel() {
           ))}
         </tbody>
       </table>
-      <button onClick={() => up((p) => void p.zones.push({ id: uid('z'), name: 'New zone', x: 10, rise: 1 }))}>+ Add zone</button>
+      <button data-tip="Add a location aboard, e.g. a radar arch or fly bridge." onClick={() => up((p) => void p.zones.push({ id: uid('z'), name: 'New zone', x: 10, rise: 1 }))}>+ Add zone</button>
       {!STANDARDS_VERIFIED && (
         <p className="hint caution">
           Wire tables and limits are seeded from widely published ABYC-derived values and have not been checked against the current ABYC E-11 text. Have a qualified marine electrician review any design before installation.

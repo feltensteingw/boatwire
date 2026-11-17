@@ -7,12 +7,12 @@ import { acVoltsOf, useExisting, useFindings, useIdeal } from '../state/derived'
 import { useStore, type ReportTab } from '../state/store';
 import { FindingsList } from './Findings';
 
-const TABS: { id: ReportTab; label: string }[] = [
-  { id: 'findings', label: 'Design check' },
-  { id: 'changes', label: 'Upgrade plan' },
-  { id: 'wires', label: 'Wire schedule' },
-  { id: 'bom', label: 'Bill of materials' },
-  { id: 'energy', label: 'Energy budget' },
+const TABS: { id: ReportTab; label: string; tip: string }[] = [
+  { id: 'findings', label: 'Design check', tip: 'Every error, warning and note for the chosen design, with suggested fixes.' },
+  { id: 'changes', label: 'Upgrade plan', tip: 'Prioritized changes to take your existing wiring to the ideal design.' },
+  { id: 'wires', label: 'Wire schedule', tip: 'Every conductor: from, to, size, length, current, voltage drop and protection.' },
+  { id: 'bom', label: 'Bill of materials', tip: 'Shopping list: cable by size and length, fuses, breakers, bus bars and other parts.' },
+  { id: 'energy', label: 'Energy budget', tip: 'Daily consumption per item compared with house bank capacity and charging.' },
 ];
 
 export function downloadText(name: string, text: string, type = 'text/csv') {
@@ -43,7 +43,7 @@ export function Reports() {
     <div className="reports">
       <div className="report-tabs">
         {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)} data-tip={t.tip}>
             {t.label}
           </button>
         ))}
@@ -53,7 +53,7 @@ export function Reports() {
             <button className={which === 'ideal' ? 'on' : ''} onClick={() => setWhich('ideal')}>
               Ideal ({scen?.name ?? 'base'})
             </button>
-            <button className={which === 'existing' ? 'on' : ''} disabled={!existing} onClick={() => setWhich('existing')} title={existing ? '' : 'Draw your existing system first'}>
+            <button className={which === 'existing' ? 'on' : ''} disabled={!existing} onClick={() => setWhich('existing')} data-tip={existing ? 'Show reports for your existing wiring.' : 'Draw your existing system first (Existing boat tab).'}>
               Existing
             </button>
           </div>

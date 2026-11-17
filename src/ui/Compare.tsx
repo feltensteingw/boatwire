@@ -1,3 +1,4 @@
+import { HelpLink } from './Help';
 import { useMemo } from 'react';
 import { generateIdeal } from '../engine/generate';
 import { designMetrics, type Metrics } from '../engine/reports';
@@ -52,9 +53,9 @@ export function Compare() {
       <div className="compare-head">
         <div>
           <h2>Compare scenarios</h2>
-          <p className="hint">Each scenario regenerates the ideal design from the same equipment list with a different system voltage, battery chemistry or capacity.</p>
+          <p className="hint">Each scenario regenerates the ideal design from the same equipment list with a different system voltage, battery chemistry or capacity. <HelpLink topic="compare" /></p>
         </div>
-        <button className="primary" onClick={addScenario}>
+        <button className="primary" onClick={addScenario} data-tip="Add a what-if scenario to compare.">
           + New scenario
         </button>
       </div>
@@ -129,6 +130,7 @@ function ScenarioEditor({ s, onChange, onRemove }: { s: Scenario; onChange: (p: 
   return (
     <div className="scen-edit">
       <TextInput value={s.name} onChange={(v) => onChange({ name: v })} />
+      <span data-tip="System voltage for this scenario. “Boat voltage” uses the one set on the Boat & zones tab.">
       <Select<string>
         value={String(s.systemVoltage ?? '')}
         options={[
@@ -138,8 +140,13 @@ function ScenarioEditor({ s, onChange, onRemove }: { s: Scenario; onChange: (p: 
         ]}
         onChange={(v) => onChange({ systemVoltage: v ? (Number(v) as SystemVoltage) : undefined })}
       />
-      <Select<string> value={s.houseChemistry ?? ''} options={CHEM} onChange={(v) => onChange({ houseChemistry: (v || undefined) as Chemistry | undefined })} />
-      <NumInput value={s.houseCapacityAh} unit="Ah @ sys V" onChange={(v) => onChange({ houseCapacityAh: v > 0 ? v : undefined })} />
+      </span>
+      <span data-tip="House battery chemistry for this scenario. “As specified” uses your equipment list.">
+        <Select<string> value={s.houseChemistry ?? ''} options={CHEM} onChange={(v) => onChange({ houseChemistry: (v || undefined) as Chemistry | undefined })} />
+      </span>
+      <span data-tip="House bank capacity in amp-hours at this scenario's system voltage (a 24 V 200 Ah bank stores the same energy as 12 V 400 Ah). Leave empty to keep your equipment list's size.">
+        <NumInput value={s.houseCapacityAh} unit="Ah @ sys V" onChange={(v) => onChange({ houseCapacityAh: v > 0 ? v : undefined })} />
+      </span>
       {onRemove && (
         <button className="link danger" onClick={onRemove}>
           Remove

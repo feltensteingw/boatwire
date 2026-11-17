@@ -141,6 +141,26 @@ export function Icon({ n }: { n: DNode }) {
         </g>
       );
       break;
+    case 'bus-pos':
+    case 'bus-neg':
+    case 'ac-ground-bus':
+      body = (
+        <g {...p}>
+          <rect x="3" y="13" width="26" height="6" rx="1" fill={n.type === 'bus-pos' ? 'var(--bus-pos)' : n.type === 'bus-neg' ? 'var(--bus-neg)' : 'var(--bus-gnd)'} stroke="none" />
+          <path d="M8 13V8M16 13V8M24 13V8M8 19v5M16 19v5M24 19v5" />
+        </g>
+      );
+      break;
+    case 'dc-panel':
+    case 'ac-panel':
+    case 'fuse-block':
+      body = (
+        <g {...p}>
+          <rect x="4" y="3" width="24" height="26" rx="2" />
+          <path d="M8 9h8M8 15h8M8 21h8M20 9h4M20 15h4M20 21h4" />
+        </g>
+      );
+      break;
     case 'galvanic-isolator':
       body = (
         <g {...p}>
@@ -287,7 +307,7 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
         </div>
         {portLabels}
         {laid.hiddenCircuits ? (
-          <div className="panel-collapsed" title="Branch circuits are collapsed. Turn on “Panel loads” to show them.">
+          <div className="panel-collapsed" data-tip="Branch circuits are collapsed. Turn on “Panel loads” to show them.">
             {laid.hiddenCircuits} circuits hidden · ~{Math.round(laid.hiddenAmps ?? 0)} A
           </div>
         ) : null}
@@ -310,9 +330,9 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
           {showParts && n.data.part && <div className="sym-part">{String(n.data.part)}</div>}
         </div>
       </div>
-      {laid.negHidden && <span className="neg-stub" title="Negative return to the negative bus (hidden)">⏚</span>}
+      {laid.negHidden && <span className="neg-stub" data-tip="This item has a negative return to the negative bus; it is hidden by the Negatives setting.">⏚</span>}
       {portLabels}
-      {severity && <span className={`badge ${severity}`} title={severity} />}
+      {severity && <span className={`badge ${severity}`} data-tip={`Design check: ${severity}. Click the component for details.`} />}
       {handles}
     </div>
   );

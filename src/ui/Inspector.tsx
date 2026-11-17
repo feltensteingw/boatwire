@@ -128,14 +128,14 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
       )}
       {editable ? (
         <div className="eq-edit">
-          <Field label="Label">
+          <Field label="Label" help="Name shown on the drawing.">
             <TextInput value={node.label} onChange={(v) => edit((n) => void (n.label = v))} />
           </Field>
-          <Field label="Location">
+          <Field label="Location" help="Where this component is aboard. Used for the wire lengths connected to it.">
             <Select value={node.zone} options={zones} onChange={(v) => edit((n) => void (n.zone = v))} />
           </Field>
           {node.type === 'isolator' && (
-            <Field label="Isolator type">
+            <Field label="Isolator type" help="Diode isolators lose ~0.7 V, so batteries are undercharged with a stock regulator. FET (MOSFET) isolators have almost no loss.">
               <Select
                 value={String(data.isolatorType ?? 'diode')}
                 options={[
@@ -152,13 +152,13 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
             </Field>
           )}
           {['fuse', 'breaker', 'switch', 'elci', 'contactor', 'acr', 'dcdc', 'converter', 'isolator'].includes(node.type) && (
-            <Field label="Rating">
+            <Field label="Rating" help="Current rating in amps: the fuse or breaker size, or the device's continuous rating. The wire it protects must be able to carry at least this much.">
               <NumInput value={data.rating} unit="A" onChange={(v) => edit((n) => void (n.data.rating = v))} />
             </Field>
           )}
           {node.type === 'battery' && (
             <>
-              <Field label="Chemistry">
+              <Field label="Chemistry" help="Battery type. Mixing lithium and lead-acid on the same bus is flagged as an error.">
                 <Select
                   value={String(data.chemistry ?? 'agm')}
                   options={[
@@ -170,27 +170,27 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
                   onChange={(v) => edit((n) => void (n.data.chemistry = v))}
                 />
               </Field>
-              <Field label="Capacity">
+              <Field label="Capacity" help="Total bank capacity in amp-hours at the system voltage.">
                 <NumInput value={data.ah as number | undefined} unit="Ah" onChange={(v) => edit((n) => void (n.data.ah = v))} />
               </Field>
             </>
           )}
           {(node.type === 'load' || node.type === 'ac-load') && !equipment && (
             <>
-              <Field label="Current">
+              <Field label="Current" help="Current the load draws while running, in amps (watts ÷ volts).">
                 <NumInput value={data.amps} unit="A" onChange={(v) => edit((n) => void (n.data.amps = v))} />
               </Field>
-              <Toggle checked={!!data.critical} label="Critical circuit (3% drop)" onChange={(v) => edit((n) => void (n.data.critical = v))} />
-              <Toggle checked={data.kind === 'bilge-pump'} label="This is a bilge pump" onChange={(v) => edit((n) => void (n.data.kind = v ? 'bilge-pump' : 'custom-dc'))} />
+              <Toggle checked={!!data.critical} label="Critical circuit (3% drop)" tip="Navigation, bilge and electronics circuits are held to 3% voltage drop; others 10%." onChange={(v) => edit((n) => void (n.data.critical = v))} />
+              <Toggle checked={data.kind === 'bilge-pump'} label="This is a bilge pump" tip="Bilge pumps must be fed unswitched (battery side of the main switch) with their own fuse; the check enforces this." onChange={(v) => edit((n) => void (n.data.kind = v ? 'bilge-pump' : 'custom-dc'))} />
             </>
           )}
           {['alternator', 'charger', 'mppt', 'controller', 'solar-panel', 'wind-gen', 'hydro-gen', 'inverter-charger'].includes(node.type) && (
-            <Field label="Output current">
+            <Field label="Output current" help="Maximum charging current this source can deliver, in amps.">
               <NumInput value={data.amps} unit="A" onChange={(v) => edit((n) => void (n.data.amps = v))} />
             </Field>
           )}
           {(node.type === 'inverter' || node.type === 'inverter-charger') && (
-            <Field label="Inverter rating">
+            <Field label="Inverter rating" help="Continuous AC output in watts. Sets the DC current it can draw (about watts ÷ volts ÷ 0.9 efficiency), and so the size of its cable and fuse.">
               <NumInput value={data.watts} unit="W" onChange={(v) => edit((n) => void (n.data.watts = v))} />
             </Field>
           )}
@@ -345,13 +345,13 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
       )}
       {editable ? (
         <div className="eq-edit">
-          <Field label="Conductor size">
+          <Field label="Conductor size" help="Wire gauge as installed (AWG). Checked against the current it carries, the fuse protecting it, and voltage drop over its length.">
             <Select value={wire.gauge} options={GAUGES.map((g) => ({ value: g.awg, label: fmtGauge(g.awg) }))} onChange={(v) => edit((w) => void (w.gauge = v))} />
           </Field>
-          <Field label="Run length (one way)">
+          <Field label="Run length (one way)" help="Length of this wire in feet, one way. Voltage drop is calculated over the round trip (positive + negative).">
             <NumInput value={wire.lengthFt} unit="ft" onChange={(v) => edit((w) => void (w.lengthFt = v))} />
           </Field>
-          <Field label="Conductor type">
+          <Field label="Conductor type" help="What this wire is: DC positive, DC negative, AC, safety ground, or a low-current signal.">
             <Select
               value={wire.kind}
               options={[
@@ -369,7 +369,7 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
               }
             />
           </Field>
-          <Toggle checked={!!wire.inEngineSpace} label="Runs through engine space" onChange={(v) => edit((w) => void (w.inEngineSpace = v))} />
+          <Toggle checked={!!wire.inEngineSpace} label="Runs through engine space" tip="Engine rooms are hot, so the wire's current rating is reduced (derated) to about 82%." onChange={(v) => edit((w) => void (w.inEngineSpace = v))} />
         </div>
       ) : null}
       <table className="kv">
