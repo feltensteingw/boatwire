@@ -4,7 +4,7 @@ import type { PropValue } from '../model/types';
 
 export function Field({ label, children, help }: { label: string; children: ReactNode; help?: string }) {
   return (
-    <label className="field" title={help}>
+    <label className="field" data-tip={help}>
       <span className="field-label">
         {label}
         {help && <span className="help-dot">?</span>}
@@ -57,9 +57,9 @@ export function Select<T extends string | number>({ value, options, onChange }: 
   );
 }
 
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Toggle({ checked, onChange, label, tip }: { checked: boolean; onChange: (v: boolean) => void; label: string; tip?: string }) {
   return (
-    <label className="toggle">
+    <label className="toggle" data-tip={tip}>
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span>{label}</span>
     </label>
@@ -67,7 +67,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 }
 
 export function PropEditor({ def, value, onChange }: { def: PropDef; value: PropValue | undefined; onChange: (v: PropValue) => void }) {
-  if (def.type === 'bool') return <Toggle checked={!!value} onChange={onChange} label={def.label} />;
+  if (def.type === 'bool') return <Toggle checked={!!value} onChange={onChange} label={def.label} tip={def.help} />;
   if (def.type === 'select')
     return (
       <Field label={def.label} help={def.help}>

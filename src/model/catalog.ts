@@ -266,6 +266,48 @@ export const CATALOG: CatalogItem[] = [
   ac('custom-ac', 'Custom AC load', 'AC', 'saloon', 200, 1, false),
 ];
 
+/**
+ * Hover explanations for properties that don't carry their own `help`.
+ * Looked up as "<kind>.<key>" first, then "<category>.<key>", then "<key>".
+ */
+const PROP_HELP: Record<string, string> = {
+  // batteries
+  role: 'What this bank does. House runs everything aboard; Engine start only cranks the engine; dedicated windlass / thruster banks sit near the bow so the heavy motor cables stay short.',
+  chemistry: 'Battery type. Lead-acid (flooded, AGM, gel) is cheaper but only ~50% is usable. Lithium (LiFePO4) gives ~80% usable, is lighter and charges faster, but needs a BMS, Class T fuse and alternator protection.',
+  unitVolts: 'Voltage of each individual battery. They are wired in series to reach the system voltage (e.g. two 6 V golf-cart batteries make 12 V).',
+  unitAh: 'Amp-hour rating printed on each battery (20-hour rate).',
+  units: 'How many batteries are in this bank. Series strings add voltage; parallel strings add capacity.',
+  bms: 'Battery management system. Drop-in lithium batteries have one built in. An external BMS controls a contactor and tells the chargers and loads to stop before it has to disconnect the bank.',
+  // engine
+  'engine.starterAmps': 'Current the starter motor draws while cranking, at 12 V. Typical 30–50 hp diesel: 120–200 A. Halved automatically for 24 V.',
+  alternatorAmps: 'Rated output of the engine alternator. It sets the alternator cable and fuse size and how fast the batteries recharge under power.',
+  regulator: 'Internal: the stock regulator built into the alternator. External smart regulator: multi-stage charging that senses at the battery and can limit output. Needed for charging lithium directly.',
+  // charging
+  'solar.watts': 'Total panel wattage (sum of all panels).',
+  'wind.watts': 'Rated output of the wind generator. A dump load is added automatically so it is never run unloaded.',
+  'hydro.watts': 'Rated output of the towed / transom-mounted hydro generator.',
+  amps: 'Rated current.',
+  'battery-charger.amps': 'Maximum DC output of the shore-power charger.',
+  'battery-charger.outputs': 'Number of separate outputs, so one charger can top up several banks without connecting them together.',
+  'inverter-charger.watts': 'Continuous AC output rating. Sets the size of the DC cable and fuse feeding it, which can be very large.',
+  'inverter.watts': 'Continuous AC output rating. Sets the size of the DC cable and fuse feeding it, which can be very large.',
+  chargeAmps: 'Maximum DC charging current when the unit runs on shore power or the generator.',
+  'shore-power.amps': 'Rating of the shore inlet and cord: 30 A or 50 A in North America, 16 A or 32 A in Europe.',
+  'generator.watts': 'Continuous rated output of the AC generator.',
+  // loads
+  'dc-load.watts': 'How much power the item draws while running (from its label or manual). Watts ÷ volts = amps.',
+  'ac-load.watts': 'How much power the item draws while running. AC loads run through the inverter take the same energy from the batteries, plus ~10% losses.',
+  'dc-load.hoursPerDay': 'Typical hours per day it is switched on. Used for the energy budget and bank sizing, not for wire size.',
+  'ac-load.hoursPerDay': 'Hours per day it runs from the inverter (batteries). Time on shore power does not count.',
+  alwaysOn: 'Wired to the battery side of the main switch through its own fuse, so it keeps working when the boat is shut down. Use for bilge pumps and alarms.',
+};
+
+for (const c of CATALOG) {
+  for (const d of c.defs) {
+    d.help ??= PROP_HELP[`${c.kind}.${d.key}`] ?? PROP_HELP[`${c.category}.${d.key}`] ?? PROP_HELP[d.key];
+  }
+}
+
 export const CATALOG_BY_KIND: Record<string, CatalogItem> = Object.fromEntries(CATALOG.map((c) => [c.kind, c]));
 
 export const CATEGORY_LABELS: Record<Category, string> = {

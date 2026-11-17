@@ -89,6 +89,7 @@ export function CloudControls() {
       <button
         className="signin"
         disabled={busy}
+        data-tip="Sign in with Google to save boats to your account and open them on any computer. Without signing in, work is still saved in this browser."
         onClick={async () => {
           setBusy(true);
           try {
@@ -117,13 +118,14 @@ export function CloudControls() {
   return (
     <div className="cloud">
       {cloudId ? (
-        <span className={`cloud-status st-${cloudId ? status : 'local'}`} title={error ?? ''}>
+        <span className={`cloud-status st-${cloudId ? status : 'local'}`} data-tip={error ?? 'Changes to this boat save to your account automatically.'}>
           {statusText}
         </span>
       ) : (
         <button
           className="save-cloud"
           disabled={busy}
+          data-tip="Store this boat in your account. After this, changes save automatically."
           onClick={async () => {
             setBusy(true);
             try {
@@ -140,7 +142,7 @@ export function CloudControls() {
           Save to cloud
         </button>
       )}
-      <button onClick={() => set({ dialog: true })}>My boats</button>
+      <button onClick={() => set({ dialog: true })} data-tip="Open, switch between, or delete the boats saved in your account.">My boats</button>
       <button className="avatar" onClick={() => setMenu(!menu)} title={user.email ?? ''}>
         {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : (user.displayName ?? user.email ?? '?').slice(0, 1)}
       </button>
