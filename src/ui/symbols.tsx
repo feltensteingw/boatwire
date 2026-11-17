@@ -92,7 +92,7 @@ export function Icon({ n }: { n: DNode }) {
         <g {...p}>
           <rect x="5" y="7" width="22" height="18" rx="2" />
           <path d="M9 19c2-6 4-6 6 0s4 6 6 0" />
-          {t(16, 14, n.type === 'acr' ? 'ACR' : 'K', 7)}
+          {t(16, 14, n.type === 'acr' ? (n.data.trigger === 'engine-run' ? 'D+' : 'ACR') : 'K', 7)}
         </g>
       );
       break;

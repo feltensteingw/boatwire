@@ -533,6 +533,12 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
       const split = String(engine.props.chargeSplit ?? 'auto');
       const wantsIso = split === 'isolator-fet' || split === 'isolator-diode';
       const useIso = wantsIso && !lfp && !!startBus;
+      const wantsRunRelay = split === 'relay-run';
+      if (wantsRunRelay && lfp) {
+        b.find('info', 'charge-relay', 'Charge splitting is set to an engine-run charging relay, but a relay would parallel the lithium house bank with the start battery while the engine runs.', lfp && !extReg && startBus ? 'The design uses a DC-DC charger instead.' : 'The design uses an external regulator and alternator protection instead.');
+      } else if (wantsRunRelay && !startBus) {
+        b.find('info', 'charge-relay', 'Charge splitting is set to a charging relay, but there is only one battery bank, so no relay is needed.');
+      }
       if (wantsIso && lfp) {
         b.find('info', 'isolator', 'Charge splitting is set to a battery isolator, but an isolator cannot give the lithium house bank its own charge profile or protect the alternator from a BMS disconnect.', lfp && !extReg && startBus ? 'The design uses a DC-DC charger instead.' : 'The design uses an external regulator and alternator protection instead.');
       } else if (wantsIso && !startBus) {
@@ -607,11 +613,23 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
             b.wire('pos', [f2, 'out'], [startBus, b.stud(startBus)], { amps: dcA, protect: r, len: 0.5 });
           } else {
             const acrR = altA > 100 ? 500 : 120;
-            const acr = b.add('acr', 'acr', 'Automatic charging relay', { zone: BZ, sublabel: `${acrR} A`, data: { rating: acrR, part: `ACR / VSR ${acrR} A` }, notes: ['acr'] });
+            const acr = wantsRunRelay
+              ? b.add('acr', 'acr', 'Charging relay (engine-run)', {
+                  zone: BZ,
+                  sublabel: `${acrR} A · closes on D+`,
+                  data: { rating: acrR, trigger: 'engine-run', part: `Split-charge relay, continuous duty, ${acrR} A, D+/ignition triggered` },
+                  notes: ['charge-relay'],
+                })
+              : b.add('acr', 'acr', 'Automatic charging relay', { zone: BZ, sublabel: `${acrR} A`, data: { rating: acrR, part: `ACR / VSR ${acrR} A` }, notes: ['acr'] });
+            if (wantsRunRelay) {
+              // coil is energised by the alternator's D+ / engine-run signal, so the banks join only while charging
+              acr.terminals.push({ id: 'trig', pol: 'sig', side: 'N', label: 'D+' });
+              b.wire('sig', [engineNode, 'run'], [acr, 'trig'], { amps: 0, len: crankLen });
+            }
             const fr = protectionFor(Math.min(altA, acrR));
             const cls = fuseClassFor(fr, { mainFeeder: true });
-            const fa = b.add('fuse', 'acr-fuse-house', 'ACR fuse (house side)', { zone: BZ, col: 5, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });
-            const fb = b.add('fuse', 'acr-fuse-start', 'ACR fuse (start side)', { zone: startBus.zone, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });
+            const fa = b.add('fuse', 'acr-fuse-house', `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (house side)`, { zone: BZ, col: 5, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });
+            const fb = b.add('fuse', 'acr-fuse-start', `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (start side)`, { zone: startBus.zone, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });
             const o = { amps: Math.min(altA, acrR), protect: fr, len: 1.5 };
             b.wire('pos', [posBus, b.stud(posBus)], [fa, 'in'], { ...o, len: 0.5 });
             b.wire('pos', [fa, 'out'], [acr, 'a'], { ...o, protectedBy: fa.id });

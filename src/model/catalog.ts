@@ -130,9 +130,10 @@ export const CATALOG: CatalogItem[] = [
         { value: 'internal', label: 'Internal regulator (stock)' },
         { value: 'external', label: 'External smart regulator' },
       ] },
-      { key: 'chargeSplit', label: 'Charge splitting', type: 'select', help: 'How one alternator charges several banks without bridging them. Automatic picks an ACR for lead-acid and a DC-DC charger for lithium.', options: [
+      { key: 'chargeSplit', label: 'Charge splitting', type: 'select', help: 'How one alternator charges several banks without bridging them. Automatic picks an ACR for lead-acid and a DC-DC charger for lithium. An engine-run relay closes only while the alternator is charging.', options: [
         { value: 'auto', label: 'Automatic (recommended)' },
         { value: 'acr', label: 'ACR / voltage-sensitive relay' },
+        { value: 'relay-run', label: 'Charging relay (engine-run / D+ triggered)' },
         { value: 'isolator-fet', label: 'FET isolator (zero-drop)' },
         { value: 'isolator-diode', label: 'Diode isolator' },
       ] },

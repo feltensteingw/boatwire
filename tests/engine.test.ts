@@ -158,6 +158,24 @@ describe('battery isolators', () => {
     expect(d.findings.some((f) => f.rule === 'isolator' && f.severity === 'info')).toBe(true);
   });
 
+  it('engine-run charging relay replaces the ACR, is triggered from D+ and passes audit', () => {
+    const p = withSplit('relay-run');
+    const d = generateIdeal(p);
+    const relay = d.nodes.find((n) => n.id === 'acr')!;
+    expect(relay.data.trigger).toBe('engine-run');
+    expect(relay.notes).toContain('charge-relay');
+    expect(d.wires.some((w) => w.kind === 'sig' && w.to.node === 'acr' && w.to.term === 'trig' && w.from.node === 'engine' && w.from.term === 'run')).toBe(true);
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+    expect(d.findings.some((f) => f.rule === 'charge-relay')).toBe(false);
+  });
+
+  it('lithium house ignores the charging relay choice', () => {
+    const p = withSplit('relay-run');
+    const d = generateIdeal(p, p.scenarios[1]);
+    expect(d.nodes.some((n) => n.data.trigger === 'engine-run')).toBe(false);
+    expect(d.findings.some((f) => f.rule === 'charge-relay' && f.severity === 'info')).toBe(true);
+  });
+
   it('audit: isolator outputs are not "bridged", but feeding lithium is flagged', () => {
     const alt = makeNode('alternator', 'alt', 'Alternator', { data: { amps: 90 } });
     const iso = makeNode('isolator', 'iso', 'Isolator', { data: { isolatorType: 'fet', rating: 120 } });
