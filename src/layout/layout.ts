@@ -28,6 +28,14 @@ export interface LaidNode {
   hiddenAmps?: number;
 }
 
+/**
+ * True when two layouts of a component put the same terminals in the same places on a box of the
+ * same size. The canvas can then keep what it measured for the component instead of measuring again.
+ */
+export function sameFootprint(a: LaidNode, b: LaidNode): boolean {
+  return a.w === b.w && a.h === b.h && a.ports.length === b.ports.length && a.ports.every((p, i) => p.id === b.ports[i].id && p.side === b.ports[i].side && p.x === b.ports[i].x && p.y === b.ports[i].y);
+}
+
 export interface LaidEdge {
   id: string;
   wire: Wire;

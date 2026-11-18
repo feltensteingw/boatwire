@@ -24,6 +24,24 @@ test('every view opens without errors', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('an edit made the moment the diagram appears does not lose the wires', async ({ page }) => {
+  // Rebuilding the diagram twice in quick succession, just as it is first measured, used to leave
+  // every component without known terminals: all the wires vanished and did not come back.
+  // It happened about one time in three, so try several times.
+  const errors = await openFresh(page);
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    if (attempt > 1) await page.reload();
+    await page.locator('.eq-head', { hasText: 'Cabin lights' }).click();
+    const watts = page.locator('.eq-edit input[type=number]').first();
+    await expect(page.locator('.wlabel').first()).toBeVisible();
+    await watts.fill(String(30 + attempt));
+    await expect(page.locator('.react-flow__node', { hasText: `${30 + attempt} W` })).toHaveCount(1);
+    await page.waitForTimeout(600);
+    expect(await page.locator('.react-flow__edge').count(), `attempt ${attempt}`).toBeGreaterThan(50);
+  }
+  expect(errors).toEqual([]);
+});
+
 test('editing equipment updates the diagram, keeps the view, and can be undone', async ({ page }) => {
   const errors = await openFresh(page);
   for (let i = 0; i < 3; i++) await page.locator('.react-flow__controls-zoomin').click();

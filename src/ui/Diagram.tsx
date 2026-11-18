@@ -19,14 +19,14 @@ import { toPng, toSvg } from 'html-to-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { joinTerminals } from '../engine/connect';
 import { estimateCurrents } from '../engine/audit';
-import { autoLayout, cachedLayout, manualLayout, viewShift, type Layout } from '../layout/layout';
+import { autoLayout, cachedLayout, manualLayout, sameFootprint, viewShift, type Layout } from '../layout/layout';
 import type { Design, Finding } from '../model/types';
 import { severityByNode, useUnits } from '../state/derived';
 import { useStore } from '../state/store';
 import { SymbolNode, type SymbolFlowNode } from './symbols';
 import { UnderlayControls, UnderlayImage } from './Underlay';
 import { WireEdge, type WireFlowEdge } from './WireEdge';
-import { Panel, type Edge } from '@xyflow/react';
+import { Panel, useUpdateNodeInternals, type Edge } from '@xyflow/react';
 import { copyOf, GRID, snapToGrid, type Clip } from '../engine/drawing';
 import { paletteNode } from '../engine/existing';
 import type { NodeType } from '../model/types';
@@ -36,6 +36,9 @@ import { registerViewCentre } from './viewCentre';
 let clipboard: { clip: Clip; pastes: number } | null = null;
 /** dataTransfer type used when a part is dragged from the quick-add strip onto the canvas. */
 export const PART_MIME = 'application/x-boatwire-part';
+
+/** How long to give the canvas to measure rebuilt components before doing it for it. */
+const REMEASURE_AFTER_MS = 150;
 
 const nodeTypes = { sym: SymbolNode };
 const edgeTypes = { wire: WireEdge };
@@ -152,15 +155,24 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
     if (fresh) selectNext.current = null;
     setNodes((prev) => {
       const picked = fresh ?? new Set(prev.filter((n) => n.selected).map((n) => n.id));
-      return layout.nodes.map((ln) => ({
-        id: ln.id,
-        type: 'sym',
-        position: { x: ln.x, y: ln.y },
-        data: { laid: ln, severity: severities.get(ln.id), showParts: layers.labels.parts, manual: mode === 'manual' },
-        selected: selection ? selection.kind === 'node' && selection.id === ln.id : picked.has(ln.id),
-        width: ln.w,
-        height: ln.h,
-      }));
+      const before = new Map(prev.map((n) => [n.id, n]));
+      return layout.nodes.map((ln) => {
+        // A component whose box and terminals have not moved keeps what the canvas measured for it.
+        // Without `measured` the canvas forgets where the terminals are and has to find them again
+        // before it can draw any wire to the component, on every edit (see the safety net below).
+        const was = before.get(ln.id);
+        const measured = was?.measured && sameFootprint(was.data.laid, ln) ? was.measured : undefined;
+        return {
+          id: ln.id,
+          type: 'sym' as const,
+          position: { x: ln.x, y: ln.y },
+          data: { laid: ln, severity: severities.get(ln.id), showParts: layers.labels.parts, manual: mode === 'manual' },
+          selected: selection ? selection.kind === 'node' && selection.id === ln.id : picked.has(ln.id),
+          width: ln.w,
+          height: ln.h,
+          ...(measured ? { measured } : {}),
+        };
+      });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, severities, layers.labels.parts, mode]);
@@ -220,6 +232,21 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
   }, [selection]);
 
   const initialized = useNodesInitialized();
+
+  // Safety net. When a component is rebuilt without its measurements, the canvas measures it again
+  // only if it notices the change. Two rebuilds close together (an edit made just as the diagram
+  // first appears, for instance) can slip past that, and the component is then left with no known
+  // terminals: every wire to it disappears and stays gone. So if the diagram has not settled
+  // shortly after a rebuild, measure whatever is still unmeasured ourselves.
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    if (initialized || !nodes.length) return;
+    const t = setTimeout(() => {
+      const stuck = [...flow.getState().nodeLookup.values()].filter((n) => !n.internals.handleBounds).map((n) => n.id);
+      if (stuck.length) updateNodeInternals(stuck);
+    }, REMEASURE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [initialized, nodes, flow, updateNodeInternals]);
   useEffect(() => {
     if (fitPending.current && initialized && nodes.length) {
       fitPending.current = false;
