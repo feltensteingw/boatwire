@@ -21,6 +21,9 @@ export default defineConfig(({ command }) => {
   const info = buildInfo();
   return {
     plugins: [react()],
+    // Vite's default 'modules' target (safari14, chrome87…) makes esbuild lower pdf.js's class syntax into
+    // helpers that Vite's own import analysis then fails to parse ("Parse error @:1:1"). es2020 avoids that.
+    build: { target: 'es2020' },
     define: {
       __APP_VERSION__: JSON.stringify(info.version),
       __APP_COMMIT__: JSON.stringify(command === 'serve' ? `${info.sha}-dev` : info.sha),
