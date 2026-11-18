@@ -1955,3 +1955,75 @@ table.cmp td.best {
     display: none;
   }
 }
+
+/* ---------------------------------------------------------------- full (printable) report */
+.full-report {
+  max-width: 1100px;
+}
+.fr-head h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+.fr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.fr-summary {
+  margin: 10px 0 6px;
+}
+.fr-notice {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn, #d97706);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.fr-section {
+  margin-top: 28px;
+}
+.fr-section > h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.fr-diagram {
+  position: relative;
+}
+.fr-diagram img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+/* the live canvas the picture is taken from: laid out at a fixed size, off-screen */
+.fr-diagram-render {
+  position: absolute;
+  left: -20000px;
+  top: 0;
+  width: 1400px;
+  height: 900px;
+  display: flex;
+  pointer-events: none;
+}
+@media print {
+  .fr-diagram-render {
+    display: none;
+  }
+  .fr-section > h2 {
+    break-after: avoid;
+  }
+  .fr-diagram img {
+    max-height: 90vh;
+    margin: 0 auto;
+    object-fit: contain;
+    break-inside: avoid;
+  }
+  .full-report .finding,
+  .full-report tr {
+    break-inside: avoid;
+  }
+}

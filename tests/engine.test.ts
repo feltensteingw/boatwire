@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { exampleProject, newEquipment } from '../src/model/examples';
 import { generateIdeal } from '../src/engine/generate';
 import { audit } from '../src/engine/audit';
+import { allFindings, findingCounts } from '../src/engine/reports';
 import { sizeConductor, vdropPct } from '../src/engine/calc';
 import { makeNode } from '../src/model/nodeDefs';
 import type { Design, Project } from '../src/model/types';
@@ -267,5 +268,18 @@ describe('dedicated batteries for high-draw equipment', () => {
       const d = generateIdeal(p, s);
       expect(errorsOf(d, p).map((e) => e.message), s.name).toEqual([]);
     }
+  });
+});
+
+describe('findingCounts', () => {
+  it('tallies findings by severity', () => {
+    const f = (severity: 'error' | 'warning' | 'info', id: string) => ({ id, rule: 'battery-fuse', severity, message: id });
+    expect(findingCounts([f('error', 'a'), f('warning', 'b'), f('warning', 'c'), f('info', 'd')])).toEqual({ errors: 1, warnings: 2, notes: 1 });
+    expect(findingCounts([])).toEqual({ errors: 0, warnings: 0, notes: 0 });
+  });
+  it('reports no errors for the example ideal design', () => {
+    const p = exampleProject();
+    const d = generateIdeal(p);
+    expect(findingCounts(allFindings(d, 120)).errors).toBe(0);
   });
 });

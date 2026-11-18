@@ -285,3 +285,18 @@ export function changeList(existing: Design, ideal: Design, acVolts: number): Ch
 export function allFindings(design: Design, acVolts: number): Finding[] {
   return [...design.findings, ...audit(design, { acVolts })];
 }
+
+export interface FindingCounts {
+  errors: number;
+  warnings: number;
+  notes: number;
+}
+
+/** Tally of findings by severity, for report summaries. */
+export function findingCounts(findings: Finding[]): FindingCounts {
+  return {
+    errors: findings.filter((f) => f.severity === 'error').length,
+    warnings: findings.filter((f) => f.severity === 'warning').length,
+    notes: findings.filter((f) => f.severity === 'info').length,
+  };
+}

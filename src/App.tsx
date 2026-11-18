@@ -27,7 +27,7 @@ const VIEWS: { id: View; label: string; tip: string }[] = [
   { id: 'ideal', label: 'Ideal design', tip: 'The best-practice wiring for your equipment list, drawn automatically. Change equipment on the left and it redraws instantly.' },
   { id: 'existing', label: 'Existing boat', tip: 'Draw how your boat is wired today. BoatWire checks it against the rules and builds an upgrade plan toward the ideal design.' },
   { id: 'compare', label: 'Compare', tip: 'What-if scenarios side by side: 12 V vs 24 V, lead-acid vs lithium, bigger banks. See how cable sizes, fuses, weight and cost change.' },
-  { id: 'reports', label: 'Reports', tip: 'Design check, upgrade plan, wire schedule, bill of materials and energy budget. Printable and downloadable as CSV.' },
+  { id: 'reports', label: 'Reports', tip: 'Design check, upgrade plan, wire schedule, bill of materials and energy budget, plus a full printable report for an electrician. Printable and downloadable as CSV.' },
 ];
 
 export default function App() {
@@ -59,6 +59,7 @@ function Header() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const setScenario = useStore((s) => s.setScenario);
+  const setReportTab = useStore((s) => s.setReportTab);
   const loadProject = useStore((s) => s.loadProject);
   const newProject = useStore((s) => s.newProject);
   const loadExample = useStore((s) => s.loadExample);
@@ -147,6 +148,15 @@ function Header() {
             </button>
             <button onClick={() => downloadText(`${slug}-bom.csv`, toCsv([['Category', 'Item', 'Spec', 'Qty', 'Unit'], ...billOfMaterials(diagramDesign).map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]))}>
               Bill of materials (CSV)
+            </button>
+            <button
+              onClick={() => {
+                setReportTab('full');
+                setView('reports');
+                setMenu(false);
+              }}
+            >
+              Full report for an electrician (print / PDF)…
             </button>
             <button onClick={() => window.print()}>Print current view</button>
           </div>

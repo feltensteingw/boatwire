@@ -4,6 +4,7 @@ import { AC_STANDARDS, STANDARDS_VERIFIED } from '../model/standards';
 import type { Equipment, EquipmentKind, SystemVoltage } from '../model/types';
 import { energyBudget } from '../engine/energy';
 import { activeScenario } from '../engine/scenario';
+import { STANDARDS_NOTICE } from '../engine/rules';
 import { uid } from '../model/examples';
 import { useStore } from '../state/store';
 import { Field, NumInput, PropEditor, Select, TextInput } from './fields';
@@ -255,9 +256,7 @@ function BoatPanel() {
       </table>
       <button data-tip="Add a location aboard, e.g. a radar arch or fly bridge." onClick={() => up((p) => void p.zones.push({ id: uid('z'), name: 'New zone', x: 10, rise: 1 }))}>+ Add zone</button>
       {!STANDARDS_VERIFIED && (
-        <p className="hint caution">
-          Wire tables and limits are seeded from widely published ABYC-derived values and have not been checked against the current ABYC E-11 text. Have a qualified marine electrician review any design before installation.
-        </p>
+        <p className="hint caution">{STANDARDS_NOTICE}</p>
       )}
     </div>
   );

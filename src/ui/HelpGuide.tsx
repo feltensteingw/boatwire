@@ -348,7 +348,7 @@ const SECTIONS: Section[] = [
   {
     id: 'reports',
     title: 'Reports',
-    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list',
+    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list full report electrician pdf',
     body: (
       <>
         <table className="g-table">
@@ -358,6 +358,7 @@ const SECTIONS: Section[] = [
             <tr><td><b>Wire schedule</b></td><td>Every conductor: from, to, size, length, current, voltage drop, protection. Hand it to whoever is pulling cable.</td></tr>
             <tr><td><b>Bill of materials</b></td><td>A shopping list: cable by size and total length, fuses, breakers, bus bars, lugs, and so on.</td></tr>
             <tr><td><b>Energy budget</b></td><td>Daily consumption per item, and how the house bank and charging compare.</td></tr>
+            <tr><td><b>Full report</b></td><td>All of the above plus the wiring diagram, the date, the BoatWire version and the standards notice, in one printable document for your electrician.</td></tr>
           </tbody>
         </table>
         <p>Switch between <b>Ideal</b> and <b>Existing</b> at the top. <b>Download CSV</b> opens in Excel or Google Sheets. <b>Print</b> gives a clean paper copy.</p>
@@ -388,11 +389,12 @@ const SECTIONS: Section[] = [
   {
     id: 'export',
     title: 'Exporting & printing',
-    keywords: 'export png svg image print pdf diagram share',
+    keywords: 'export png svg image print pdf diagram share electrician full report',
     body: (
       <ul>
         <li><b>File → Export diagram (PNG)</b> saves a picture of the current diagram, and <b>SVG</b> saves a scalable drawing for printing large or editing.</li>
         <li><b>File → Wire schedule (CSV)</b> and <b>Bill of materials (CSV)</b> save spreadsheets.</li>
+        <li><b>File → Full report for an electrician</b> (or <b>Reports → Full report</b>) puts the diagram, design check, upgrade plan, wire schedule, bill of materials and energy budget on one page. Click <b>Print / Save as PDF</b> and choose “Save as PDF” to get a single file to email.</li>
         <li><b>File → Print current view</b>, or <b>Print</b> in Reports, prints without the toolbars. Choose “Save as PDF” in the print dialog to make a PDF.</li>
         <li>Exports use the current colour scheme. Switch to Light first for a white background.</li>
       </ul>

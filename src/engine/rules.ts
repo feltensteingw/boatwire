@@ -6,6 +6,10 @@ export interface RuleInfo {
   ref?: string;
 }
 
+/** Shown wherever a design is presented as advice (Boat & zones tab, printed report) while STANDARDS_VERIFIED is false. */
+export const STANDARDS_NOTICE =
+  'Wire tables and limits are seeded from widely published ABYC-derived values and have not been checked against the current ABYC E-11 text. Have a qualified marine electrician review any design before installation.';
+
 /** Plain-English explanations attached to nodes, wires and findings. */
 export const RULES: Record<string, RuleInfo> = {
   'battery-fuse': {
