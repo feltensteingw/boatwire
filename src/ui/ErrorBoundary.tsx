@@ -38,7 +38,23 @@ export class ErrorBoundary extends Component<Props, { error: Error | null }> {
     if (!error) return this.props.children;
     const retry = () => this.setState({ error: null });
     // After a new version is deployed, the parts of the app loaded on demand have new names.
-    const stale = /dynamically imported module|Loading chunk|Importing a module script failed/i.test(error.message);
+    const missing = /dynamically imported module|Loading chunk|Importing a module script failed/i.test(error.message);
+    // The same failure with no connection means this part was never downloaded, not that the app changed.
+    const offline = missing && typeof navigator !== 'undefined' && !navigator.onLine;
+    const stale = missing && !offline;
+    if (offline) {
+      return (
+        <div className={`crash crash-${this.props.scope}`} role="alert">
+          <h2>This part needs a connection the first time</h2>
+          <p>There is no connection, and this part of BoatWire has not been stored on this device yet. Your boat is safe. Reconnect and try again; after that it will work offline too.</p>
+          <div className="crash-actions">
+            <button className="primary" onClick={retry}>
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className={`crash crash-${this.props.scope}`} role="alert">
         <h2>{stale ? 'BoatWire has been updated' : 'Something went wrong'}</h2>

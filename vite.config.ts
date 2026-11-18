@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 /** Build stamp shown in the header so you can tell which deploy you are looking at. */
 function buildInfo() {
@@ -20,7 +21,45 @@ function buildInfo() {
 export default defineConfig(({ command }) => {
   const info = buildInfo();
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      // Offline support and "install as an app" (see src/pwa.ts).
+      VitePWA({
+        // A new version waits until the user reloads; it never swaps the app out mid-edit.
+        registerType: 'prompt',
+        manifest: {
+          name: 'BoatWire — Sailboat Electrical Designer',
+          short_name: 'BoatWire',
+          description: "Design and check a sailboat's 12 / 24 V and AC electrical system.",
+          theme_color: '#0f2b46',
+          background_color: '#0f2b46',
+          display: 'standalone',
+          start_url: '/',
+          icons: [
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+            { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+        },
+        workbox: {
+          // Everything needed to design a boat offline: the app, the layout engine's worker, PDF
+          // import and the fonts. Left to load from the network when wanted: Firebase (sign-in
+          // needs a connection anyway), the layout engine's in-page fallback, and font files
+          // for scripts the interface does not use.
+          globPatterns: ['**/*.{js,mjs,css,html,png,woff2}'],
+          globIgnores: ['**/firebase-*.js', '**/elk.bundled-*.js', '**/*-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2'],
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+          navigateFallback: '/index.html',
+          // Firebase's own pages (sign-in helper) are never answered from the offline copy.
+          navigateFallbackDenylist: [/^\/__\//],
+          cleanupOutdatedCaches: true,
+          // On the very first visit, take over the open page as soon as the offline copy is ready,
+          // so parts loaded later in that session (Reports, the guide) also come from it. This does
+          // not affect updates: a new version still waits for the user.
+          clientsClaim: true,
+        },
+      }),
+    ],
     // Vite's default 'modules' target (safari14, chrome87…) makes esbuild lower pdf.js's class syntax into
     // helpers that Vite's own import analysis then fails to parse ("Parse error @:1:1"). es2020 avoids that.
     build: {

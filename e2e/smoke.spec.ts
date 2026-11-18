@@ -182,3 +182,43 @@ for (const size of [
     await context.close();
   });
 }
+
+test('works with no connection after the first visit, and can be installed', async ({ page, context }) => {
+  const errors = await openFresh(page);
+  // installable: a manifest with icons, and a service worker in control of the page
+  const manifest = await (await page.request.get('/manifest.webmanifest')).json();
+  expect(manifest.short_name).toBe('BoatWire');
+  expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
+  for (const icon of manifest.icons) expect((await page.request.get(icon.src)).ok()).toBe(true);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  // it takes over this first page too, so parts loaded later in the session come from the offline copy
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 30_000 }).toBe(true);
+  // wait until the offline copy is complete (the layout engine's worker is the largest part)
+  await expect
+    .poll(async () => page.evaluate(async () => (await Promise.all((await caches.keys()).map(async (k) => (await (await caches.open(k)).keys()).map((r) => r.url)))).flat().some((u) => u.includes('elk-worker'))), { timeout: 30_000 })
+    .toBe(true);
+
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator('.header')).toBeVisible();
+  await expect(page.locator('.offline-chip')).toBeVisible();
+  // the diagram is laid out again from scratch, with no network
+  await expect.poll(() => page.locator('.react-flow__node').count()).toBeGreaterThan(30);
+
+  // …and stays fully usable: edit, switch views, draw
+  await page.locator('.eq-head', { hasText: 'Cabin lights' }).click();
+  await page.locator('.eq-edit input[type=number]').first().fill('45');
+  await expect(page.locator('.react-flow__node', { hasText: '45 W' })).toHaveCount(1);
+  await page.getByRole('button', { name: 'Reports', exact: true }).click();
+  await expect(page.locator('.report-body')).not.toBeEmpty();
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  await expect(page.locator('table.cmp')).toBeVisible();
+  await page.keyboard.press('?');
+  await expect(page.getByRole('dialog', { name: 'BoatWire how-to guide' })).toContainText('How to use BoatWire');
+
+  await context.setOffline(false);
+  await expect(page.locator('.offline-chip')).toHaveCount(0);
+  // fonts come with the app: nothing is requested from a font service
+  expect(await page.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Variable')))).toBe(true);
+  expect(errors.filter((e) => !/Failed to load resource|ERR_INTERNET_DISCONNECTED/.test(e))).toEqual([]);
+});

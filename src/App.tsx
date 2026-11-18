@@ -152,6 +152,7 @@ function Header() {
       </div>
       <ThemePicker />
       <HelpButton />
+      <OfflineChip />
       <CloudControls />
       <div className="file">
         <button {...fileMenu.trigger} data-tip="New boat, example boat, open / save a project file, and export the diagram or reports.">
@@ -236,6 +237,28 @@ function Header() {
         />
       </div>
     </header>
+  );
+}
+
+/** Shown only while the browser has no connection: the app keeps working from its offline copy. */
+function OfflineChip() {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+  if (online) return null;
+  return (
+    <span className="offline-chip" role="status" data-tip="No connection. BoatWire keeps working, and your changes are saved on this device. Signing in and cloud saving resume when the connection returns.">
+      <span aria-hidden>●</span>
+      <span className="offline-text"> Offline</span>
+    </span>
   );
 }
 

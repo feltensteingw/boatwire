@@ -418,6 +418,23 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: 'offline',
+    title: 'Working offline & installing',
+    keywords: 'offline no connection signal internet install app home screen pwa tablet phone update new version',
+    body: (
+      <>
+        <p>After you have opened BoatWire once, it works with no connection: at the dock, at anchor, or in a boatyard shed. Your boat is saved on the device you are using.</p>
+        <ul>
+          <li>The word <b>Offline</b> appears in the header while there is no connection. Everything except signing in and cloud saving carries on working.</li>
+          <li>If the boat is saved to your account, changes made offline are sent when the connection returns.</li>
+          <li><b>Install it as an app:</b> in Chrome or Edge use the install icon in the address bar (or the menu → “Install BoatWire”). On an iPad or iPhone use Share → “Add to Home Screen”. It then opens in its own window like any other app.</li>
+          <li>When a new version is ready you are told, with a <b>Reload</b> button. Nothing changes until you reload or next open the app.</li>
+        </ul>
+        <p className="hint">The copy on the device is only as safe as the device. Sign in and save to the cloud, or use <b>File → Save project file</b>, to keep a second copy.</p>
+      </>
+    ),
+  },
+  {
     id: 'shortcuts',
     title: 'Keyboard & mouse',
     keywords: 'keyboard shortcuts mouse delete zoom pan help undo redo mistake restore touch tablet phone ipad tap hold mobile',

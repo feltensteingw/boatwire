@@ -37,7 +37,7 @@
   --bus-gnd: #2b9348;
   --radius: 8px;
   --shadow: 0 1px 2px rgba(15, 43, 70, 0.08), 0 2px 8px rgba(15, 43, 70, 0.06);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: 'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
   font-size: 13px;
   color: var(--text);
   color-scheme: light;
@@ -444,6 +444,12 @@ h4 {
 .undo {
   display: flex;
   gap: 2px;
+}
+.offline-chip {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffcf7a;
+  white-space: nowrap;
 }
 .header .undo button {
   border: none;
@@ -1126,7 +1132,7 @@ table.zones td:nth-child(3) {
   text-overflow: ellipsis;
 }
 .plabel.pl-panel {
-  font-family: Inter, sans-serif;
+  font-family: 'Inter Variable', Inter, sans-serif;
   font-size: 10.5px;
   color: var(--text);
 }
@@ -1182,7 +1188,7 @@ table.zones td:nth-child(3) {
   inset: 0;
   display: grid;
   place-items: center;
-  font: 800 8px/1 Inter, sans-serif;
+  font: 800 8px/1 'Inter Variable', Inter, sans-serif;
   color: #fff;
 }
 .badge.error::after {
@@ -2408,6 +2414,7 @@ table.cmp td.best {
     max-width: none;
   }
   .cloud-status,
+  .offline-text,
   .brand > span:not(.version) {
     display: none;
   }
