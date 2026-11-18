@@ -11,7 +11,6 @@ import { stashUnreadable, useRecovery } from './recovery';
 import type { CloudBase } from '../cloud/sync';
 
 export type View = 'ideal' | 'existing' | 'compare' | 'reports';
-const VIEW_IDS: View[] = ['ideal', 'existing', 'compare', 'reports'];
 export type ReportTab = 'findings' | 'changes' | 'wires' | 'bom' | 'energy';
 export type Selection = { kind: 'node' | 'wire'; id: string; design: 'ideal' | 'existing' } | null;
 
@@ -74,6 +73,8 @@ interface State {
   connectExisting(a: WireEnd, b: WireEnd): void;
   deleteSelection(): void;
 }
+
+const VIEW_IDS: View[] = ['ideal', 'existing', 'compare', 'reports'];
 
 /**
  * Browser storage that survives its own contents. If what is stored is not even valid JSON, it is
