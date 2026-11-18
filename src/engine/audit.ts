@@ -1,7 +1,7 @@
 // Audit: check any design (hand-drawn or generated) against the rules.
 
 import { NODE_DEFS } from '../model/nodeDefs';
-import { BATTERY_FUSE_MAX_IN, BATTERY_FUSE_SHEATHED_MAX_IN, SHORE_MAIN_MAX_FT, VDROP } from '../model/standards';
+import { BATTERY_FUSE_MAX_IN, BATTERY_FUSE_SHEATHED_MAX_IN, FUSE_CLASSES, LITHIUM_FUSE_MIN_AIC, SHORE_MAIN_MAX_FT, VDROP, type FuseClass } from '../model/standards';
 import type { Design, DNode, Finding, Severity, Wire } from '../model/types';
 import { ampacity, isUnsized, vdropPct } from './calc';
 import { AC_SOURCE_TERMS, buildGraph, key, passThrough, positiveNets, SOURCE_TERMS, walk, type Graph, type Reach } from './graph';
@@ -88,6 +88,29 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
     const viaBlock = exposed.filter((r) => !r.via.some((v) => g.node.get(v)?.type === 'fuse-block'));
     if (viaBlock.length) {
       add('warning', 'battery-switch', `${label(bat)} feeds ${viaBlock.map((r) => label(r.node)).slice(0, 3).join(', ')} without an isolation switch.`, 'Install a battery switch after the main fuse.', [bat.id]);
+    }
+  }
+
+  // 4b. A fuse on a lithium battery must be able to interrupt the battery's short-circuit current
+  for (const bat of batteries) {
+    if (bat.data.chemistry !== 'lifepo4') continue;
+    for (const w of g.at.get(key(bat.id, 'pos')) ?? []) {
+      if (w.kind !== 'pos') continue;
+      const n = g.node.get(w.from.node === bat.id ? w.to.node : w.from.node);
+      if (n?.type !== 'fuse') continue;
+      const name = n.data.fuseClass;
+      const cls = name ? FUSE_CLASSES[name as FuseClass] : undefined;
+      if (!cls) {
+        add('warning', 'class-t', `${label(n)} on ${label(bat)}: the fuse type is not set, so its interrupt rating cannot be checked.`, 'Select the fuse and choose its type. A lithium battery needs a Class T fuse.', [n.id, bat.id]);
+      } else if (cls.aic < LITHIUM_FUSE_MIN_AIC) {
+        add(
+          'error',
+          'class-t',
+          `${label(n)} on ${label(bat)} is ${/^A/.test(name!) ? 'an' : 'a'} ${name} fuse, which can only interrupt about ${cls.aic.toLocaleString('en-US')} A. A lithium battery can deliver more than that into a short circuit, so the fuse may arc instead of clearing.`,
+          `Replace it with a Class T fuse (about ${FUSE_CLASSES['Class T'].aic.toLocaleString('en-US')} A interrupt rating).`,
+          [n.id, bat.id],
+        );
+      }
     }
   }
 

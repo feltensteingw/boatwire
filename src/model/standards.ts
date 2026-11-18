@@ -99,6 +99,12 @@ export const FUSE_CLASSES = {
 } as const;
 export type FuseClass = keyof typeof FUSE_CLASSES;
 
+/**
+ * Smallest interrupt rating (AIC, amps) accepted for a fuse connected straight to a lithium
+ * battery. Only Class T meets it. The same policy the ideal design follows.
+ */
+export const LITHIUM_FUSE_MIN_AIC = 20000;
+
 /** Usable fraction of nameplate capacity used for bank sizing. */
 export const USABLE_DOD: Record<string, number> = {
   flooded: 0.5,
