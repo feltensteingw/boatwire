@@ -316,8 +316,9 @@ test('metric units: mm² and metres everywhere, same design underneath', async (
   await page.locator('.seg button', { hasText: 'Boat' }).click();
   await page.locator('.boat .field', { hasText: 'Units' }).locator('select').selectOption('metric');
   // diagram labels
+  // (wait for the metric labels to appear first: while the diagram redraws there are briefly none at all)
+  await expect.poll(async () => (await labels()).some((l) => /mm²$/.test(l))).toBe(true);
   await expect.poll(async () => (await labels()).every((l) => !/^(\d+|\d\/0)$/.test(l))).toBe(true);
-  expect((await labels()).some((l) => /mm²$/.test(l))).toBe(true);
   // boat length and zone table are in metres, and the stored values (feet) have not moved
   await expect(page.locator('.boat .field', { hasText: 'Length overall' }).locator('.unit')).toHaveText('m');
   await expect(page.locator('table.zones thead')).toContainText('Aft (m)');
