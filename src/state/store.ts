@@ -8,6 +8,7 @@ import { draftRunLength } from '../engine/existing';
 import type { ThemeId } from '../ui/themes';
 import { parseProject } from '../model/validate';
 import { stashUnreadable, useRecovery } from './recovery';
+import type { CloudBase } from '../cloud/sync';
 
 export type View = 'ideal' | 'existing' | 'compare' | 'reports';
 const VIEW_IDS: View[] = ['ideal', 'existing', 'compare', 'reports'];
@@ -39,7 +40,11 @@ interface State {
   layoutNonce: number;
   /** Firestore document id of the boat being edited (undefined = local only). */
   cloudId?: string;
-  setCloudId(id: string | undefined): void;
+  /** What this browser last knew to be in the cloud for that boat. Used to notice changes from other devices. */
+  cloudBase?: CloudBase;
+  /** Link the open boat to a cloud boat (or unlink it with undefined). */
+  setCloudId(id: string | undefined, base?: CloudBase): void;
+  setCloudBase(base: CloudBase | undefined): void;
 
   setView(v: View): void;
   setReportTab(t: ReportTab): void;
@@ -48,7 +53,7 @@ interface State {
   select(s: Selection): void;
   relayout(): void;
 
-  loadProject(p: Project, cloudId?: string): void;
+  loadProject(p: Project, cloudId?: string, cloudBase?: CloudBase): void;
   newProject(): void;
   loadExample(): void;
 
@@ -126,7 +131,9 @@ export const useStore = create<State>()(
       selection: null,
       layoutNonce: 0,
       cloudId: undefined,
-      setCloudId: (cloudId) => set({ cloudId }),
+      cloudBase: undefined,
+      setCloudId: (cloudId, cloudBase) => set({ cloudId, cloudBase }),
+      setCloudBase: (cloudBase) => set({ cloudBase }),
 
       setView: (view) => set({ view, selection: null }),
       setReportTab: (reportTab) => set({ reportTab }),
@@ -135,9 +142,9 @@ export const useStore = create<State>()(
       select: (selection) => set({ selection }),
       relayout: () => set({ layoutNonce: get().layoutNonce + 1 }),
 
-      loadProject: (project, cloudId) => set({ project, cloudId, selection: null }),
-      newProject: () => set({ project: blankProject(), cloudId: undefined, selection: null, view: 'ideal' }),
-      loadExample: () => set({ project: exampleProject(), cloudId: undefined, selection: null, view: 'ideal' }),
+      loadProject: (project, cloudId, cloudBase) => set({ project, cloudId, cloudBase, selection: null }),
+      newProject: () => set({ project: blankProject(), cloudId: undefined, cloudBase: undefined, selection: null, view: 'ideal' }),
+      loadExample: () => set({ project: exampleProject(), cloudId: undefined, cloudBase: undefined, selection: null, view: 'ideal' }),
 
       updateProfile: (fn) => set({ project: mutate(get().project, (p) => fn(p.profile)) }),
       addEquipment: (kind) => {
@@ -279,7 +286,7 @@ export const useStore = create<State>()(
       version: 1,
       migrate: (stored) => stored as never,
       storage: createJSONStorage(() => checkedStorage),
-      partialize: (s) => ({ project: s.project, layers: s.layers, view: s.view, cloudId: s.cloudId, theme: s.theme }),
+      partialize: (s) => ({ project: s.project, layers: s.layers, view: s.view, cloudId: s.cloudId, cloudBase: s.cloudBase, theme: s.theme }),
       // Never trust what comes back from storage: check and repair the project, and fall back to
       // a safe value for anything else that is not what it should be.
       merge: (stored, current) => {
@@ -295,7 +302,11 @@ export const useStore = create<State>()(
         }
         if (typeof s.layers === 'object' && s.layers !== null) next.layers = { ...DEFAULT_LAYERS, ...s.layers, labels: { ...DEFAULT_LAYERS.labels, ...(s.layers.labels ?? {}) } };
         if (s.view && VIEW_IDS.includes(s.view)) next.view = s.view;
-        if (typeof s.cloudId === 'string') next.cloudId = s.cloudId;
+        if (typeof s.cloudId === 'string') {
+          next.cloudId = s.cloudId;
+          const b = s.cloudBase;
+          if (b && typeof b.rev === 'number' && typeof b.sig === 'string') next.cloudBase = { rev: b.rev, sig: b.sig };
+        }
         if (typeof s.theme === 'string') next.theme = s.theme;
         return next;
       },

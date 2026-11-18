@@ -1703,13 +1703,51 @@ table.cmp td.best {
 .cloud-status {
   font-size: 12px;
   color: #9fb3c6;
+  white-space: nowrap;
 }
 .cloud-status.st-saved::before {
   content: '✓ ';
   color: #6fd08c;
 }
+.cloud-status.st-idle::before {
+  content: '✓ ';
+  color: #6fd08c;
+}
 .cloud-status.st-error {
   color: #ff8a80;
+}
+.cloud-status.st-error::before {
+  content: '! ';
+}
+.cloud-status.st-conflict,
+.cloud-status.st-offline {
+  color: #ffcf7a;
+}
+/* Bar under the header: a conflict with another device, or a save that failed. */
+.cloud-notice {
+  padding: 8px 14px;
+  background: var(--err-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.cloud-notice.conflict {
+  background: var(--warn-bg);
+}
+.cloud-notice p {
+  margin: 2px 0;
+}
+.cloud-notice .crash-actions {
+  margin: 6px 0 2px;
+}
+.leave {
+  padding: 4px 2px 8px;
+  line-height: 1.5;
+}
+@media print {
+  .cloud-notice {
+    display: none;
+  }
 }
 .avatar {
   width: 30px;

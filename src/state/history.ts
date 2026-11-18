@@ -5,6 +5,7 @@
 // History lives for the browser session only; it is not saved.
 
 import { create } from 'zustand';
+import type { CloudBase } from '../cloud/sync';
 import type { Project } from '../model/types';
 import { describeChange, type Change } from './changes';
 import { useStore } from './store';
@@ -14,6 +15,25 @@ import { toast, useToasts } from '../ui/toastStore';
 export interface Snapshot {
   project: Project;
   cloudId?: string;
+  cloudBase?: CloudBase;
+}
+
+/**
+ * Apply a change that did not come from the user (a newer version arriving from another device).
+ * It is not an undo step, and the steps recorded so far are dropped: each holds a whole earlier
+ * boat, so undoing one would silently wipe out the other device's work.
+ */
+export function applyOutsideChange(change: () => void) {
+  restoring = true;
+  try {
+    change();
+  } finally {
+    restoring = false;
+  }
+  history.past = [];
+  history.future = [];
+  hush();
+  publish();
 }
 
 interface Step {
@@ -100,7 +120,7 @@ useStore.subscribe((s, prev) => {
     change = { label: 'Changed the boat' };
   }
   if (!change) return;
-  history.record({ project: prev.project, cloudId: prev.cloudId }, change, Date.now());
+  history.record({ project: prev.project, cloudId: prev.cloudId, cloudBase: prev.cloudBase }, change, Date.now());
   publish();
   // Removing or replacing something is done at once and can be taken back, rather than asked about first.
   if (change.destructive) say(change.label, { action: { label: 'Undo', run: undo }, ms: 12000 });
@@ -111,7 +131,11 @@ function restore(step: { snapshot: Snapshot; label: string } | null, verb: strin
   if (!step) return;
   restoring = true;
   try {
-    useStore.setState({ project: step.snapshot.project, cloudId: step.snapshot.cloudId, selection: null });
+    const { cloudId, cloudBase } = useStore.getState();
+    // Same cloud boat before and after: what we know about the cloud copy is still current, so keep it.
+    // A different boat (undoing "New boat" or "Open"): go back to what was known about that one.
+    const base = step.snapshot.cloudId === cloudId ? cloudBase : step.snapshot.cloudBase;
+    useStore.setState({ project: step.snapshot.project, cloudId: step.snapshot.cloudId, cloudBase: base, selection: null });
   } finally {
     restoring = false;
   }
@@ -121,7 +145,7 @@ function restore(step: { snapshot: Snapshot; label: string } | null, verb: strin
 
 const current = (): Snapshot => {
   const s = useStore.getState();
-  return { project: s.project, cloudId: s.cloudId };
+  return { project: s.project, cloudId: s.cloudId, cloudBase: s.cloudBase };
 };
 
 export function undo() {

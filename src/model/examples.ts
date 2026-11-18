@@ -77,3 +77,11 @@ export function exampleProject(): Project {
   ];
   return p;
 }
+
+/** True for a new or example boat nobody has changed yet. Replacing one of these loses nothing. */
+export function isUntouched(p: Project): boolean {
+  if (p.existing) return false;
+  const shape = (x: Project) => JSON.stringify({ profile: x.profile, scenarios: x.scenarios, equipment: x.equipment.map((e) => ({ kind: e.kind, name: e.name, zone: e.zone, props: e.props })) });
+  const mine = shape(p);
+  return mine === shape(blankProject()) || mine === shape(exampleProject());
+}

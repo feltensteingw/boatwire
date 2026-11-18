@@ -13,7 +13,7 @@ import { Inspector } from './ui/Inspector';
 import { downloadText, toCsv } from './ui/download';
 import { Sidebar } from './ui/Sidebar';
 import { Toggle } from './ui/fields';
-import { CloudControls, CloudSync } from './cloud/CloudControls';
+import { CloudControls, CloudNotice, CloudSync } from './cloud/CloudControls';
 import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
 import { ToastLayer } from './ui/Toasts';
@@ -48,6 +48,7 @@ export default function App() {
         <HelpGuide />
         <Header />
         <RecoveryBanner />
+        <CloudNotice />
         {/* A crash in the working area leaves the header, File menu and undo usable. `key` clears it when the view changes. */}
         <ErrorBoundary scope="view" key={view}>
           <div className="main">
