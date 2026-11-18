@@ -1,3 +1,4 @@
+import { produce } from 'immer';
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { exampleProject, blankProject, newEquipment, uid } from '../model/examples';
@@ -8,6 +9,7 @@ import { draftRunLength } from '../engine/existing';
 import type { ThemeId } from '../ui/themes';
 import { parseProject } from '../model/validate';
 import { removeZone } from '../model/zones';
+import { storable } from './imageStore';
 import { stashUnreadable, useRecovery } from './recovery';
 import type { CloudBase } from '../cloud/sync';
 
@@ -112,14 +114,15 @@ const checkedStorage: StateStorage = {
   },
 };
 
-const mutate = (p: Project, fn: (p: Project) => void): Project => {
-  const copy: Project = structuredClone(p);
-  // structuredClone makes a fresh copy of the trace-over image (hundreds of KB of text). Point the
-  // copy back at the original string, so edits and the undo history all share one copy of it.
-  if (p.existing?.underlay && copy.existing?.underlay) copy.existing.underlay.src = p.existing.underlay.src;
-  fn(copy);
-  return copy;
-};
+/**
+ * Make a changed copy of the project. Only the parts that are changed are copied (immer); the
+ * rest, including the trace-over picture, is shared with the previous version. That keeps edits
+ * and the undo history cheap, and lets screens that depend on one part ignore changes to another.
+ */
+const mutate = (p: Project, fn: (p: Project) => void): Project =>
+  produce(p, (draft) => {
+    fn(draft as Project);
+  });
 
 export const useStore = create<State>()(
   persist(
@@ -290,7 +293,8 @@ export const useStore = create<State>()(
       version: 1,
       migrate: (stored) => stored as never,
       storage: createJSONStorage(() => checkedStorage),
-      partialize: (s) => ({ project: s.project, layers: s.layers, view: s.view, cloudId: s.cloudId, cloudBase: s.cloudBase, theme: s.theme }),
+      // The trace-over picture is kept in IndexedDB; the stored project holds a reference to it (see imageStore.ts).
+      partialize: (s) => ({ project: storable(s.project), layers: s.layers, view: s.view, cloudId: s.cloudId, cloudBase: s.cloudBase, theme: s.theme }),
       // Never trust what comes back from storage: check and repair the project, and fall back to
       // a safe value for anything else that is not what it should be.
       merge: (stored, current) => {
@@ -298,7 +302,7 @@ export const useStore = create<State>()(
         const s = stored as Partial<State>;
         const next = { ...current };
         try {
-          const { project, notes } = parseProject(s.project);
+          const { project, notes } = parseProject(s.project, { storedImages: true });
           next.project = project;
           if (notes.length) useRecovery.setState({ notes });
         } catch (e) {

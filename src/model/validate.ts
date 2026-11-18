@@ -33,7 +33,15 @@ export interface Parsed {
   notes: string[];
 }
 
-export function parseProject(raw: unknown): Parsed {
+export interface ParseOptions {
+  /**
+   * Accept a trace-over picture given as a reference to this browser's picture store ("idb:…").
+   * Only true for the copy in browser storage; in a file or the cloud such a reference is meaningless.
+   */
+  storedImages?: boolean;
+}
+
+export function parseProject(raw: unknown, opts: ParseOptions = {}): Parsed {
   if (!isObj(raw)) throw new ProjectError('This is not a BoatWire project.');
   if (!isObj(raw.profile) && !Array.isArray(raw.equipment)) throw new ProjectError('This is not a BoatWire project.');
   const notes: string[] = [];
@@ -124,14 +132,14 @@ export function parseProject(raw: unknown): Parsed {
 
   const project: Project = { version: PROJECT_VERSION, profile, equipment, scenarios, activeScenario };
   if (data.existing !== undefined && data.existing !== null) {
-    const existing = parseDrawing(data.existing, profile.systemVoltage, notes);
+    const existing = parseDrawing(data.existing, profile.systemVoltage, notes, opts);
     if (existing) project.existing = existing;
     else notes.push('The existing-boat drawing was damaged and has been left out.');
   }
   return { project, notes };
 }
 
-function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[]): Design | undefined {
+function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[], opts: ParseOptions): Design | undefined {
   if (!isObj(raw) || !Array.isArray(raw.nodes)) return undefined;
   const nodes: DNode[] = [];
   const ids = new Set<string>();
@@ -195,7 +203,8 @@ function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[]): Design | u
 
   const design: Design = { id: 'existing', name: 'Existing', systemVoltage: volts, nodes, wires, findings: [] };
   const u = raw.underlay;
-  if (isObj(u) && typeof u.src === 'string' && u.src.startsWith('data:image/') && num(u.width, 0) > 0 && num(u.height, 0) > 0) {
+  const picture = isObj(u) && typeof u.src === 'string' && (u.src.startsWith('data:image/') || (!!opts.storedImages && u.src.startsWith('idb:img-')));
+  if (isObj(u) && picture && typeof u.src === 'string' && num(u.width, 0) > 0 && num(u.height, 0) > 0) {
     const underlay: Underlay = { src: u.src, name: str(u.name, 'diagram'), x: num(u.x, 0), y: num(u.y, 0), width: num(u.width, 0), height: num(u.height, 0), opacity: Math.min(1, Math.max(0.05, num(u.opacity, 0.5))), visible: u.visible !== false, locked: u.locked === true };
     design.underlay = underlay;
   } else if (u !== undefined && u !== null) {
