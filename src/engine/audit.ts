@@ -5,6 +5,7 @@ import { BATTERY_FUSE_MAX_IN, BATTERY_FUSE_SHEATHED_MAX_IN, SHORE_MAIN_MAX_FT, V
 import type { Design, DNode, Finding, Severity, Wire } from '../model/types';
 import { ampacity, vdropPct } from './calc';
 import { AC_SOURCE_TERMS, buildGraph, key, passThrough, positiveNets, SOURCE_TERMS, walk, type Graph, type Reach } from './graph';
+import { joinTerminals } from './connect';
 
 const LEAD = new Set(['flooded', 'agm', 'gel']);
 
@@ -217,6 +218,17 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
     if (n.data.shoreOnly && reach.some((r) => r.node.type === 'inverter' || r.node.type === 'inverter-charger')) {
       add('warning', 'shore-only', `${label(n)} can run from the inverter and will drain the batteries quickly.`, 'Put it on a shore/generator-only circuit.', [n.id]);
     }
+  }
+
+  // 10. Wires that join terminals which must never be joined (e.g. positive to negative)
+  for (const w of design.wires) {
+    const a = g.node.get(w.from.node);
+    const b = g.node.get(w.to.node);
+    const pa = a?.terminals.find((t) => t.id === w.from.term)?.pol;
+    const pb = b?.terminals.find((t) => t.id === w.to.term)?.pol;
+    if (!a || !b || !pa || !pb) continue;
+    const joined = joinTerminals(pa, pb);
+    if (!joined.ok) add('error', 'wire-mismatch', `${label(a)} → ${label(b)}: this wire joins ${joined.what}.`, 'Delete the wire and redraw it between matching terminals.', [a.id, b.id], [w.id]);
   }
 
   return out;

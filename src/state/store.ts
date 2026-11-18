@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { exampleProject, blankProject, newEquipment, uid } from '../model/examples';
+import { joinTerminals } from '../engine/connect';
 import { growTerminal, terminal } from '../model/nodeDefs';
 import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
 import { runLength } from '../engine/calc';
@@ -184,7 +185,9 @@ export const useStore = create<State>()(
             if (!na || !nb) return;
             const ta = terminal(na, a.term);
             const tb = terminal(nb, b.term);
-            const pol = ta?.pol === 'sig' || tb?.pol === 'sig' ? 'sig' : (ta?.pol ?? tb?.pol ?? 'pos');
+            const joined = joinTerminals(ta?.pol, tb?.pol);
+            if (!joined.ok) return; // refused; the diagram tells the user why
+            const pol = joined.kind;
             const w: Wire = {
               id: uid('w'),
               kind: pol,

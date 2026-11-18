@@ -167,6 +167,11 @@ export const RULES: Record<string, RuleInfo> = {
     title: '12 V equipment on a 24 V supply',
     why: 'Equipment rated only for 12 V will be damaged by 24 V; it needs a converter.',
   },
+  'wire-mismatch': {
+    title: 'Wire joins terminals that must stay separate',
+    why: 'A wire between a positive and a negative terminal is a dead short across the battery. AC (mains) and DC (battery) circuits are separate systems and are never joined, and a live AC conductor never connects to the safety ground. The only link between the two systems is the bond from the AC grounding bus to DC negative.',
+    ref: REFS.E11,
+  },
   'neg-return': {
     title: 'Every load needs a negative return',
     why: 'A load without a proper negative conductor will find a return path through other equipment, bonding or the hull — causing failures and corrosion.',
