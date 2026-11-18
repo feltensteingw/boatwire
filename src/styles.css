@@ -62,6 +62,7 @@
     --navy: #0a1f33;
     --navy-2: #12304d;
     --accent: #4fb3c4;
+    --accent-fg: #06222a;
     --accent-soft: #15323a;
     --grid: #22303c;
     --mini: #3a4a58;
@@ -100,6 +101,7 @@
   --navy: #0a1f33;
   --navy-2: #12304d;
   --accent: #4fb3c4;
+  --accent-fg: #06222a;
   --accent-soft: #15323a;
   --grid: #22303c;
   --mini: #3a4a58;
@@ -168,6 +170,7 @@
   --navy: #160606;
   --navy-2: #2a0d0b;
   --accent: #e0574b;
+  --accent-fg: #1a0503;
   --accent-soft: #2c0f0d;
   --grid: #24100e;
   --mini: #3d1a17;
@@ -213,6 +216,7 @@
   --navy: #082544;
   --navy-2: #0e3a66;
   --accent: #7fd3ff;
+  --accent-fg: #06222a;
   --accent-soft: #154e82;
   --grid: #2b5f92;
   --mini: #4f80b3;
@@ -312,7 +316,8 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  /* Text on the accent colour: white on the dark accents, near-black on the light ones (dark and blueprint themes). */
+  color: var(--accent-fg, #fff);
 }
 button.danger,
 .link.danger {
@@ -853,6 +858,130 @@ table.zones td:nth-child(3) {
 .zone-move-row select {
   flex: 1;
   min-width: 120px;
+}
+/* ---- new boat wizard ---- */
+.modal.wizard {
+  width: min(760px, calc(100vw - 32px));
+  max-height: 88vh;
+}
+.wiz-steps {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.wiz-steps li {
+  flex: 1;
+  padding: 4px 0 6px;
+  border-top: 3px solid var(--border);
+}
+.wiz-steps li.on {
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.wiz-steps li.done {
+  border-color: var(--accent);
+}
+.wiz-body > p {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.wiz-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.wiz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.wiz-card span {
+  flex: 1;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.wiz-card-actions,
+.wiz-alt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.wiz-alt {
+  margin-top: 14px;
+}
+.wiz-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 20px;
+  align-items: end;
+}
+.wiz-loads {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 14px;
+}
+.wiz-loads fieldset {
+  margin: 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wiz-loads legend {
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.wiz-budget {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.wiz-budget.warn {
+  background: var(--warn-bg);
+}
+.modal-foot.wiz-foot {
+  justify-content: space-between;
+}
+.example-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+@media (max-width: 699px) {
+  .wiz-cards,
+  .wiz-form,
+  .wiz-loads {
+    grid-template-columns: 1fr;
+  }
+}
+@media print {
+  .example-note {
+    display: none;
+  }
 }
 /* ---- in-app message and question dialogs ---- */
 /* A message or question always sits above any dialog that raised it. */
@@ -1871,7 +2000,7 @@ table.cmp td.best {
 .modal button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg, #fff);
 }
 .modal button.link.danger {
   color: var(--err);

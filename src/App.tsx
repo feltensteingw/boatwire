@@ -20,6 +20,8 @@ import { ToastLayer } from './ui/Toasts';
 import { isNarrow, usePane } from './ui/panes';
 import { DialogLayer, showMessage } from './ui/dialogs';
 import { useMenu } from './ui/useMenu';
+import { NewBoatWizard, useNewBoat } from './ui/NewBoat';
+import { isUntouched } from './model/examples';
 import { redo, undo, useHistory } from './state/history';
 import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
 import { parseProject } from './model/validate';
@@ -56,6 +58,7 @@ export default function App() {
         <CloudSync />
         <TipLayer />
         <ToastLayer />
+        <NewBoatWizard />
         <DialogLayer />
         <HelpGuide />
         <Header />
@@ -111,7 +114,7 @@ function Header() {
   const setView = useStore((s) => s.setView);
   const setScenario = useStore((s) => s.setScenario);
   const loadProject = useStore((s) => s.loadProject);
-  const newProject = useStore((s) => s.newProject);
+  const startNewBoat = useNewBoat((s) => s.start);
   const loadExample = useStore((s) => s.loadExample);
   const fileRef = useRef<HTMLInputElement>(null);
   const ideal = useIdeal();
@@ -165,11 +168,11 @@ function Header() {
             </div>
             <button
               onClick={() => {
-                newProject();
+                startNewBoat();
                 setMenu(false);
               }}
             >
-              New boat
+              New boat…
             </button>
             <button
               onClick={() => {
@@ -397,6 +400,7 @@ function LayerBar({ manual }: { manual?: boolean }) {
 }
 
 function IdealView() {
+  const startNewBoat = useNewBoat((s) => s.start);
   const ideal = useIdeal();
   const findings = useFindings(ideal);
   const project = useStore((s) => s.project);
@@ -405,6 +409,16 @@ function IdealView() {
     <div className="workspace">
       <div className="canvas-col">
         <LayerBar />
+        {isUntouched(project) && (
+          <div className="example-note">
+            <span>
+              This is an <b>example boat</b> to look around in.
+            </span>
+            <button className="primary" onClick={() => startNewBoat()}>
+              Start my own boat
+            </button>
+          </div>
+        )}
         <div className="canvas-title">
           <b>Ideal design</b> · {project.profile.name} · {scen?.name} · {ideal.systemVoltage} V
           <span className="hint"> — generated from your equipment list. Edit equipment on the left; the design updates instantly.</span>

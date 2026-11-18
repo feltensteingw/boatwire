@@ -222,3 +222,45 @@ test('works with no connection after the first visit, and can be installed', asy
   expect(await page.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Variable')))).toBe(true);
   expect(errors.filter((e) => !/Failed to load resource|ERR_INTERNET_DISCONNECTED/.test(e))).toEqual([]);
 });
+
+test('new boat: a template gives a complete design; the questions build a custom one', async ({ page }) => {
+  const errors = await openFresh(page);
+  // the example boat invites you to start your own
+  await page.locator('.example-note button').click();
+  const wizard = page.getByRole('dialog', { name: 'New boat' });
+  await expect(wizard).toBeVisible();
+
+  // 1. straight from a template
+  await wizard.locator('.wiz-card', { hasText: 'Coastal cruiser' }).getByRole('button', { name: 'Use this' }).click();
+  await expect(wizard).toHaveCount(0);
+  await expect(page.locator('.canvas-title')).toContainText('My coastal cruiser');
+  await expect.poll(() => page.locator('.react-flow__node').count()).toBeGreaterThan(25);
+  await expect(page.locator('.inspector .counts')).toContainText('0 errors');
+  await expect(page.locator('.example-note')).toHaveCount(0);
+  // …and it is one undoable step
+  await expect(page.locator('.toast-msg')).toContainText('Opened My coastal cruiser');
+
+  // 2. answering the questions
+  await page.locator('.file > button').click();
+  await page.locator('.file .menu button', { hasText: 'New boat' }).click();
+  await wizard.getByRole('button', { name: 'Answer a few questions instead' }).click();
+  await wizard.locator('.field', { hasText: 'Boat name' }).locator('input').fill('Kittiwake');
+  await wizard.locator('.field', { hasText: 'Length overall' }).locator('input').fill('28');
+  await wizard.getByRole('button', { name: 'Next' }).click();
+  await wizard.locator('.field', { hasText: 'House battery type' }).locator('select').selectOption('lifepo4');
+  await wizard.locator('.field', { hasText: 'Solar' }).locator('input').fill('300');
+  await wizard.getByRole('button', { name: 'Next' }).click();
+  await wizard.locator('.toggle', { hasText: 'Anchor windlass' }).click();
+  await expect(wizard.locator('.wiz-budget')).toContainText('Ah a day');
+  await wizard.getByRole('button', { name: 'Create my boat' }).click();
+  await expect(wizard).toHaveCount(0);
+
+  await expect(page.locator('.canvas-title')).toContainText('Kittiwake');
+  await expect(page.locator('.eq-head', { hasText: 'Anchor windlass' })).toBeVisible();
+  await expect(page.locator('.eq-head', { hasText: 'House bank' })).toContainText('LIFEPO4');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('boatwire:v1')!).state.project);
+  expect(stored.profile.lengthFt).toBe(28);
+  // zones scaled to a 28 ft boat: nothing sits beyond the transom
+  expect(Math.max(...stored.profile.zones.map((z: { x: number }) => z.x))).toBeLessThan(28);
+  expect(errors).toEqual([]);
+});

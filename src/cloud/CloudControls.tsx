@@ -8,6 +8,7 @@ import { toast } from '../ui/toastStore';
 import { askConfirm, showMessage } from '../ui/dialogs';
 import { Modal } from '../ui/Modal';
 import { useMenu } from '../ui/useMenu';
+import { useNewBoat } from '../ui/NewBoat';
 import { applyOutsideChange } from '../state/history';
 import { CloudConflict, explainSaveError, isDirty, onRemote, signature, sizeProblem, type RemoteCopy } from './sync';
 import { cloudEnabled, fakeCloud } from './config';
@@ -458,8 +459,8 @@ function BoatsDialog() {
     setBusy(what.kind === 'open' ? what.boat.id : 'new');
     try {
       if (what.kind === 'new') {
-        useStore.getState().newProject();
-        await saveAsNewBoat(user);
+        // The wizard builds the boat; once it exists it goes straight into the account.
+        useNewBoat.getState().start(() => void saveAsNewBoat(user));
       } else {
         const remote = await (await fb()).readBoat(user.uid, what.boat.id);
         if (!remote.exists) throw new Error('It is no longer in your account.');

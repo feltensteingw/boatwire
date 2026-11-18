@@ -50,14 +50,22 @@ test('no serious accessibility problems in any view or dialog', async ({ page })
   expect(found, found.join('\n')).toEqual([]);
 });
 
-test('dark theme passes the same check', async ({ page }) => {
-  await openFresh(page);
-  await page.locator('.header > .theme-pick').selectOption('dark');
-  const found = await problems(page, 'dark');
-  await page.getByRole('button', { name: 'Reports', exact: true }).click();
-  found.push(...(await problems(page, 'dark reports')));
-  expect(found, found.join('\n')).toEqual([]);
-});
+// The other colour schemes are not scanned yet: Night vision is dim red on black on purpose, and
+// Chart, Blueprint and High contrast each have a few known low-contrast labels still to fix.
+for (const theme of ['dark']) {
+  test(`${theme} theme passes the same check`, async ({ page }) => {
+    await openFresh(page);
+    await page.locator('.header > .theme-pick').selectOption(theme);
+    const found = await problems(page, theme);
+    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    found.push(...(await problems(page, `${theme} reports`)));
+    await page.locator('.file > button').click();
+    await page.locator('.file .menu button', { hasText: 'New boat' }).click();
+    await expect(page.getByRole('dialog', { name: 'New boat' })).toBeVisible();
+    found.push(...(await problems(page, `${theme} new boat`)));
+    expect(found, found.join('\n')).toEqual([]);
+  });
+}
 
 test('dialogs and menus work from the keyboard', async ({ page }) => {
   await openFresh(page);
