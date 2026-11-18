@@ -817,6 +817,29 @@ table.zones td:nth-child(3) {
     display: none;
   }
 }
+/* ---- removing a zone that is in use ---- */
+.zone-move {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn);
+  border-radius: 6px;
+  background: var(--warn-bg);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.zone-move p {
+  margin: 0 0 8px;
+}
+.zone-move-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.zone-move-row select {
+  flex: 1;
+  min-width: 120px;
+}
 /* ---- crash screen and recovery banner ---- */
 .crash {
   margin: 0 auto;

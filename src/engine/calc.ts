@@ -112,12 +112,15 @@ export function zoneById(profile: BoatProfile, id: string): Zone | undefined {
   return profile.zones.find((z) => z.id === id);
 }
 
+/** Run length assumed when one end is in a zone that is not in the list. The design check reports these. */
+export const MISSING_ZONE_RUN_FT = 10;
+
 /** Estimated one-way cable run between two zones, feet (includes 2 ft of slack/terminations). */
 export function runLength(profile: BoatProfile, zoneA: string, zoneB: string): number {
   if (zoneA === zoneB) return 3;
   const a = zoneById(profile, zoneA);
   const b = zoneById(profile, zoneB);
-  if (!a || !b) return 10;
+  if (!a || !b) return MISSING_ZONE_RUN_FT;
   // Cables follow the hull, not a straight line: add 20% routing allowance.
   return Math.round((Math.abs(a.x - b.x) * 1.2 + a.rise + b.rise + 2) * 10) / 10;
 }

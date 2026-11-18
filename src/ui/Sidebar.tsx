@@ -6,6 +6,7 @@ import { energyBudget } from '../engine/energy';
 import { activeScenario } from '../engine/scenario';
 import { uid } from '../model/examples';
 import { useStore } from '../state/store';
+import { zoneInUse, zoneUse } from '../model/zones';
 import { Field, NumInput, PropEditor, Select, TextInput } from './fields';
 
 const ORDER: Category[] = ['storage', 'engine', 'charging', 'ac-source', 'dc-load', 'ac-load'];
@@ -197,9 +198,48 @@ function DedicatedBattery({ e }: { e: Equipment }) {
   );
 }
 
+/** Shown when the user removes a zone that things are located in: choose where they go first. */
+function MoveOutOfZone({ zoneId, done }: { zoneId: string; done: () => void }) {
+  const project = useStore((s) => s.project);
+  const removeZone = useStore((s) => s.removeZone);
+  const zone = project.profile.zones.find((z) => z.id === zoneId)!;
+  const others = project.profile.zones.filter((z) => z.id !== zoneId);
+  const [to, setTo] = useState(others[0]?.id);
+  const use = zoneUse(project, zoneId);
+  const things = [
+    use.equipment.length ? `${use.equipment.slice(0, 3).join(', ')}${use.equipment.length > 3 ? ` and ${use.equipment.length - 3} more` : ''}` : '',
+    use.drawn ? `${use.drawn} component${use.drawn === 1 ? '' : 's'} on the existing-boat drawing` : '',
+  ].filter(Boolean);
+  return (
+    <div className="zone-move" role="alert">
+      <p>
+        <b>“{zone.name}” is in use.</b>
+        {things.length > 0 && <> Located there: {things.join('; ')}.</>}
+        {use.roles.length > 0 && <> It is also {use.roles.join(' and ')}.</>} Cable lengths are measured from where things are, so choose where these move to.
+      </p>
+      <div className="zone-move-row">
+        <Select value={to} options={others.map((z) => ({ value: z.id, label: z.name }))} onChange={setTo} />
+        <button
+          className="primary"
+          onClick={() => {
+            removeZone(zoneId, to);
+            done();
+          }}
+        >
+          Move and remove
+        </button>
+        <button onClick={done}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function BoatPanel() {
-  const profile = useStore((s) => s.project.profile);
+  const project = useStore((s) => s.project);
+  const profile = project.profile;
   const up = useStore((s) => s.updateProfile);
+  const removeZone = useStore((s) => s.removeZone);
+  const [removing, setRemoving] = useState<string | null>(null);
   const zoneOpts = profile.zones.map((z) => ({ value: z.id, label: z.name }));
   return (
     <div className="boat">
@@ -220,6 +260,9 @@ function BoatPanel() {
       </Field>
       <Field label="Main panel location" help="Where the main DC/AC distribution panel is. Branch circuit lengths are measured from here.">
         <Select value={profile.panelZone} options={zoneOpts} onChange={(v) => up((p) => void (p.panelZone = v))} />
+      </Field>
+      <Field label="Helm location" help="Where you steer from. Windlass, thruster and winch control switches are placed here, and their control wires are measured from here.">
+        <Select value={profile.helmZone} options={zoneOpts} onChange={(v) => up((p) => void (p.helmZone = v))} />
       </Field>
       <h4>Zones</h4>
       <p className="hint">Cable lengths are estimated from where things are: distance aft of the bow, plus extra height or routing (the masthead is ~50 ft up). Runs add 20% for routing along the hull.</p>
@@ -245,7 +288,12 @@ function BoatPanel() {
                 <input type="number" value={z.rise} onChange={(e) => up((p) => void (p.zones[i].rise = +e.target.value))} />
               </td>
               <td>
-                <button className="icon" data-tip="Remove zone" onClick={() => up((p) => void p.zones.splice(i, 1))}>
+                <button
+                  className="icon"
+                  disabled={profile.zones.length <= 1}
+                  data-tip={profile.zones.length <= 1 ? 'A boat needs at least one zone.' : 'Remove this zone. If anything is located in it, you are asked where to move it first.'}
+                  onClick={() => (zoneInUse(zoneUse(project, z.id)) ? setRemoving(z.id) : removeZone(z.id))}
+                >
                   ×
                 </button>
               </td>
@@ -253,6 +301,7 @@ function BoatPanel() {
           ))}
         </tbody>
       </table>
+      {removing && profile.zones.some((z) => z.id === removing) && <MoveOutOfZone zoneId={removing} done={() => setRemoving(null)} />}
       <button data-tip="Add a location aboard, e.g. a radar arch or fly bridge." onClick={() => up((p) => void p.zones.push({ id: uid('z'), name: 'New zone', x: 10, rise: 1 }))}>+ Add zone</button>
       {!STANDARDS_VERIFIED && (
         <p className="hint caution">

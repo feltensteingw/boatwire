@@ -75,6 +75,8 @@ export function parseProject(raw: unknown): Parsed {
     acStandard: p.acStandard === 'eu230' ? 'eu230' : 'us120',
     batteryZone: zoneOr(p.batteryZone, blank.profile.batteryZone),
     panelZone: zoneOr(p.panelZone, blank.profile.panelZone),
+    // Boats saved before the helm had its own setting used the cockpit.
+    helmZone: zoneOr(p.helmZone, blank.profile.helmZone),
     zones,
   };
 

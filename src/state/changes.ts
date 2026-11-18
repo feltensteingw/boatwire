@@ -27,6 +27,11 @@ export function describeChange(a: Project, b: Project): Change | null {
     return { label: blank ? 'Started a new boat' : `Opened ${b.profile.name || 'another boat'}`, destructive: true };
   }
 
+  // A zone removed (its equipment may have been moved elsewhere in the same step)
+  const zonesLeft = ids(b.profile.zones);
+  const zoneGone = a.profile.zones.find((z) => !zonesLeft.has(z.id));
+  if (zoneGone) return { label: `Removed the zone ${zoneGone.name}`, destructive: true };
+
   // Equipment
   if (a.equipment !== b.equipment) {
     const before = ids(a.equipment);
@@ -43,9 +48,6 @@ export function describeChange(a: Project, b: Project): Change | null {
   // Boat settings and zones
   if (!same(a.profile, b.profile)) {
     const za = ids(a.profile.zones);
-    const zb = ids(b.profile.zones);
-    const gone = a.profile.zones.filter((z) => !zb.has(z.id));
-    if (gone.length) return { label: `Removed the zone ${gone[0].name}`, destructive: true };
     const fresh = b.profile.zones.filter((z) => !za.has(z.id));
     if (fresh.length) return { label: 'Added a zone' };
     return { label: 'Changed boat settings', mergeKey: 'profile' };

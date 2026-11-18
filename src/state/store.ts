@@ -7,6 +7,7 @@ import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, S
 import { draftRunLength } from '../engine/existing';
 import type { ThemeId } from '../ui/themes';
 import { parseProject } from '../model/validate';
+import { removeZone } from '../model/zones';
 import { stashUnreadable, useRecovery } from './recovery';
 import type { CloudBase } from '../cloud/sync';
 
@@ -58,6 +59,8 @@ interface State {
   loadExample(): void;
 
   updateProfile(fn: (p: Project['profile']) => void): void;
+  /** Remove a zone, first moving whatever is located in it to `moveTo`. */
+  removeZone(id: string, moveTo?: string): void;
   addEquipment(kind: EquipmentKind): string;
   updateEquipment(id: string, fn: (e: Equipment) => void): void;
   removeEquipment(id: string): void;
@@ -147,6 +150,7 @@ export const useStore = create<State>()(
       loadExample: () => set({ project: exampleProject(), cloudId: undefined, cloudBase: undefined, selection: null, view: 'ideal' }),
 
       updateProfile: (fn) => set({ project: mutate(get().project, (p) => fn(p.profile)) }),
+      removeZone: (id, moveTo) => set({ project: mutate(get().project, (p) => removeZone(p, id, moveTo)) }),
       addEquipment: (kind) => {
         const e = newEquipment(kind);
         set({ project: mutate(get().project, (p) => void p.equipment.push(e)) });

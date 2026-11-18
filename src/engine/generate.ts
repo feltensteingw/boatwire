@@ -2,6 +2,7 @@
 
 import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A } from '../model/catalog';
 import { growTerminal, makeNode } from '../model/nodeDefs';
+import { missingZones } from '../model/zones';
 import { AC_STANDARDS, FUSE_CLASSES, GAUGES, STANDARD_BREAKERS_DC, VDROP } from '../model/standards';
 import type {
   Chemistry,
@@ -16,7 +17,7 @@ import type {
   Wire,
   WireKind,
 } from '../model/types';
-import { fuseClassFor, nextStandard, protectionFor, runLength, sizeConductor } from './calc';
+import { fuseClassFor, MISSING_ZONE_RUN_FT, nextStandard, protectionFor, runLength, sizeConductor } from './calc';
 import { energyBudget, num } from './energy';
 import { effectiveEquipment, scenarioVoltage } from './scenario';
 
@@ -162,6 +163,7 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   const eq = effectiveEquipment(project, scenario);
   const BZ = profile.batteryZone;
   const PZ = profile.panelZone;
+  const HZ = profile.helmZone;
   const run = (a: string, z: string) => runLength(profile, a, z);
   const scale = 12 / V; // catalog currents are quoted at 12 V
 
@@ -189,6 +191,21 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   if (house.length === 0) {
     b.find('error', 'bank-sizing', 'No house battery bank. Add a battery bank with the role "House" to generate a design.');
     return design;
+  }
+
+  // A cable to somewhere that is not in the zone list can only be guessed at. Say so.
+  const lost = missingZones(project);
+  if (lost.equipment.length) {
+    const n = lost.equipment.length;
+    b.find(
+      'warning',
+      'missing-zone',
+      `${lost.equipment.slice(0, 4).join(', ')}${n > 4 ? ` and ${n - 4} more` : ''} ${n === 1 ? 'is' : 'are'} in a location that is not in the zone list, so the cable length to ${n === 1 ? 'it' : 'them'} is a ${MISSING_ZONE_RUN_FT} ft guess.`,
+      'Open each item and choose its location, or add the zone back under Boat & zones.',
+    );
+  }
+  if (lost.roles.length) {
+    b.find('warning', 'missing-zone', `The ${lost.roles.join(' and the ')} ${lost.roles.length === 1 ? 'is' : 'are'} not in the zone list, so cable lengths measured from there are guesses.`, 'Choose the location again under Boat & zones.');
   }
 
   // The design has one of each of these. Every extra is reported, never left out silently.
@@ -535,12 +552,12 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     const ctl = ded && housePanel ? { panel: housePanel.panel, t: b.stud(housePanel.panel, { rating: 5, label: `5 A · ${l.e.name} control` }) } : undefined;
     if (l.heavy) {
       const helm = b.add('helm-switch', `helm-${l.e.id}`, `${l.e.name} control`, {
-        zone: 'cockpit',
+        zone: HZ,
         notes: ['heavy-load'],
         extraTerminals: ctl ? [['in', 'pos', 'W', '+']] : undefined,
       });
-      if (ctl) b.wire('sig', [ctl.panel, ctl.t], [helm, 'in'], { amps: 0, len: run(PZ, 'cockpit'), notes: ['dedicated-bank'] });
-      b.wire('sig', [helm, 'out'], [cont, 'coil'], { amps: 0, len: run('cockpit', l.e.zone) });
+      if (ctl) b.wire('sig', [ctl.panel, ctl.t], [helm, 'in'], { amps: 0, len: run(PZ, HZ), notes: ['dedicated-bank'] });
+      b.wire('sig', [helm, 'out'], [cont, 'coil'], { amps: 0, len: run(HZ, l.e.zone) });
     } else if (ctl) {
       b.wire('sig', [ctl.panel, ctl.t], [cont, 'coil'], { amps: 0, len: run(PZ, l.e.zone), notes: ['dedicated-bank'] });
     }
@@ -557,7 +574,7 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     const starterA = num(engine, 'starterAmps', 150) * scale;
     const altA = num(engine, 'alternatorAmps', 0) * scale;
     const extReg = engine.props.regulator === 'external';
-    const EZ = engine.zone || 'engine';
+    const EZ = engine.zone || BZ;
     engineNode = b.add('engine', 'engine', engine.name, {
       zone: EZ,
       equipmentId: engine.id,

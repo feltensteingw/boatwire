@@ -31,6 +31,7 @@ export function blankProject(): Project {
       acStandard: 'us120',
       batteryZone: 'battery',
       panelZone: 'nav',
+      helmZone: 'cockpit',
       zones: DEFAULT_ZONES.map((z) => ({ ...z })),
     },
     equipment: [newEquipment('battery-bank', { name: 'House bank' })],

@@ -28,6 +28,8 @@ export interface BoatProfile {
   batteryZone: string;
   /** Zone of the main DC/AC panel (nav station). */
   panelZone: string;
+  /** Zone of the helm, where windlass, thruster and winch controls are. */
+  helmZone: string;
   zones: Zone[];
 }
 
