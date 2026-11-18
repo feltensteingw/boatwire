@@ -22,6 +22,7 @@ import type { Design, Finding } from '../model/types';
 import { severityByNode } from '../state/derived';
 import { useStore } from '../state/store';
 import { SymbolNode, type SymbolFlowNode } from './symbols';
+import { UnderlayControls, UnderlayImage } from './Underlay';
 import { WireEdge, type WireFlowEdge } from './WireEdge';
 
 const nodeTypes = { sym: SymbolNode };
@@ -49,7 +50,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   const updateExisting = useStore((s) => s.updateExisting);
   const connectExisting = useStore((s) => s.connectExisting);
   const deleteSelection = useStore((s) => s.deleteSelection);
-  const { fitView } = useReactFlow();
+  const { fitView, fitBounds } = useReactFlow();
   const [layout, setLayout] = useState<Layout | null>(null);
   const [busy, setBusy] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<SymbolFlowNode>([]);
@@ -151,6 +152,13 @@ function DiagramInner({ design, findings, mode }: Props) {
     }
   }, [initialized, nodes, fitView]);
 
+  // A drawing that is only an uploaded diagram so far (no components yet): frame the diagram.
+  const underlay = mode === 'manual' ? design.underlay : undefined;
+  useEffect(() => {
+    if (underlay?.visible && !design.nodes.length) setTimeout(() => fitBounds(underlay, { padding: 0.08 }), 30);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [underlay?.src]);
+
   const onConnect = useCallback(
     (c: Connection) => {
       if (!c.source || !c.target || !c.sourceHandle || !c.targetHandle) return;
@@ -205,6 +213,8 @@ function DiagramInner({ design, findings, mode }: Props) {
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--grid)" />
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable nodeColor={(n) => ((n as SymbolFlowNode).data.laid.node.domain === 'ac' ? 'var(--w-ac)' : 'var(--mini)')} />
+        {underlay && <UnderlayImage u={underlay} />}
+        {mode === 'manual' && <UnderlayControls u={underlay} />}
         <ExportBridge />
       </ReactFlow>
     </div>
