@@ -2,9 +2,30 @@
 
 import { CATALOG_BY_KIND } from '../model/catalog';
 import { growTerminal, makeNode, NODE_DEFS } from '../model/nodeDefs';
+import { BATTERY_FUSE_MAX_IN } from '../model/standards';
 import { uid } from '../model/examples';
-import type { Design, DNode, Equipment, NodeType, Project } from '../model/types';
+import type { BoatProfile, Design, DNode, Equipment, NodeType, Project } from '../model/types';
+import { runLength } from './calc';
 import { num } from './energy';
+
+/** Starting length for a battery-to-fuse wire in one location: the longest tenth of a foot inside the limit (0.5 ft = 6 in). */
+export const BATTERY_FUSE_DRAFT_FT = Math.floor((BATTERY_FUSE_MAX_IN / 12) * 10) / 10;
+
+/**
+ * Starting length (feet, one way) for a wire the user has just drawn. It is a guess from where
+ * the two components are, to be replaced with the measured run.
+ *
+ * Two components in the same location are normally guessed at 3 ft. A battery positive to its
+ * fuse or breaker is the exception: 3 ft would put every freshly drawn battery fuse 36 in from
+ * the battery and raise a warning the user did nothing to earn.
+ */
+export function draftRunLength(profile: BoatProfile, a: DNode, aTerm: string, b: DNode, bTerm: string): number {
+  const za = a.zone || profile.batteryZone;
+  const zb = b.zone || profile.batteryZone;
+  const isFuse = (n: DNode) => n.type === 'fuse' || n.type === 'breaker';
+  const batteryToFuse = (a.type === 'battery' && aTerm === 'pos' && isFuse(b)) || (b.type === 'battery' && bTerm === 'pos' && isFuse(a));
+  return batteryToFuse && za === zb ? BATTERY_FUSE_DRAFT_FT : runLength(profile, za, zb);
+}
 
 /** Create a palette node with sensible starting terminals. */
 export function paletteNode(type: NodeType, zone: string): DNode {

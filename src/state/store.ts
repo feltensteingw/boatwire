@@ -4,7 +4,7 @@ import { exampleProject, blankProject, newEquipment, uid } from '../model/exampl
 import { joinTerminals } from '../engine/connect';
 import { growTerminal, terminal } from '../model/nodeDefs';
 import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
-import { runLength } from '../engine/calc';
+import { draftRunLength } from '../engine/existing';
 import type { ThemeId } from '../ui/themes';
 
 export type View = 'ideal' | 'existing' | 'compare' | 'reports';
@@ -194,7 +194,8 @@ export const useStore = create<State>()(
               domain: pol === 'ac' || pol === 'gnd' ? 'ac' : 'dc',
               from: a,
               to: b,
-              lengthFt: runLength(p.profile, na.zone || p.profile.batteryZone, nb.zone || p.profile.batteryZone),
+              lengthFt: draftRunLength(p.profile, na, a.term, nb, b.term),
+              lengthEstimated: true,
             };
             d.wires.push(w);
             // keep a free stud available on growable nodes

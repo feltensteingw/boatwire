@@ -366,8 +366,17 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
           <Field label="Conductor size" help="Wire gauge as installed (AWG). Checked against the current it carries, the fuse protecting it, and voltage drop over its length.">
             <Select value={wire.gauge} options={GAUGES.map((g) => ({ value: g.awg, label: fmtGauge(g.awg) }))} onChange={(v) => edit((w) => void (w.gauge = v))} />
           </Field>
-          <Field label="Run length (one way)" help="Length of this wire in feet, one way. Voltage drop is calculated over the round trip (positive + negative).">
-            <NumInput value={wire.lengthFt} unit="ft" onChange={(v) => edit((w) => void (w.lengthFt = v))} />
+          <Field label="Run length (one way)" help="Length of this wire in feet, one way. It starts as an estimate from where the two components are; replace it with the measured run. Voltage drop is calculated over the round trip (positive + negative).">
+            <NumInput
+              value={wire.lengthFt}
+              unit="ft"
+              onChange={(v) =>
+                edit((w) => {
+                  w.lengthFt = v;
+                  delete w.lengthEstimated;
+                })
+              }
+            />
           </Field>
           <Field label="Conductor type" help="What this wire is: DC positive, DC negative, AC, safety ground, or a low-current signal.">
             <Select
@@ -398,7 +407,9 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
           </tr>
           <tr>
             <th>Length</th>
-            <td>{wire.lengthFt} ft one way</td>
+            <td>
+              {wire.lengthFt} ft one way {wire.lengthEstimated && <span className="hint">(estimated)</span>}
+            </td>
           </tr>
           {amps !== undefined && (
             <tr>
