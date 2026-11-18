@@ -95,6 +95,8 @@ export const CATALOG: CatalogItem[] = [
         { value: 'start', label: 'Engine start' },
         { value: 'windlass', label: 'Windlass / bow (dedicated)' },
         { value: 'thruster', label: 'Bow thruster (dedicated)' },
+        { value: 'winch', label: 'Electric winch (dedicated)' },
+        { value: 'fridge', label: 'Refrigeration (dedicated)' },
       ] },
       { key: 'chemistry', label: 'Chemistry', type: 'select', options: [
         { value: 'flooded', label: 'Flooded lead-acid' },
@@ -251,10 +253,14 @@ export const CATALOG: CatalogItem[] = [
   dc('horn', 'Electric horn', 'HRN', 'bow', 120, 0.01, { critical: true }),
   dc('diesel-heater', 'Diesel heater', 'HTR', 'aft', 40, 4),
   dc('windlass', 'Anchor windlass', 'WL', 'bow', 1200, 0.05, {
-    help: 'Heavy motor load: fed from the main bus through its own breaker and a reversing contactor.',
+    help: 'Heavy motor load: fed from the main bus through its own breaker and a reversing contactor. It can have its own battery near the bow instead.',
   }),
-  dc('bow-thruster', 'Bow thruster', 'THR', 'bow', 3000, 0.02),
-  dc('electric-winch', 'Electric winch', 'WIN', 'cockpit', 1000, 0.05),
+  dc('bow-thruster', 'Bow thruster', 'THR', 'bow', 3000, 0.02, {
+    help: 'Heavy motor load: fed through its own breaker and a contactor. It can have its own battery near the bow instead.',
+  }),
+  dc('electric-winch', 'Electric winch', 'WIN', 'cockpit', 1000, 0.05, {
+    help: 'Heavy motor load: fed through its own breaker and a contactor. It can have its own battery nearby instead.',
+  }),
   dc('custom-dc', 'Custom DC load', 'DC', 'saloon', 50, 1),
 
   // ---- AC loads
@@ -272,7 +278,7 @@ export const CATALOG: CatalogItem[] = [
  */
 const PROP_HELP: Record<string, string> = {
   // batteries
-  role: 'What this bank does. House runs everything aboard; Engine start only cranks the engine; dedicated windlass / thruster banks sit near the bow so the heavy motor cables stay short.',
+  role: 'What this bank does. House runs everything aboard; Engine start only cranks the engine. A dedicated bank (windlass, thruster, winch or refrigeration) sits next to its equipment and supplies its power, so the heavy cables stay short. The equipment is still switched from the house panel through a relay, and the bank is recharged from the house bank by a DC-DC charger.',
   chemistry: 'Battery type. Lead-acid (flooded, AGM, gel) is cheaper but only ~50% is usable. Lithium (LiFePO4) gives ~80% usable, is lighter and charges faster, but needs a BMS, Class T fuse and alternator protection.',
   unitVolts: 'Voltage of each individual battery. They are wired in series to reach the system voltage (e.g. two 6 V golf-cart batteries make 12 V).',
   unitAh: 'Amp-hour rating printed on each battery (20-hour rate).',
@@ -318,6 +324,22 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   'dc-load': 'DC loads',
   'ac-load': 'AC loads',
 };
+
+/**
+ * Battery-bank roles that give equipment its own dedicated battery, and the load kinds each one powers.
+ * The load is switched from the house DC panel through a relay but draws its power from that battery.
+ */
+export const DEDICATED_BANK_ROLES: Record<string, { label: string; kinds: EquipmentKind[] }> = {
+  windlass: { label: 'Windlass', kinds: ['windlass'] },
+  thruster: { label: 'Thruster', kinds: ['bow-thruster'] },
+  winch: { label: 'Winch', kinds: ['electric-winch'] },
+  fridge: { label: 'Refrigeration', kinds: ['fridge', 'freezer'] },
+};
+
+/** Dedicated-bank role that can power a given load kind, if any. */
+export function dedicatedRoleFor(kind: EquipmentKind): string | undefined {
+  return Object.keys(DEDICATED_BANK_ROLES).find((r) => DEDICATED_BANK_ROLES[r].kinds.includes(kind));
+}
 
 /** Heavy DC loads that are fed directly from the main bus rather than the panel. */
 export const HEAVY_DC_THRESHOLD_A = 30;

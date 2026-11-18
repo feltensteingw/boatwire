@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CATALOG, CATALOG_BY_KIND, CATEGORY_LABELS, type Category } from '../model/catalog';
+import { CATALOG, CATALOG_BY_KIND, CATEGORY_LABELS, DEDICATED_BANK_ROLES, dedicatedRoleFor, type Category } from '../model/catalog';
 import { AC_STANDARDS, STANDARDS_VERIFIED } from '../model/standards';
 import type { Equipment, EquipmentKind, SystemVoltage } from '../model/types';
 import { energyBudget } from '../engine/energy';
@@ -147,6 +147,7 @@ export function EquipmentEditor({
           <PropEditor key={d.key} def={d} value={e.props[d.key]} onChange={(v) => update(e.id, (x) => void (x.props[d.key] = v))} />
         ))}
       {c?.help && <p className="hint">{c.help}</p>}
+      <DedicatedBattery e={e} />
       {(remove || dup) && (
         <div className="row-actions">
           {dup && <button onClick={() => dup(e.id)}>Duplicate</button>}
@@ -157,6 +158,41 @@ export function EquipmentEditor({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** For equipment that can have its own battery (windlass, thruster, winch, fridge): add one, or say which one powers it. */
+function DedicatedBattery({ e }: { e: Equipment }) {
+  const role = dedicatedRoleFor(e.kind);
+  const bank = useStore((s) => (role ? s.project.equipment.find((x) => x.kind === 'battery-bank' && x.props.role === role) : undefined));
+  const V = useStore((s) => s.project.profile.systemVoltage);
+  const addEquipment = useStore((s) => s.addEquipment);
+  const update = useStore((s) => s.updateEquipment);
+  if (!role) return null;
+  const label = DEDICATED_BANK_ROLES[role].label;
+  if (bank) {
+    return (
+      <p className="hint">
+        Powered by its own battery, <b>{bank.name}</b>, and switched from the house DC panel through a relay. Change that battery's role to stop.
+      </p>
+    );
+  }
+  return (
+    <div className="row-actions">
+      <button
+        data-tip={`Give the ${label.toLowerCase()} its own battery next to it. It draws its power from that battery, is switched from the house DC panel through a relay, and the battery is recharged from the house bank by a DC-DC charger.`}
+        onClick={() => {
+          const id = addEquipment('battery-bank');
+          update(id, (b) => {
+            b.name = `${label} battery`;
+            b.zone = e.zone;
+            b.props = { ...b.props, role, chemistry: 'agm', unitVolts: 12, unitAh: 100, units: V / 12 };
+          });
+        }}
+      >
+        + Add a dedicated battery
+      </button>
     </div>
   );
 }

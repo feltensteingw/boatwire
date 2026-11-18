@@ -195,3 +195,77 @@ describe('battery isolators', () => {
     expect(rules).toContain('alternator-lfp');
   });
 });
+
+describe('dedicated batteries for high-draw equipment', () => {
+  const withBank = (role: string, zone: string, extra: string[] = []) => {
+    const p = exampleProject();
+    p.equipment.push(newEquipment('battery-bank', { name: `${role} battery`, zone, props: { role, chemistry: 'agm', unitVolts: 12, unitAh: 100, units: 1 } }));
+    for (const k of extra) p.equipment.push(newEquipment(k as never, {}));
+    return p;
+  };
+  const feeds = (d: Design, from: string, to: string) => d.wires.some((w) => w.from.node === from && w.to.node === to);
+
+  it('refrigeration bank powers the fridge through a relay switched from the house panel', () => {
+    const p = withBank('fridge', 'galley');
+    const d = generateIdeal(p);
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+    const fridge = p.equipment.find((e) => e.kind === 'fridge')!;
+    const load = d.nodes.find((n) => n.id === `ld-${fridge.id}`)!;
+    const relay = d.nodes.find((n) => n.id === `cont-${fridge.id}`)!;
+    expect(relay.type).toBe('contactor');
+    // power: fridge bank bus → fuse → relay → fridge
+    expect(feeds(d, 'fr-bus', `prot-${fridge.id}`)).toBe(true);
+    expect(feeds(d, `prot-${fridge.id}`, relay.id)).toBe(true);
+    expect(feeds(d, relay.id, load.id)).toBe(true);
+    // it is no longer a branch circuit on the house panel …
+    expect(d.wires.some((w) => w.from.node === 'dc-panel' && w.to.node === load.id)).toBe(false);
+    // … but the panel powers the relay coil
+    const ctl = d.wires.find((w) => w.from.node === 'dc-panel' && w.to.node === relay.id)!;
+    expect(ctl.kind).toBe('sig');
+    expect(ctl.to.term).toBe('coil');
+    // bank recharged from house by DC-DC
+    expect(d.nodes.some((n) => n.id === 'fr-dcdc' && n.type === 'dcdc')).toBe(true);
+  });
+
+  it('windlass bank: motor fed from the bow battery, helm switch powered from the house panel', () => {
+    const p = withBank('windlass', 'bow');
+    const d = generateIdeal(p);
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+    const wl = p.equipment.find((e) => e.kind === 'windlass')!;
+    expect(feeds(d, 'wl-bus', `prot-${wl.id}`)).toBe(true);
+    const helm = d.nodes.find((n) => n.id === `helm-${wl.id}`)!;
+    expect(helm.terminals.some((t) => t.id === 'in')).toBe(true);
+    expect(d.wires.some((w) => w.from.node === 'dc-panel' && w.to.node === helm.id && w.to.term === 'in')).toBe(true);
+    // the bank fuse is sized from the load it serves and never smaller than the windlass protection
+    const bankFuse = d.nodes.find((n) => n.id === 'wl-fuse')!.data.rating!;
+    const motorProt = d.nodes.find((n) => n.id === `prot-${wl.id}`)!.data.rating!;
+    expect(bankFuse).toBeGreaterThanOrEqual(motorProt);
+    // without the bank the windlass is wired from the house bus
+    const plain = generateIdeal(exampleProject());
+    const wl2 = plain.nodes.find((n) => n.data.kind === 'windlass')!;
+    expect(plain.wires.some((w) => w.from.node === 'pos-bus' && w.to.node === wl2.id.replace('ld-', 'prot-'))).toBe(true);
+  });
+
+  it('winch bank powers an electric winch', () => {
+    const p = withBank('winch', 'cockpit', ['electric-winch']);
+    const d = generateIdeal(p);
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+    const w = p.equipment.find((e) => e.kind === 'electric-winch')!;
+    expect(feeds(d, 'wn-bus', `prot-${w.id}`)).toBe(true);
+  });
+
+  it('notes a dedicated bank with nothing to power', () => {
+    const p = withBank('thruster', 'bow');
+    const d = generateIdeal(p);
+    expect(d.findings.some((f) => f.rule === 'dedicated-bank')).toBe(true);
+  });
+
+  it('every scenario still passes its audit with fridge + windlass banks', () => {
+    const p = withBank('fridge', 'galley');
+    p.equipment.push(newEquipment('battery-bank', { name: 'Bow battery', zone: 'bow', props: { role: 'windlass', chemistry: 'lifepo4', unitVolts: 12, unitAh: 100, units: 2 } }));
+    for (const s of p.scenarios) {
+      const d = generateIdeal(p, s);
+      expect(errorsOf(d, p).map((e) => e.message), s.name).toEqual([]);
+    }
+  });
+});

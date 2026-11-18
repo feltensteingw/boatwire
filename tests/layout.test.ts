@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exampleProject } from '../src/model/examples';
+import { exampleProject, newEquipment } from '../src/model/examples';
 import { generateIdeal } from '../src/engine/generate';
 import { autoLayout, visibleSubset } from '../src/layout/layout';
 import type { LayerSettings } from '../src/model/types';
@@ -17,6 +17,17 @@ describe('layout', () => {
       const xs = l.nodes.map((n) => n.x + n.w);
       const ys = l.nodes.map((n) => n.y + n.h);
       console.log(s.name, 'size', Math.max(...xs), 'x', Math.max(...ys));
+    }
+  });
+  it('lays out dedicated fridge and windlass banks with their relay control wiring', async () => {
+    const p = exampleProject();
+    p.equipment.push(newEquipment('battery-bank', { name: 'Fridge battery', zone: 'galley', props: { role: 'fridge', units: 1 } }));
+    p.equipment.push(newEquipment('battery-bank', { name: 'Bow battery', zone: 'bow', props: { role: 'windlass', units: 1 } }));
+    const d = generateIdeal(p);
+    for (const lv of [layers, { ...layers, panelLoads: 'collapse' as const }, { ...layers, signal: false }]) {
+      const l = await autoLayout(d, lv);
+      expect(l.nodes.some((n) => n.node.id === 'fr-bat')).toBe(true);
+      expect(l.edges.every((e) => e.points && e.points.length >= 2)).toBe(true);
     }
   });
   it('DC-only and AC-only views', async () => {

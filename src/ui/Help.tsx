@@ -208,6 +208,9 @@ const SECTIONS: Section[] = [
           </li>
           <li>Positive and negative bus bars, an always-on fuse block for bilge pumps, and the DC panel with one breaker per circuit.</li>
           <li>Heavy loads like the windlass, thruster and inverter fed straight from the bus with their own protection.</li>
+          <li>
+            Optional dedicated batteries for the windlass, thruster, winch or refrigeration. Open the equipment and click <b>+ Add a dedicated battery</b> (or add a battery bank and pick its role). The equipment then draws its power from that battery, is switched from the house DC panel through a relay, and the battery is recharged from the house bank by a DC-DC charger.
+          </li>
           <li>Charging: alternator, solar, wind, hydro and shore charger, each fused at the battery end, plus the right way to share charge between banks.</li>
           <li>The AC side: inlet, main breaker with ELCI, galvanic isolator, source selector, AC panel, and the AC ground bonded to DC negative.</li>
         </ul>
