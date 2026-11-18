@@ -33,7 +33,19 @@ keep a `.boatwire.json` copy.
   Blank it out to run fully local with no sign-in.
 
 Signed-in users get **Save to cloud** and **My boats** in the header. Once a boat is saved,
-edits autosave about 1.5 s after you stop typing. If you edit the same boat on two devices at once, the last write wins.
+edits autosave about 1.5 s after you stop typing.
+
+**Two devices.** The open boat's cloud copy is watched. A save from another device is shown here
+straight away if nothing here is unsaved. If both devices have changes, saving pauses and the user
+chooses: use the other version, keep this one, or save this one as a copy. A save never overwrites a
+cloud copy this browser has not seen (`saveBoat` in `src/cloud/firebase.ts` runs in a transaction; the
+decisions are in `src/cloud/sync.ts`).
+
+**Trying cloud features without an account.** `VITE_CLOUD_FAKE=1 npm run dev` swaps Firebase for an
+in-memory stand-in (`src/cloud/fakeCloud.ts`): "Sign in" signs in a made-up user, and boats are kept
+in this browser. `window.fakeCloud` can then act as a second device (`remoteSave`, `remoteDelete`,
+`offline`). It follows the same size limit and "has it changed since I looked?" rule as the real
+thing, but it is not Firestore: check real cloud behaviour on a PR preview.
 
 | Task | Command |
 |------|---------|

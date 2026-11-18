@@ -417,11 +417,7 @@ h4 {
 .theme-pick {
   max-width: 170px;
 }
-@media (max-width: 1100px) {
-  .theme-pick {
-    max-width: 40px;
-  }
-}
+
 .views {
   display: flex;
   gap: 2px;
@@ -436,6 +432,33 @@ h4 {
   background: var(--navy-2);
   color: #fff;
   box-shadow: inset 0 -2px 0 var(--w-ac);
+}
+.undo {
+  display: flex;
+  gap: 2px;
+}
+.header .undo button {
+  border: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+/* Keep the header on one line: nothing in it wraps, and the build time gives way first. */
+.header button,
+.header .pill,
+.brand .version {
+  white-space: nowrap;
+}
+@media (max-width: 1640px) {
+  .brand .v-time {
+    display: none;
+  }
+}
+.header .undo button:disabled {
+  opacity: 0.35;
 }
 .scen {
   display: flex;
@@ -763,6 +786,150 @@ table.zones td:nth-child(3) {
   border-radius: 999px;
   padding: 4px 12px;
   box-shadow: var(--shadow);
+}
+/* ---- a drawn wire that was refused (Existing boat) ---- */
+.refusal {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: min(560px, calc(100% - 32px));
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--err);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.refusal b {
+  color: var(--err);
+  white-space: nowrap;
+}
+@media print {
+  .refusal {
+    display: none;
+  }
+}
+/* ---- removing a zone that is in use ---- */
+.zone-move {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn);
+  border-radius: 6px;
+  background: var(--warn-bg);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.zone-move p {
+  margin: 0 0 8px;
+}
+.zone-move-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.zone-move-row select {
+  flex: 1;
+  min-width: 120px;
+}
+/* ---- crash screen and recovery banner ---- */
+.crash {
+  margin: 0 auto;
+  padding: 32px 24px;
+  max-width: 640px;
+  line-height: 1.5;
+}
+.crash-app {
+  padding-top: 12vh;
+}
+.crash h2 {
+  margin: 0 0 8px;
+}
+.crash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.crash pre {
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px;
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.recovery {
+  padding: 8px 14px;
+  background: var(--warn-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.recovery p {
+  margin: 2px 0;
+}
+.recovery .crash-actions {
+  margin: 6px 0 2px;
+}
+@media print {
+  .recovery {
+    display: none;
+  }
+}
+/* ---- toasts: brief messages with an optional action, bottom centre ---- */
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 8px 8px 8px 14px;
+  border-radius: 8px;
+  background: var(--navy);
+  color: #e8f0f7;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+.toast button {
+  background: transparent;
+  color: inherit;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.toast .toast-action {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.toast button.icon {
+  border: none;
+  opacity: 0.7;
+}
+@media print {
+  .toasts {
+    display: none;
+  }
 }
 .react-flow__controls button {
   background: var(--panel);
@@ -1495,12 +1662,6 @@ table.cmp td.best {
 }
 
 @media (max-width: 1100px) {
-  .inspector {
-    width: 270px;
-  }
-  .sidebar {
-    width: 260px;
-  }
   .starts {
     grid-template-columns: 1fr;
   }
@@ -1555,13 +1716,51 @@ table.cmp td.best {
 .cloud-status {
   font-size: 12px;
   color: #9fb3c6;
+  white-space: nowrap;
 }
 .cloud-status.st-saved::before {
   content: '✓ ';
   color: #6fd08c;
 }
+.cloud-status.st-idle::before {
+  content: '✓ ';
+  color: #6fd08c;
+}
 .cloud-status.st-error {
   color: #ff8a80;
+}
+.cloud-status.st-error::before {
+  content: '! ';
+}
+.cloud-status.st-conflict,
+.cloud-status.st-offline {
+  color: #ffcf7a;
+}
+/* Bar under the header: a conflict with another device, or a save that failed. */
+.cloud-notice {
+  padding: 8px 14px;
+  background: var(--err-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.cloud-notice.conflict {
+  background: var(--warn-bg);
+}
+.cloud-notice p {
+  margin: 2px 0;
+}
+.cloud-notice .crash-actions {
+  margin: 6px 0 2px;
+}
+.leave {
+  padding: 4px 2px 8px;
+  line-height: 1.5;
+}
+@media print {
+  .cloud-notice {
+    display: none;
+  }
 }
 .avatar {
   width: 30px;
@@ -1960,33 +2159,287 @@ table.cmp td.best {
   }
 }
 
-/* ---- a drawn wire that was refused (Existing boat) ---- */
-.refusal {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 6;
-  max-width: min(560px, calc(100% - 32px));
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px 8px 12px;
-  border: 1px solid var(--err);
-  border-left-width: 4px;
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 12.5px;
-  line-height: 1.4;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+/* ================================================================ narrow screens (tablets and phones)
+   Below 1200 px the equipment list and the details panel no longer fit beside the diagram. They
+   become panels that slide over it, switched from a bar at the bottom of the screen (see
+   ui/panes.ts, NARROW_PX). Below 700 px (phones) the equipment list takes the whole screen and
+   the details panel is a sheet over the lower half, so the diagram stays in view above it. */
+.panebar,
+.pane-backdrop,
+.menu-theme {
+  display: none;
 }
-.refusal b {
-  color: var(--err);
-  white-space: nowrap;
+@media (max-width: 1199px) {
+  /* -- header: two rows. Brand and actions above, views and scenario below. */
+  .header {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 6px 10px;
+    padding: 6px 10px;
+  }
+  .header::after {
+    content: '';
+    order: 9;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .brand .version {
+    display: none;
+  }
+  .undo {
+    margin-right: auto;
+  }
+  .views {
+    order: 10;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .scen {
+    order: 11;
+    min-width: 0;
+  }
+  .scen select {
+    min-width: 0;
+    max-width: 240px;
+  }
+  .theme-pick {
+    max-width: 150px;
+  }
+
+  /* -- side panels slide over the diagram */
+  .main,
+  .workspace {
+    position: relative;
+    overflow: hidden;
+  }
+  .sidebar,
+  .inspector {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(340px, 88vw);
+    transition: transform 0.18s ease;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.22);
+  }
+  .sidebar {
+    left: 0;
+    transform: translateX(-105%);
+  }
+  .inspector {
+    right: 0;
+    z-index: 25;
+    transform: translateX(105%);
+  }
+  .pane-left .sidebar,
+  .pane-right .inspector {
+    transform: none;
+  }
+  /* closed panels must not be reachable by keyboard or screen reader */
+  .app:not(.pane-left) .sidebar,
+  .app:not(.pane-right) .inspector {
+    visibility: hidden;
+    transition:
+      transform 0.18s ease,
+      visibility 0s 0.18s;
+  }
+  .pane-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 29;
+    background: rgba(10, 20, 30, 0.35);
+  }
+
+  /* -- the bar that switches panels */
+  .panebar {
+    display: flex;
+    flex-shrink: 0;
+    height: 48px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .panebar button {
+    flex: 1;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .panebar button.on {
+    color: var(--accent);
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  /* -- option bars: one line that scrolls sideways, instead of wrapping into several */
+  .layerbar,
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+  }
+  .layerbar > *,
+  .toolbar > * {
+    flex-shrink: 0;
+  }
+  .toolbar .spacer {
+    display: none;
+  }
+  .canvas-title .hint {
+    display: none;
+  }
+  .toasts {
+    bottom: 64px;
+  }
+  .report-body,
+  .compare-scroll {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .report-body table,
+  .compare-scroll table {
+    min-width: 640px;
+  }
+}
+@media (max-width: 899px) {
+  .react-flow__minimap {
+    display: none;
+  }
+  .starts {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 699px) {
+  /* -- header: third row for the scenario; the colour scheme moves into the File menu */
+  .header {
+    gap: 4px 6px;
+    padding: 5px 8px;
+  }
+  .header > .theme-pick {
+    display: none;
+  }
+  .menu-theme {
+    display: block;
+    padding: 2px 4px 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .menu-theme .theme-pick {
+    max-width: none;
+    width: 100%;
+    color: var(--text);
+    border-color: var(--border-2);
+  }
+  .views {
+    flex: 1 1 100%;
+  }
+  .views button {
+    flex: 1;
+    padding: 7px 4px;
+    font-size: 12.5px;
+  }
+  .scen {
+    flex: 1 1 100%;
+    order: 12;
+  }
+  .scen .hint {
+    display: none;
+  }
+  .scen select {
+    flex: 1;
+    max-width: none;
+  }
+  .cloud-status,
+  .brand > span:not(.version) {
+    display: none;
+  }
+  .signin {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  /* the header already names the boat's scenario and voltage; give the room to the diagram */
+  .canvas-title {
+    display: none;
+  }
+
+  /* -- equipment: the whole screen. Details: a sheet over the lower half. */
+  .sidebar {
+    width: 100%;
+    box-shadow: none;
+  }
+  .pane-backdrop {
+    display: none;
+  }
+  .inspector {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 55%;
+    transform: translateY(105%);
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.22);
+  }
+  .modal {
+    max-height: 86vh;
+    padding: 14px;
+  }
+  .underlay-bar {
+    flex-wrap: wrap;
+    max-width: calc(100vw - 32px);
+  }
+  .refusal {
+    top: 8px;
+  }
+}
+
+/* -- fingers, not a mouse: larger targets, and text large enough that iOS does not zoom on focus */
+@media (pointer: coarse) {
+  button,
+  select,
+  input[type='text'],
+  input[type='number'] {
+    min-height: 38px;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  .toggle {
+    min-height: 38px;
+  }
+  button.icon,
+  .header .undo button {
+    min-width: 38px;
+  }
+  .view-existing .react-flow__handle.h {
+    width: 15px;
+    height: 15px;
+  }
+  /* An invisible margin beside each terminal dot, so it can be hit with a fingertip. Sideways
+     only: dots are stacked 16 px apart, and a taller margin would steal taps meant for the next one. */
+  .view-existing .react-flow__handle.h::after {
+    content: '';
+    position: absolute;
+    inset: -1px -14px;
+  }
+}
+/* A terminal that has been tapped and is waiting for the other end of the wire. */
+.view-existing .react-flow__handle.h.clickconnecting,
+.view-existing .react-flow__handle.h.connectingfrom {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }
 @media print {
-  .refusal {
+  .panebar {
     display: none;
   }
 }

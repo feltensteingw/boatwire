@@ -142,13 +142,12 @@ export function UnderlayControls({ u }: { u?: Underlay }) {
           </button>
           <button
             className="link danger"
-            onClick={() => {
-              if (window.confirm('Remove the uploaded diagram? Your drawing is not affected.'))
-                updateExisting((d) => {
-                  delete d.underlay;
-                });
-            }}
-            data-tip="Remove the uploaded diagram. Your drawing is not affected."
+            onClick={() =>
+              updateExisting((d) => {
+                delete d.underlay;
+              })
+            }
+            data-tip="Remove the uploaded diagram. Your drawing is not affected. You can undo this."
           >
             ✕
           </button>

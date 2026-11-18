@@ -1,6 +1,8 @@
 import {
   AC_CABLE_AMPACITY,
   ENGINE_SPACE_DERATE,
+  INVERTER_EFFICIENCY,
+  LOW_BATTERY_FACTOR,
   MIN_GAUGE_AC,
   GAUGES,
   MIN_GAUGE,
@@ -82,6 +84,14 @@ export function sizeConductor(opts: {
   return { gauge: awg, vdropPct: vdropPct(opts.designAmps, opts.oneWayFt, awg, opts.volts), limitedBy, overflow };
 }
 
+/**
+ * DC current an inverter draws at full output, in amps: its AC watts, divided by its efficiency,
+ * at low battery voltage. The ideal design and the check of a hand-drawn boat both use this.
+ */
+export function inverterDcAmps(watts: number, systemVolts: number): number {
+  return watts / (systemVolts * LOW_BATTERY_FACTOR * INVERTER_EFFICIENCY);
+}
+
 /** A power wire with no conductor size recorded. Nothing about it can be checked until it has one. */
 export function isUnsized(w: Pick<Wire, 'gauge' | 'kind'>): boolean {
   return !w.gauge && (w.kind === 'pos' || w.kind === 'neg' || w.kind === 'ac');
@@ -112,12 +122,15 @@ export function zoneById(profile: BoatProfile, id: string): Zone | undefined {
   return profile.zones.find((z) => z.id === id);
 }
 
+/** Run length assumed when one end is in a zone that is not in the list. The design check reports these. */
+export const MISSING_ZONE_RUN_FT = 10;
+
 /** Estimated one-way cable run between two zones, feet (includes 2 ft of slack/terminations). */
 export function runLength(profile: BoatProfile, zoneA: string, zoneB: string): number {
   if (zoneA === zoneB) return 3;
   const a = zoneById(profile, zoneA);
   const b = zoneById(profile, zoneB);
-  if (!a || !b) return 10;
+  if (!a || !b) return MISSING_ZONE_RUN_FT;
   // Cables follow the hull, not a straight line: add 20% routing allowance.
   return Math.round((Math.abs(a.x - b.x) * 1.2 + a.rise + b.rise + 2) * 10) / 10;
 }

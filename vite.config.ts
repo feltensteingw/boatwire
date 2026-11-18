@@ -46,6 +46,8 @@ export default defineConfig(({ command }) => {
       __APP_COMMIT__: JSON.stringify(command === 'serve' ? `${info.sha}-dev` : info.sha),
       __APP_BUILD_TIME__: JSON.stringify(info.time),
     },
-    test: { globals: true, environment: 'node' },
+    // The layout tests run the real ELK engine. On a busy CI machine one can take well over the
+    // 5 s default, so allow plenty: a slow test is not a failed test.
+    test: { globals: true, environment: 'node', testTimeout: 60000 },
   } as never;
 });

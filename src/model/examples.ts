@@ -18,16 +18,20 @@ export function newEquipment(kind: EquipmentKind, overrides: { name?: string; zo
   };
 }
 
+/** Name a new, empty boat starts with. */
+export const BLANK_NAME = 'My boat';
+
 export function blankProject(): Project {
   return {
     version: 1,
     profile: {
-      name: 'My boat',
+      name: BLANK_NAME,
       lengthFt: 40,
       systemVoltage: 12,
       acStandard: 'us120',
       batteryZone: 'battery',
       panelZone: 'nav',
+      helmZone: 'cockpit',
       zones: DEFAULT_ZONES.map((z) => ({ ...z })),
     },
     equipment: [newEquipment('battery-bank', { name: 'House bank' })],
@@ -73,4 +77,12 @@ export function exampleProject(): Project {
     { id: 'lfp24', name: '24 V lithium', systemVoltage: 24, houseChemistry: 'lifepo4', houseCapacityAh: 200 },
   ];
   return p;
+}
+
+/** True for a new or example boat nobody has changed yet. Replacing one of these loses nothing. */
+export function isUntouched(p: Project): boolean {
+  if (p.existing) return false;
+  const shape = (x: Project) => JSON.stringify({ profile: x.profile, scenarios: x.scenarios, equipment: x.equipment.map((e) => ({ kind: e.kind, name: e.name, zone: e.zone, props: e.props })) });
+  const mine = shape(p);
+  return mine === shape(blankProject()) || mine === shape(exampleProject());
 }

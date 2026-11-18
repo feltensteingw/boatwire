@@ -153,6 +153,10 @@ export const RULES: Record<string, RuleInfo> = {
     title: '24 → 12 V converter',
     why: 'In a 24 V system, equipment only built for 12 V (most electronics and nav lights) is fed through a DC-DC converter and a 12 V sub-panel.',
   },
+  'missing-zone': {
+    title: 'Location not in the zone list',
+    why: 'Cable lengths are worked out from where things are aboard: each zone has a distance from the bow and an extra rise. If an item sits in a zone that is not in the list, there is nothing to measure from, so a fixed length is assumed and the wire size, voltage drop and cable quantities for it cannot be trusted.',
+  },
   'not-drawn': {
     title: 'Equipment left out of the design',
     why: 'The ideal design is built around one propulsion engine, one inverter or inverter/charger, one shore power inlet, one AC generator, one engine start battery and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',

@@ -1,5 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { memo } from 'react';
+import { memo, type MouseEvent } from 'react';
 import { NODE_DEFS } from '../model/nodeDefs';
 import type { DNode, Severity } from '../model/types';
 import type { LaidNode, Side } from '../layout/layout';
@@ -290,7 +290,7 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
 
   if (isBus) {
     return (
-      <div className={cls} style={{ width: laid.w, height: laid.h }} title={n.label}>
+      <div className={cls} style={{ width: laid.w, height: laid.h }} onClick={keepTerminalClicks} title={n.label}>
         <div className="bus-bar" />
         <div className="bus-label">{n.label}</div>
         {severity && <span className={`badge ${severity}`} />}
@@ -300,7 +300,7 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
   }
   if (isPanel) {
     return (
-      <div className={cls} style={{ width: laid.w, height: laid.h }}>
+      <div className={cls} style={{ width: laid.w, height: laid.h }} onClick={keepTerminalClicks}>
         <div className="panel-head">
           <div className="panel-title">{n.label}</div>
           {n.sublabel && <div className="panel-sub">{n.sublabel}</div>}
@@ -319,7 +319,7 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
   const hasW = !!portLabels && laid.ports.some((pt) => pt.label && pt.side === 'W');
   const hasE = !!portLabels && laid.ports.some((pt) => pt.label && pt.side === 'E');
   return (
-    <div className={cls} style={{ width: laid.w, height: laid.h }}>
+    <div className={cls} style={{ width: laid.w, height: laid.h }} onClick={keepTerminalClicks}>
       <div className="sym-body" style={{ paddingLeft: hasW && n.type !== 'battery' ? 40 : undefined, paddingRight: hasE && n.type !== 'battery' ? 40 : undefined }}>
         <span className="sym-icon">
           <Icon n={n} />
@@ -336,6 +336,15 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
       {handles}
     </div>
   );
+}
+
+/**
+ * A click on a terminal dot is about wiring (it starts or ends a wire), not about the component.
+ * Stop it here so it does not also select the component, which would recentre the view and, on a
+ * tablet or phone, slide the details panel over the terminal the user is about to tap next.
+ */
+function keepTerminalClicks(e: MouseEvent<HTMLDivElement>) {
+  if ((e.target as HTMLElement).closest('.react-flow__handle')) e.stopPropagation();
 }
 
 export const SymbolNode = memo(SymbolNodeImpl);

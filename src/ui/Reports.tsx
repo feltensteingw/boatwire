@@ -166,6 +166,8 @@ function Bom() {
   );
 }
 
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+
 function Energy() {
   const project = useStore((s) => s.project);
   const b = energyBudget(project, activeScenario(project));
@@ -224,7 +226,7 @@ function Energy() {
         </tbody>
       </table>
       <p className="hint">
-        Assumptions: solar {`4.5`} peak sun hours at 75% of rating; wind/hydro at 20% capacity factor; inverter 88% efficient. Edit hours per day and duty cycle on each load in the
+        Assumptions: solar {b.assumptions.solarPeakHours} peak sun hours at {pct(b.assumptions.solarDerate)} of rating; wind/hydro at {pct(b.assumptions.windHydroCapacityFactor)} capacity factor; inverter {pct(b.assumptions.inverterEfficiency)} efficient; {pct(b.assumptions.alternatorChargeEfficiency)} of the alternator's rating reaches the bank. Edit hours per day and duty cycle on each load in the
         Equipment list.
       </p>
     </div>

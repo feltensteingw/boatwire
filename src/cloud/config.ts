@@ -10,4 +10,11 @@ export const config = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
 };
 
-export const cloudEnabled = !!(config.apiKey && config.projectId && config.appId);
+/**
+ * Development and automated tests only: use the in-memory stand-in for Firebase (fakeCloud.ts)
+ * so sign-in and cloud saving can be exercised without an account or a network. Start the app
+ * with VITE_CLOUD_FAKE=1. The variable is never set in a production build.
+ */
+export const fakeCloud = !!import.meta.env.VITE_CLOUD_FAKE;
+
+export const cloudEnabled = fakeCloud || !!(config.apiKey && config.projectId && config.appId);

@@ -1,13 +1,17 @@
 import type { User } from 'firebase/auth';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
-import type { Project } from '../model/types';
+import { isUntouched } from '../model/examples';
 import { useStore } from '../state/store';
-import { cloudEnabled } from './config';
+import { parseProject } from '../model/validate';
+import { toast } from '../ui/toastStore';
+import { applyOutsideChange } from '../state/history';
+import { CloudConflict, explainSaveError, isDirty, onRemote, signature, sizeProblem, type RemoteCopy } from './sync';
+import { cloudEnabled, fakeCloud } from './config';
 import type { BoatSummary } from './firebase';
 
 /** The Firebase SDK is large: load it after first paint, only when cloud storage is configured. */
-const fb = () => import('./firebase');
+const fb = () => (fakeCloud ? import('./fakeCloud') : import('./firebase'));
 
 /** Start a Firebase subscription once the SDK has loaded; returns a cleanup usable from useEffect. */
 function subscribeLater(start: (m: Awaited<ReturnType<typeof fb>>) => () => void, onError: (e: Error) => void): () => void {
@@ -24,14 +28,28 @@ function subscribeLater(start: (m: Awaited<ReturnType<typeof fb>>) => () => void
   };
 }
 
-type Status = 'idle' | 'saving' | 'saved' | 'error';
+type Status =
+  | 'idle'
+  /** Changes here are waiting to be sent. */
+  | 'unsaved'
+  | 'saving'
+  | 'saved'
+  /** No connection; will retry. */
+  | 'offline'
+  /** The cloud refused the save; see `error`. */
+  | 'error'
+  /** Another device changed the boat while there were unsaved changes here; see `conflict`. */
+  | 'conflict';
 
 interface CloudState {
   user: User | null;
   ready: boolean;
   boats: BoatSummary[];
   status: Status;
+  /** Plain-English reason for 'error' or 'offline'. */
   error?: string;
+  /** The other device's copy, while the user decides what to do about it. */
+  conflict?: RemoteCopy;
   dialog: boolean;
   set(p: Partial<CloudState>): void;
 }
@@ -46,15 +64,152 @@ const useCloud = create<CloudState>((set) => ({
 }));
 
 const AUTOSAVE_MS = 1500;
+const RETRY_MS = 20000;
 
-/** Mount once: tracks the signed-in user, their boat list, and autosaves the open boat. */
+const cloud = () => useCloud.getState();
+const text = (p: unknown) => JSON.stringify(p);
+
+/** Text of our most recent save, so its confirmation is recognised even if the user has typed since. */
+let lastSent: string | undefined;
+
+/** Parse a cloud copy into a project, or explain why it cannot be used. */
+function readCopy(data: string | undefined) {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(data ?? '');
+  } catch {
+    throw new Error('The saved copy is damaged and cannot be read.');
+  }
+  return parseProject(raw);
+}
+
+/**
+ * Send the open boat to the cloud now. With `force`, overwrite whatever is there; otherwise the
+ * save only goes through if no other device has saved since this browser last looked.
+ * Returns true when the cloud has this version.
+ */
+async function saveNow(force = false): Promise<boolean> {
+  const st = useStore.getState();
+  const { user } = cloud();
+  const id = st.cloudId;
+  if (!user || !id) return false;
+  const project = st.project;
+  const data = text(project);
+  if (!force && !isDirty(data, st.cloudBase)) {
+    cloud().set({ status: 'saved', error: undefined });
+    return true;
+  }
+  const tooBig = sizeProblem(data, project.existing?.underlay?.src.length ?? 0);
+  if (tooBig) {
+    cloud().set({ status: 'error', error: tooBig });
+    return false;
+  }
+  cloud().set({ status: 'saving' });
+  lastSent = data;
+  try {
+    const rev = await (await fb()).saveBoat(user.uid, id, project, data, force || !st.cloudBase ? 'any' : st.cloudBase.rev);
+    const now = useStore.getState();
+    if (now.cloudId !== id) return true; // switched boats while saving
+    const base = { rev, sig: signature(data) };
+    now.setCloudBase(base);
+    // More typing may have happened while the save was in flight; the autosave effect will send it.
+    cloud().set({ status: isDirty(text(now.project), base) ? 'unsaved' : 'saved', error: undefined, conflict: undefined });
+    return true;
+  } catch (e) {
+    if (e instanceof CloudConflict) {
+      if (e.remote.exists) cloud().set({ status: 'conflict', conflict: e.remote, error: undefined });
+      else boatWasDeleted(id);
+      return false;
+    }
+    const why = explainSaveError(e);
+    cloud().set({ status: why.offline ? 'offline' : 'error', error: why.message });
+    return false;
+  }
+}
+
+function boatWasDeleted(id: string) {
+  if (useStore.getState().cloudId !== id) return;
+  useStore.getState().setCloudId(undefined);
+  cloud().set({ status: 'idle', conflict: undefined, error: undefined });
+  toast('This boat was deleted from your account on another device. It is still open here: use “Save to cloud” to keep it.', { ms: 20000 });
+}
+
+/** The cloud copy of the open boat changed, or was looked at for the first time. */
+function onCloudCopy(id: string, remote: RemoteCopy) {
+  const st = useStore.getState();
+  if (st.cloudId !== id) return;
+  const decision = onRemote(text(st.project), st.cloudBase, lastSent, remote);
+  if (decision === 'in-sync') return;
+  if (decision === 'deleted') return boatWasDeleted(id);
+  const base = { rev: remote.rev ?? 0, sig: signature(remote.data ?? '') };
+  if (decision === 'adopt') {
+    st.setCloudBase(base);
+    if (cloud().status === 'conflict') cloud().set({ status: 'saved', conflict: undefined });
+    return;
+  }
+  if (decision === 'take-remote') {
+    try {
+      const { project } = readCopy(remote.data);
+      // The saved base describes the text as it is in the cloud, so re-reading it here stays "in sync".
+      applyOutsideChange(() => st.loadProject(project, id, base));
+      cloud().set({ status: 'saved', conflict: undefined, error: undefined });
+      toast('Updated with changes made on another device.');
+    } catch (e) {
+      cloud().set({ status: 'error', error: `A newer version of this boat is in your account, but it could not be opened. ${(e as Error).message}` });
+    }
+    return;
+  }
+  cloud().set({ status: 'conflict', conflict: remote, error: undefined });
+}
+
+// ---- what the user can do about a conflict
+
+function useTheirs() {
+  const { conflict } = cloud();
+  const id = useStore.getState().cloudId;
+  if (!conflict || !id) return;
+  try {
+    const { project } = readCopy(conflict.data);
+    // Recorded as an ordinary change, so Undo brings this device's version back.
+    useStore.getState().loadProject(project, id, { rev: conflict.rev ?? 0, sig: signature(conflict.data ?? '') });
+    cloud().set({ status: 'saved', conflict: undefined });
+  } catch (e) {
+    alert(`The other version could not be opened. ${(e as Error).message}`);
+  }
+}
+
+async function keepMine() {
+  cloud().set({ conflict: undefined });
+  await saveNow(true);
+}
+
+async function saveMineAsCopy() {
+  const { user } = cloud();
+  if (!user) return;
+  const st = useStore.getState();
+  const name = `${st.project.profile.name} (copy)`;
+  st.updateProfile((p) => void (p.name = name));
+  const project = useStore.getState().project;
+  const data = text(project);
+  try {
+    const made = await (await fb()).createBoat(user.uid, project, data);
+    useStore.getState().setCloudId(made.id, { rev: made.rev, sig: signature(data) });
+    cloud().set({ status: 'saved', conflict: undefined, error: undefined });
+    toast(`Saved here as “${name}”. The other device's version is still in My boats.`, { ms: 12000 });
+  } catch (e) {
+    alert(`Could not save a copy. ${sizeProblem(data) ?? explainSaveError(e).message}`);
+  }
+}
+
+/** Mount once: tracks the signed-in user, their boat list, and keeps the open boat in step with the cloud. */
 export function CloudSync() {
   const user = useCloud((s) => s.user);
+  const status = useCloud((s) => s.status);
+  const conflict = useCloud((s) => s.conflict);
   const setCloud = useCloud((s) => s.set);
   const project = useStore((s) => s.project);
   const cloudId = useStore((s) => s.cloudId);
   const setCloudId = useStore((s) => s.setCloudId);
-  const lastSaved = useRef<Project | null>(null);
 
   useEffect(() => {
     if (!cloudEnabled) return;
@@ -70,35 +225,123 @@ export function CloudSync() {
 
   useEffect(() => {
     if (!user) return;
-    const onError = (e: Error) => setCloud({ status: 'error', error: e.message });
+    const onError = (e: Error) => console.warn('Could not list cloud boats:', e.message);
     return subscribeLater((m) => m.watchBoats(user.uid, (boats) => setCloud({ boats }), onError), onError);
   }, [user, setCloud]);
 
-  // Autosave the open boat (debounced). New boats are only uploaded on request.
+  // Watch the open boat's cloud copy, to notice saves from other devices.
   useEffect(() => {
-    if (!user || !cloudId || project === lastSaved.current) return;
-    setCloud({ status: 'saving' });
-    const t = setTimeout(async () => {
-      try {
-        await (await fb()).saveBoat(user.uid, project, cloudId);
-        lastSaved.current = project;
-        setCloud({ status: 'saved', error: undefined });
-      } catch (e) {
-        setCloud({ status: 'error', error: (e as Error).message });
-      }
-    }, AUTOSAVE_MS);
+    if (!user || !cloudId) {
+      setCloud({ status: 'idle', conflict: undefined, error: undefined });
+      return;
+    }
+    lastSent = undefined;
+    const onError = (e: Error) => console.warn('Could not watch the cloud copy:', e.message);
+    return subscribeLater((m) => m.watchBoat(user.uid, cloudId, (remote) => onCloudCopy(cloudId, remote), onError), onError);
+  }, [user, cloudId, setCloud]);
+
+  // Autosave the open boat a moment after the last change. Paused while the user resolves a conflict.
+  useEffect(() => {
+    if (!user || !cloudId || conflict) return;
+    if (!isDirty(text(project), useStore.getState().cloudBase)) return;
+    if (cloud().status !== 'saving') setCloud({ status: 'unsaved' });
+    const t = setTimeout(() => void saveNow(), AUTOSAVE_MS);
     return () => clearTimeout(t);
-  }, [user, cloudId, project, setCloud]);
+  }, [user, cloudId, project, conflict, setCloud]);
+
+  // After a failed save, keep trying: on a timer, and as soon as the connection returns.
+  useEffect(() => {
+    if (status !== 'offline' && status !== 'error') return;
+    const retry = () => void saveNow();
+    const t = setTimeout(retry, RETRY_MS);
+    window.addEventListener('online', retry);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('online', retry);
+    };
+  }, [status, project]);
+
+  // Closing the tab with changes still on their way to the cloud: let the browser warn.
+  useEffect(() => {
+    if (status !== 'unsaved' && status !== 'saving') return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [status]);
 
   return null;
 }
 
+/** Bar under the header for anything about the cloud copy that needs the user: a conflict, or a save that failed. */
+export function CloudNotice() {
+  const { status, error, conflict } = useCloud();
+  const cloudId = useStore((s) => s.cloudId);
+  const [busy, setBusy] = useState(false);
+  if (!cloudId) return null;
+  const run = (fn: () => void | Promise<void>) => async () => {
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (status === 'conflict' && conflict) {
+    const when = conflict.rev ? new Date(conflict.rev).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'recently';
+    return (
+      <div className="cloud-notice conflict" role="alert">
+        <p>
+          <b>This boat was changed on another device</b> ({when}), and you have changes here that are not in your account yet. Saving is paused until you choose which to keep.
+        </p>
+        <div className="crash-actions">
+          <button disabled={busy} onClick={run(useTheirs)} data-tip="Replace what is on this screen with the version saved from the other device. You can undo this.">
+            Use the other version
+          </button>
+          <button disabled={busy} onClick={run(keepMine)} data-tip="Save what is on this screen over the other device's version.">
+            Keep mine
+          </button>
+          <button disabled={busy} onClick={run(saveMineAsCopy)} data-tip="Keep both: save what is on this screen as a separate boat, and leave the other version as it is.">
+            Save mine as a copy
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (status === 'error' && error) {
+    return (
+      <div className="cloud-notice" role="alert">
+        <p>
+          <b>Not saved to your account.</b> {error}
+        </p>
+        <div className="crash-actions">
+          <button disabled={busy} onClick={run(async () => void (await saveNow()))}>
+            Retry now
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
+const STATUS_TEXT: Record<Status, string> = { idle: 'Saved', saved: 'Saved', unsaved: 'Saving…', saving: 'Saving…', offline: 'Offline', error: 'Not saved', conflict: 'Changed elsewhere' };
+const STATUS_TIP: Record<Status, string> = {
+  idle: 'Changes to this boat save to your account automatically.',
+  saved: 'Changes to this boat save to your account automatically.',
+  unsaved: 'Sending your latest changes to your account.',
+  saving: 'Sending your latest changes to your account.',
+  offline: 'No connection. Your changes are safe in this browser and will be saved when the connection returns.',
+  error: 'The last save did not go through. See the message below the header.',
+  conflict: 'Another device changed this boat. Choose which version to keep in the message below the header.',
+};
+
 /** Header control: sign-in button or account menu + save status. */
 export function CloudControls() {
-  const { user, ready, status, error, set } = useCloud();
+  const { user, ready, status, set } = useCloud();
   const cloudId = useStore((s) => s.cloudId);
-  const project = useStore((s) => s.project);
-  const setCloudId = useStore((s) => s.setCloudId);
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!cloudEnabled || !ready) return null;
@@ -126,19 +369,11 @@ export function CloudControls() {
     );
   }
 
-  const statusText = !cloudId
-    ? 'Not saved to cloud'
-    : status === 'saving'
-      ? 'Saving…'
-      : status === 'error'
-        ? 'Save failed'
-        : 'Saved';
-
   return (
     <div className="cloud">
       {cloudId ? (
-        <span className={`cloud-status st-${cloudId ? status : 'local'}`} data-tip={error ?? 'Changes to this boat save to your account automatically.'}>
-          {statusText}
+        <span className={`cloud-status st-${status}`} data-tip={STATUS_TIP[status]}>
+          {STATUS_TEXT[status]}
         </span>
       ) : (
         <button
@@ -147,15 +382,8 @@ export function CloudControls() {
           data-tip="Store this boat in your account. After this, changes save automatically."
           onClick={async () => {
             setBusy(true);
-            try {
-              const id = await (await fb()).saveBoat(user.uid, project);
-              setCloudId(id);
-              set({ status: 'saved' });
-            } catch (e) {
-              alert(`Could not save: ${(e as Error).message}`);
-            } finally {
-              setBusy(false);
-            }
+            await saveAsNewBoat(user);
+            setBusy(false);
           }}
         >
           Save to cloud
@@ -187,14 +415,84 @@ export function CloudControls() {
   );
 }
 
+/** Put the open boat into the account as a new boat and link to it. Returns false, after telling the user, if it could not. */
+async function saveAsNewBoat(user: User): Promise<boolean> {
+  const project = useStore.getState().project;
+  const data = text(project);
+  const tooBig = sizeProblem(data, project.existing?.underlay?.src.length ?? 0);
+  if (tooBig) {
+    alert(tooBig);
+    return false;
+  }
+  try {
+    const made = await (await fb()).createBoat(user.uid, project, data);
+    useStore.getState().setCloudId(made.id, { rev: made.rev, sig: signature(data) });
+    cloud().set({ status: 'saved', error: undefined, conflict: undefined });
+    return true;
+  } catch (e) {
+    alert(`Could not save “${project.profile.name}” to your account. ${explainSaveError(e).message}`);
+    return false;
+  }
+}
+
+/** What the user asked for in My boats while the open boat still needs dealing with. */
+type Pending = { kind: 'new' } | { kind: 'open'; boat: BoatSummary };
+
 function BoatsDialog() {
   const { user, boats, dialog, set } = useCloud();
   const cloudId = useStore((s) => s.cloudId);
-  const loadProject = useStore((s) => s.loadProject);
-  const newProject = useStore((s) => s.newProject);
+  const openName = useStore((s) => s.project.profile.name);
   const [busy, setBusy] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   if (!dialog || !user) return null;
-  const close = () => set({ dialog: false });
+  const close = () => {
+    setPending(null);
+    set({ dialog: false });
+  };
+
+  /** Replace the open boat with another one. Call only once the open boat is safe. */
+  const go = async (what: Pending) => {
+    setPending(null);
+    setBusy(what.kind === 'open' ? what.boat.id : 'new');
+    try {
+      if (what.kind === 'new') {
+        useStore.getState().newProject();
+        await saveAsNewBoat(user);
+      } else {
+        const remote = await (await fb()).readBoat(user.uid, what.boat.id);
+        if (!remote.exists) throw new Error('It is no longer in your account.');
+        const { project, notes } = readCopy(remote.data);
+        // The base is the text as stored, so a boat that was repaired on the way in counts as changed and is saved back.
+        useStore.getState().loadProject(project, what.boat.id, { rev: remote.rev ?? 0, sig: signature(remote.data ?? '') });
+        if (notes.length) toast(`Opened with repairs: ${notes.join(' ')}`, { ms: 15000 });
+      }
+      close();
+    } catch (e) {
+      alert(`Could not open “${what.kind === 'open' ? what.boat.name : 'a new boat'}”. ${(e as Error).message}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** New boat / Open were clicked: first make sure the boat that is open now will not be lost. */
+  const leave = async (what: Pending) => {
+    const st = useStore.getState();
+    if (st.cloudId) {
+      // In the account already: get the latest changes there before switching.
+      setBusy(what.kind === 'open' ? what.boat.id : 'new');
+      const ok = cloud().status === 'conflict' ? false : await saveNow();
+      setBusy(null);
+      if (!ok) {
+        alert(`Your latest changes to “${st.project.profile.name}” are not in your account yet${cloud().status === 'conflict' ? ', because another device changed it too. Choose which version to keep first (see the message under the header)' : ` (${cloud().error ?? 'the save did not go through'})`}. Nothing was opened.`);
+        return;
+      }
+      return go(what);
+    }
+    // Only in this browser. An untouched new or example boat loses nothing; anything else, ask.
+    if (isUntouched(st.project)) return go(what);
+    setPending(what);
+  };
+
   return (
     <div className="modal-back" onClick={close}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -204,64 +502,80 @@ function BoatsDialog() {
             ×
           </button>
         </div>
-        {boats.length === 0 && <p className="hint">No boats saved yet. Use “Save to cloud” to store the boat you're working on.</p>}
-        <div className="boat-list">
-          {boats.map((b) => (
-            <div key={b.id} className={`boat-row ${b.id === cloudId ? 'current' : ''}`}>
-              <div>
-                <div className="boat-name">{b.name}</div>
-                <div className="hint">{b.updatedAt ? `Updated ${b.updatedAt.toLocaleString()}` : 'Saving…'}</div>
-              </div>
-              {b.id === cloudId ? (
-                <span className="pill-soft">Open</span>
-              ) : (
-                <button
-                  disabled={!!busy}
-                  onClick={async () => {
-                    setBusy(b.id);
-                    try {
-                      const p = await (await fb()).loadBoat(user.uid, b.id);
-                      if (p) {
-                        loadProject(p, b.id);
-                        close();
-                      }
-                    } catch (e) {
-                      alert(`Could not open: ${(e as Error).message}`);
-                    } finally {
-                      setBusy(null);
-                    }
-                  }}
-                >
-                  {busy === b.id ? 'Opening…' : 'Open'}
-                </button>
-              )}
+        {pending ? (
+          <div className="leave" role="alert">
+            <p>
+              <b>“{openName}” is only saved in this browser.</b> {pending.kind === 'new' ? 'Starting a new boat' : `Opening “${pending.boat.name}”`} will replace it on screen.
+            </p>
+            <div className="crash-actions">
               <button
-                className="link danger"
+                className="primary"
                 disabled={!!busy}
                 onClick={async () => {
-                  if (!window.confirm(`Delete “${b.name}” from your cloud boats? This cannot be undone.`)) return;
-                  await (await fb()).deleteBoat(user.uid, b.id);
-                  if (b.id === cloudId) useStore.getState().setCloudId(undefined);
+                  setBusy('save');
+                  const ok = await saveAsNewBoat(user);
+                  setBusy(null);
+                  if (ok) await go(pending);
                 }}
               >
-                Delete
+                {busy === 'save' ? 'Saving…' : 'Save it to my boats first'}
+              </button>
+              <button disabled={!!busy} onClick={() => go(pending)} data-tip="Replace it without saving it to your account. You can still undo straight afterwards.">
+                Replace without saving
+              </button>
+              <button disabled={!!busy} onClick={() => setPending(null)}>
+                Cancel
               </button>
             </div>
-          ))}
-        </div>
-        <div className="modal-foot">
-          <button
-            className="primary"
-            onClick={async () => {
-              newProject();
-              const id = await (await fb()).saveBoat(user.uid, useStore.getState().project);
-              useStore.getState().setCloudId(id);
-              close();
-            }}
-          >
-            + New boat
-          </button>
-        </div>
+          </div>
+        ) : (
+          <>
+            {boats.length === 0 && <p className="hint">No boats saved yet. Use “Save to cloud” to store the boat you're working on.</p>}
+            <div className="boat-list">
+              {boats.map((b) => (
+                <div key={b.id} className={`boat-row ${b.id === cloudId ? 'current' : ''}`}>
+                  <div>
+                    <div className="boat-name">{b.name}</div>
+                    <div className="hint">{b.updatedAt ? `Updated ${b.updatedAt.toLocaleString()}` : 'Saving…'}</div>
+                  </div>
+                  {b.id === cloudId ? (
+                    <span className="pill-soft">Open</span>
+                  ) : (
+                    <button disabled={!!busy} onClick={() => leave({ kind: 'open', boat: b })}>
+                      {busy === b.id ? 'Opening…' : 'Open'}
+                    </button>
+                  )}
+                  <button
+                    className="link danger"
+                    disabled={!!busy}
+                    onClick={async () => {
+                      if (!window.confirm(`Delete “${b.name}” from your cloud boats? This cannot be undone.`)) return;
+                      setBusy(b.id);
+                      try {
+                        await (await fb()).deleteBoat(user.uid, b.id);
+                        if (b.id === useStore.getState().cloudId) {
+                          useStore.getState().setCloudId(undefined);
+                          toast(`“${b.name}” was deleted from your account. It is still open here: use “Save to cloud” to keep it.`, { ms: 15000 });
+                        }
+                      } catch (e) {
+                        alert(`Could not delete “${b.name}”. ${explainSaveError(e).message}`);
+                      } finally {
+                        setBusy(null);
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="modal-foot">
+              <button className="primary" disabled={!!busy} onClick={() => leave({ kind: 'new' })}>
+                {busy === 'new' ? 'Starting…' : '+ New boat'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
