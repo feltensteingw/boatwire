@@ -339,6 +339,9 @@ select:focus {
   color: var(--muted);
   font-size: 12px;
 }
+.view-loading {
+  padding: 24px;
+}
 .hint.caution {
   background: var(--warn-bg);
   color: var(--warn);

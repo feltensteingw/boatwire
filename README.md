@@ -16,7 +16,8 @@ hand-drawn diagrams of existing boats.
 npm install
 npm run dev        # http://localhost:5173
 npm test           # engine + layout tests (vitest)
-npm run build      # static site in dist/ — host anywhere, no backend
+npm run build      # static site in dist/ — host anywhere, no backend (fails if the initial download exceeds the size budget)
+npm run size       # re-check the bundle-size budget for an existing dist/
 ```
 
 Projects autosave in the browser (localStorage). Use **File → Save project file** to
@@ -70,9 +71,14 @@ src/engine/     generate.ts  equipment + scenario → ideal Design (topology + s
                 reports.ts   wire schedule, BOM, scenario metrics, upgrade plan
                 energy.ts    daily load budget and bank sizing
                 rules.ts     plain-English "why" text for every rule
-src/layout/     ELK (elkjs) layered orthogonal layout; manual layout for drawings
+src/layout/     ELK (elkjs) layered orthogonal layout, run in a Web Worker; manual layout for drawings
 src/ui/         React + React Flow canvas, symbols, inspector, reports
 ```
+
+**Download size:** the page loads only the app, React and React Flow up front (about 170 KB gzipped).
+The layout engine, Firebase, PDF import, the help guide, Compare and Reports load on first use.
+`scripts/check-bundle-size.mjs` (run by `npm run build`, so also in CI) fails the build if the
+up-front download grows past its budget, so new heavy code should be loaded with a dynamic `import()`.
 
 All standards numbers live in `src/model/standards.ts`. If you hold the ABYC standard,
 replace the values there; nothing else hard-codes them.

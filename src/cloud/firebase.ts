@@ -2,6 +2,8 @@
 //
 // Configuration comes from VITE_FIREBASE_* environment variables (see
 // .env.example). Without them the app runs local-only (browser storage).
+// This module pulls in the Firebase SDK, so the UI imports it lazily (see
+// CloudControls.tsx) to keep it out of the initial download.
 // The Firebase web config is not a secret; access is enforced by
 // firestore.rules (each user can only read/write their own boats).
 
@@ -23,17 +25,7 @@ import {
   type Timestamp,
 } from 'firebase/firestore';
 import type { Project } from '../model/types';
-
-const config = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
-};
-
-export const cloudEnabled = !!(config.apiKey && config.projectId && config.appId);
+import { cloudEnabled, config } from './config';
 
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
