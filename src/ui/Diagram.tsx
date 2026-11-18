@@ -27,7 +27,7 @@ import { SymbolNode, type SymbolFlowNode } from './symbols';
 import { UnderlayControls, UnderlayImage } from './Underlay';
 import { WireEdge, type WireFlowEdge } from './WireEdge';
 import { Panel, type Edge } from '@xyflow/react';
-import { copyOf, freeSpot, GRID, type Clip } from '../engine/drawing';
+import { copyOf, GRID, snapToGrid, type Clip } from '../engine/drawing';
 import { paletteNode } from '../engine/existing';
 import type { NodeType } from '../model/types';
 import { registerViewCentre } from './viewCentre';
@@ -145,10 +145,13 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
 
   useEffect(() => {
     if (!layout) return;
+    // Keep what was selected. Newly pasted or duplicated components are selected instead, once the
+    // layout that contains them has arrived.
+    const want = selectNext.current;
+    const fresh = want && layout.nodes.some((ln) => want.has(ln.id)) ? want : null;
+    if (fresh) selectNext.current = null;
     setNodes((prev) => {
-      // Keep what was selected. Newly pasted or duplicated components are selected instead.
-      const picked = selectNext.current ?? new Set(prev.filter((n) => n.selected).map((n) => n.id));
-      selectNext.current = null;
+      const picked = fresh ?? new Set(prev.filter((n) => n.selected).map((n) => n.id));
       return layout.nodes.map((ln) => ({
         id: ln.id,
         type: 'sym',
@@ -161,6 +164,16 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, severities, layers.labels.parts, mode]);
+
+  /**
+   * How a wire is drawn when it is (or is not) selected. On the existing-boat drawing the one wire
+   * selected in the app can have either end dragged to another terminal: it gets a grip on the
+   * wire beside each end (beside, so the terminal dot itself still starts a new wire).
+   */
+  const wireState = (id: string, signal: boolean, selected: boolean) => {
+    const movable = selected && mode === 'manual' && !readOnly && selection?.kind === 'wire' && selection.id === id && design.wires.some((w) => w.id === id);
+    return { selected, reconnectable: movable, zIndex: signal ? 0 : 1 };
+  };
 
   useEffect(() => {
     if (!layout) return;
@@ -186,8 +199,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
           sourceHandle: le.sourcePort,
           targetHandle: le.targetPort,
           data: { wire: w, points: le.points, labels: layers.labels, amps: w.amps ?? currents.get(w.id), protection, units },
-          selected: selection?.kind === 'wire' && selection.id === le.id,
-          zIndex: w.kind === 'sig' ? 0 : 1,
+          ...wireState(le.id, w.kind === 'sig', selection?.kind === 'wire' && selection.id === le.id),
         };
       }),
     );
@@ -199,15 +211,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
     // One thing selected in the app: show exactly that. Nothing selected in the app leaves the
     // canvas's own selection alone, because several things may be selected there (Shift-drag).
     if (selection) setNodes((ns) => ns.map((n) => ({ ...n, selected: selection.kind === 'node' && selection.id === n.id })));
-    setEdges((es) =>
-      es.map((e) => {
-        const on = selection?.kind === 'wire' && selection.id === e.id;
-        // A selected wire can have either end dragged to another terminal. It is lifted above the
-        // components so its end grips sit on top of the terminal dots.
-        const movable = on && mode === 'manual' && !readOnly && design.wires.some((w) => w.id === e.id);
-        return { ...e, selected: selection ? on : e.selected, reconnectable: movable, zIndex: movable ? 2000 : e.data?.wire.kind === 'sig' ? 0 : 1 };
-      }),
-    );
+    setEdges((es) => es.map((e) => ({ ...e, ...wireState(e.id, e.data?.wire.kind === 'sig', selection ? selection.kind === 'wire' && selection.id === e.id : !!e.selected) })));
     if (selection?.kind === 'node') {
       const n = nodes.find((x) => x.id === selection.id);
       if (n && !n.selected) fitView({ nodes: [{ id: n.id }], duration: 400, maxZoom: 1.2, padding: 0.6 });
@@ -231,7 +235,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
   }, [underlay?.src]);
 
   /** Why the last wire the user tried to draw was refused. Shown briefly over the canvas. */
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<{ why: string; moved?: boolean } | null>(null);
   useEffect(() => {
     if (!refusal) return;
     const t = setTimeout(() => setRefusal(null), 8000);
@@ -279,6 +283,17 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
     [editing, updateExisting],
   );
 
+  // Wires attached to a selected component go with it, so only the others are worth counting.
+  const pickedSummary = useMemo(() => {
+    const on = new Set(pickedNodes);
+    const loose = pickedWires.filter((id) => {
+      const w = design.wires.find((x) => x.id === id);
+      return w && !on.has(w.from.node) && !on.has(w.to.node);
+    }).length;
+    const many = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+    return `${[pickedNodes.length ? many(pickedNodes.length, 'component') : '', loose ? many(loose, 'wire') : ''].filter(Boolean).join(' and ')} selected`;
+  }, [design, pickedNodes, pickedWires]);
+
   const removePicked = useCallback(() => removeFromExisting(pickedNodes, pickedWires), [removeFromExisting, pickedNodes, pickedWires]);
 
   /** Add copies of a set of components. They land `steps` grid squares down and right, or in the middle of the view if that would be out of sight. */
@@ -294,8 +309,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
       const sy = (Math.min(...ys) + offset.y) * vp.zoom + vp.y;
       if (sx < 0 || sy < 0 || sx > width - 60 || sy > height - 60) {
         const mid = { x: (width / 2 - vp.x) / vp.zoom, y: (height / 2 - vp.y) / vp.zoom };
-        const snap = (v: number) => Math.round(v / GRID) * GRID;
-        offset = { x: snap(mid.x - (Math.min(...xs) + Math.max(...xs)) / 2 - 60), y: snap(mid.y - (Math.min(...ys) + Math.max(...ys)) / 2 - 30) };
+        offset = { x: snapToGrid(mid.x - (Math.min(...xs) + Math.max(...xs)) / 2 - 60), y: snapToGrid(mid.y - (Math.min(...ys) + Math.max(...ys)) / 2 - 30) };
       }
       selectNext.current = new Set(pasteExisting(clip, offset));
     },
@@ -335,7 +349,8 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
       } else if (cmd && k === 'd' && pickedNodes.length) {
         done();
         duplicatePicked();
-      } else if (cmd && k === 'c' && pickedNodes.length && !window.getSelection()?.toString()) {
+      } else if (cmd && k === 'c' && pickedNodes.length) {
+        // not prevented: any selected text is still copied by the browser as usual
         clipboard = { clip: copyOf(design, pickedNodes), pastes: 0 };
       } else if (cmd && k === 'v' && clipboard) {
         done();
@@ -346,6 +361,13 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [editing, design, pickedNodes, pickedWires, removePicked, duplicatePicked, addCopies, nudgeExisting, select, setNodes, setEdges]);
+
+  /**
+   * True while a wire end is being dragged, and for the click the browser reports on the canvas
+   * when the drag is let go. That click must not clear the selection: the wire stays selected so
+   * its other end can be moved next.
+   */
+  const movingWireEnd = useRef(false);
 
   // A wire end dragged to another terminal.
   const onReconnect = useCallback(
@@ -363,7 +385,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
       if (fromStays === toStays) return; // dropped back where it was
       const landed = ends.find((x) => !is(x, fromStays ? w.from : w.to))!;
       const result = reconnectExisting(w.id, fromStays ? 'to' : 'from', landed);
-      setRefusal(result.ok ? null : result.why);
+      setRefusal(result.ok ? null : { why: result.why, moved: true });
     },
     [design, reconnectExisting],
   );
@@ -376,10 +398,11 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
       e.preventDefault();
       const at = flowApi.screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const n = paletteNode(type, useStore.getState().project.profile.batteryZone);
-      n.pos = freeSpot(design, { x: at.x - 60, y: at.y - 25 });
+      // it goes exactly where it was dropped (the pointer ends up over the middle of a typical part)
+      n.pos = { x: snapToGrid(at.x - 60), y: snapToGrid(at.y - 25) };
       addExistingNode(n);
     },
-    [editing, design, flowApi, addExistingNode],
+    [editing, flowApi, addExistingNode],
   );
 
   const onConnect = useCallback(
@@ -389,7 +412,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
       const pol = (node: string, term: string) => design.nodes.find((n) => n.id === node)?.terminals.find((t) => t.id === term)?.pol;
       const joined = joinTerminals(pol(c.source, c.sourceHandle), pol(c.target, c.targetHandle));
       if (!joined.ok) {
-        setRefusal(joined.why);
+        setRefusal({ why: joined.why });
         return;
       }
       setRefusal(null);
@@ -441,7 +464,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
             : undefined
         }
         onEdgeClick={interactive ? (_, e) => select({ kind: 'wire', id: e.id, design: which }) : undefined}
-        onPaneClick={interactive ? () => select(null) : undefined}
+        onPaneClick={interactive ? () => !movingWireEnd.current && select(null) : undefined}
         onNodeDragStop={(_, _n, moved) => saveMoved(moved)}
         onSelectionDragStop={(_, moved) => saveMoved(moved)}
         onSelectionChange={({ nodes: ns, edges: es }) => {
@@ -463,6 +486,8 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
         snapGrid={[10, 10]}
         proOptions={{ hideAttribution: true }}
         onReconnect={editing ? onReconnect : undefined}
+        onReconnectStart={() => (movingWireEnd.current = true)}
+        onReconnectEnd={() => setTimeout(() => (movingWireEnd.current = false), 0)}
         edgesReconnectable={false}
         reconnectRadius={14}
         onDrop={onDropPart}
@@ -488,7 +513,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
             </button>
             {pickedNodes.length + pickedWires.length > 1 && (
               <span className="picked" role="status">
-                <b>{pickedNodes.length + pickedWires.length} selected</b>
+                <b>{pickedSummary}</b>
                 {pickedNodes.length > 0 && (
                   <button data-tip="Make a copy of the selected components and the wires between them (Ctrl+D)." onClick={duplicatePicked}>
                     Duplicate
@@ -505,7 +530,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
       </ReactFlow>
       {refusal && (
         <div className="refusal" role="alert">
-          <b>Wire not added.</b> {refusal}
+          <b>{refusal.moved ? 'Wire not moved.' : 'Wire not added.'}</b> {refusal.why}
           <button className="icon" aria-label="Dismiss" onClick={() => setRefusal(null)}>
             ×
           </button>

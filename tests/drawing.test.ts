@@ -112,10 +112,19 @@ describe('moving a wire end to another terminal', () => {
 });
 
 describe('placing a new component', () => {
-  it('snaps to the grid and steps aside from a component already there', () => {
+  it('snaps to the grid and finds clear space next to a component already there', () => {
     const { d } = drawing();
     expect(freeSpot(d, { x: 603, y: 298 })).toEqual({ x: 600, y: 300 });
-    expect(freeSpot(d, { x: 201, y: 2 })).toEqual({ x: 220, y: 20 });
+    // the fuse is at 200,0: the new part goes just below it rather than on top of it
+    expect(freeSpot(d, { x: 201, y: 2 })).toEqual({ x: 200, y: 90 });
     expect(freeSpot(undefined, { x: 14, y: 16 })).toEqual({ x: 10, y: 20 });
+  });
+
+  it('on a crowded drawing still never lands exactly on another component', () => {
+    const { d } = drawing();
+    const proto = d.nodes[0];
+    for (let x = -700; x <= 700; x += 100) for (let y = -400; y <= 400; y += 60) d.nodes.push({ ...proto, id: `n${x}_${y}`, pos: { x, y } });
+    const p = freeSpot(d, { x: 0, y: 0 });
+    expect(d.nodes.some((n) => n.pos!.x === p.x && n.pos!.y === p.y)).toBe(false);
   });
 });

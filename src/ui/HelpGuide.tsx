@@ -315,7 +315,7 @@ const SECTIONS: Section[] = [
   {
     id: 'existing',
     title: 'Existing boat & upgrade plan',
-    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram',
+    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag',
     body: (
       <>
         <p>Use this when you're improving a boat you already own. Draw the wiring as it really is; BoatWire checks it and lists the changes needed to reach the ideal design.</p>
@@ -336,12 +336,21 @@ const SECTIONS: Section[] = [
         </ul>
         <h4>Drawing</h4>
         <ul>
-          <li><b>+ Add component…</b> adds fuses, switches, bus bars, panels and the rest. <b>+ Place equipment</b> adds items from your list that aren't drawn yet.</li>
+          <li>The <b>Quick add</b> strip has the parts most drawings need many of. Click one to add it in the middle of the view, or drag it to where it goes. <b>+ Add component…</b> lists every kind of component. <b>+ Place equipment</b> adds items from your list that aren't drawn yet.</li>
           <li>Drag from one terminal dot to another to draw a wire. Red dots are positive, black are negative, orange are AC, green are ground, and blue are signal.</li>
           <li>Click a component to set its rating, chemistry or capacity. Panels and bus bars can have studs or circuits added.</li>
           <li>A new wire opens on the right so you can set its real size, length and type, and whether it runs through the hot engine space. Click any wire to change these later.</li>
           <li>A dotted wire labelled <b>size?</b> has no size yet. BoatWire cannot check it, and the status stays amber until every power wire has a size.</li>
+          <li>To move a wire to a different terminal, click the wire, then drag the round grip beside either end onto the new terminal. BoatWire refuses a move that would join, say, positive to negative.</li>
+          <li>A <b>Note</b> is free text for anything BoatWire has no symbol for. Notes show on the drawing and in exported pictures. They are not part of the checks or the reports.</li>
           <li>Press <kbd>Delete</kbd> to remove the selection. <b>Auto-arrange</b> tidies the layout.</li>
+        </ul>
+        <h4>Working on several components at once</h4>
+        <ul>
+          <li>Hold <kbd>Shift</kbd> and drag on the empty canvas to draw a box around components, or <kbd>Shift</kbd>-click them one by one. On a touch screen, turn on <b>Select area</b> at the top left of the canvas and drag a box.</li>
+          <li>Drag any one of the selected components to move them all. The arrow keys nudge them one grid square; with <kbd>Shift</kbd>, five.</li>
+          <li><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>D</kbd> duplicates the selection, including the wires between the selected components. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>C</kbd> and <kbd>V</kbd> copy and paste. A copy is a new generic part: it is not linked to your equipment list.</li>
+          <li><kbd>Delete</kbd> removes everything selected, and one undo brings it all back.</li>
         </ul>
         <h4>Upgrade plan</h4>
         <p>The status button (e.g. “2 errors · 3 warnings → Upgrade plan”) opens <b>Reports → Upgrade plan</b>. The plan is grouped into <b>Safety: fix first</b>, <b>Recommended</b>, and <b>Improvements</b> that bring you to the ideal design.</p>
@@ -445,10 +454,15 @@ const SECTIONS: Section[] = [
       <table className="g-table">
         <tbody>
           <tr><td><kbd>?</kbd></td><td>Open this guide</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Close the guide or dialogs</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close the guide or dialogs; clear the selection on the drawing</td></tr>
           <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Z</kbd></td><td>Undo the last change. The ↶ ↷ buttons in the header do the same and say what they will undo.</td></tr>
           <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td><td>Redo (also <kbd>Ctrl</kbd> + <kbd>Y</kbd>)</td></tr>
-          <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Remove the selected component or wire (Existing boat)</td></tr>
+          <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Remove the selected components and wires (Existing boat)</td></tr>
+          <tr><td><kbd>Shift</kbd> + drag background</td><td>Draw a box to select several components (Existing boat). <kbd>Shift</kbd>-click adds or removes one.</td></tr>
+          <tr><td>Arrow keys</td><td>Nudge the selected components one grid square; with <kbd>Shift</kbd>, five</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>D</kbd></td><td>Duplicate the selected components</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>C</kbd> / <kbd>V</kbd></td><td>Copy and paste components</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>A</kbd></td><td>Select every component on the drawing</td></tr>
           <tr><td>Scroll / pinch</td><td>Zoom the diagram</td></tr>
           <tr><td>Drag background</td><td>Pan</td></tr>
           <tr><td>Drag terminal → terminal</td><td>Draw a wire (Existing boat). Clicking or tapping one terminal and then another does the same.</td></tr>

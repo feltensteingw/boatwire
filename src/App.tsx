@@ -29,6 +29,9 @@ import { parseProject } from './model/validate';
 import { toast } from './ui/toastStore';
 import { HelpButton, HelpGuide, HelpLink } from './ui/Help';
 import { UNDERLAY_ACCEPT, underlayFromFile } from './ui/underlayFile';
+import { freeSpot } from './engine/drawing';
+import { PART_MIME } from './ui/Diagram';
+import { viewCentre } from './ui/viewCentre';
 
 // Compare and Reports load on first use to keep the initial download small.
 const Compare = lazy(() => import('./ui/Compare').then((m) => ({ default: m.Compare })));
@@ -442,6 +445,21 @@ function IdealView() {
   );
 }
 
+/** The parts most drawings need many of. One click (or a drag onto the canvas) adds one. Everything else is in the Add component list. */
+const QUICK_PARTS: [NodeType, string][] = [
+  ['battery', 'Battery'],
+  ['fuse', 'Fuse'],
+  ['breaker', 'Breaker'],
+  ['switch', 'Switch'],
+  ['bus-pos', '+ Bus'],
+  ['bus-neg', '− Bus'],
+  ['fuse-block', 'Fuse block'],
+  ['dc-panel', 'DC panel'],
+  ['shunt', 'Shunt'],
+  ['load', 'Load'],
+  ['note', 'Note'],
+];
+
 function ExistingView() {
   const existing = useExisting();
   const findings = useFindings(existing);
@@ -527,6 +545,12 @@ function ExistingView() {
   }
   const errs = findings.filter((f) => f.severity === 'error').length;
   const warns = findings.filter((f) => f.severity === 'warning').length;
+  /** Add a generic part in the middle of what the user is looking at. */
+  const addPart = (type: NodeType) => {
+    const n = paletteNode(type, project.profile.batteryZone);
+    n.pos = freeSpot(existing, viewCentre());
+    addExistingNode(n);
+  };
   return (
     <div className="workspace">
       <div className="canvas-col">
@@ -534,12 +558,10 @@ function ExistingView() {
           <select
             value=""
             aria-label="Add a component to the drawing"
-            data-tip="Add a generic component (fuse, switch, bus bar, panel…) to your drawing. Click it afterwards to set its rating."
+            data-tip="Every kind of component. It is added in the middle of the view; click it afterwards to set its rating."
             onChange={(e) => {
               if (!e.target.value) return;
-              const n = paletteNode(e.target.value as NodeType, project.profile.batteryZone);
-              n.pos = { x: 80 + Math.random() * 200, y: 80 + Math.random() * 200 };
-              addExistingNode(n);
+              addPart(e.target.value as NodeType);
             }}
           >
             <option value="">+ Add component…</option>
@@ -563,7 +585,7 @@ function ExistingView() {
               if (!eq) return;
               const n = equipmentNode(eq, project);
               if (!n) return;
-              n.pos = { x: n.col * 240, y: 40 + Math.random() * 300 };
+              n.pos = freeSpot(existing, viewCentre());
               addExistingNode(n);
             }}
           >
@@ -602,10 +624,27 @@ function ExistingView() {
             Discard drawing
           </button>
         </div>
+        <div className="partbar" role="toolbar" aria-label="Common parts">
+          <span className="partbar-title">Quick add</span>
+          {QUICK_PARTS.map(([type, label]) => (
+            <button
+              key={type}
+              draggable
+              data-tip={`Click to add ${type === 'note' ? 'a note (free text for anything BoatWire has no symbol for)' : NODE_DEFS[type].label.toLowerCase()} in the middle of the view, or drag it to where it goes.`}
+              onDragStart={(e) => {
+                e.dataTransfer.setData(PART_MIME, type);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+              onClick={() => addPart(type)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <LayerBar manual />
         <div className="canvas-title">
           <b>Existing boat</b>
-          <span className="hint"> — drag from one terminal dot to another to draw a wire, or tap one dot and then the other. Click a wire to set its size and length. Delete removes the selection.</span>
+          <span className="hint"> — drag from one terminal dot to another to draw a wire, or tap one dot and then the other. Click a wire to set its size and length, or drag one of its ends to another terminal. Shift-drag selects several components; Delete removes the selection.</span>
         </div>
         <Diagram design={existing} findings={findings} mode="manual" />
       </div>
