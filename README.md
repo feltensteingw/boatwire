@@ -86,7 +86,9 @@ Every pull request gets a 7-day preview URL posted as a PR comment. Both need th
 
 ```
 src/model/      types, equipment catalog, node (symbol) definitions, standards data
-src/engine/     generate.ts  equipment + scenario → ideal Design (topology + sizing)
+src/engine/     generate.ts  equipment + scenario → ideal Design; sets the order of work only
+                ideal/       one module per subsystem: plan, houseBank, distribution, heavyLoads,
+                             engine, renewables, ac (all drawing through builder.ts)
                 audit.ts     rule checks on any Design (net tracing in graph.ts)
                 calc.ts      ampacity, voltage drop, protection sizing, run lengths
                 reports.ts   wire schedule, BOM, scenario metrics, upgrade plan
@@ -95,6 +97,16 @@ src/engine/     generate.ts  equipment + scenario → ideal Design (topology + s
 src/layout/     ELK (elkjs) layered orthogonal layout, run in a Web Worker; manual layout for drawings
 src/ui/         React + React Flow canvas, symbols, inspector, reports
 ```
+
+**Tests that guard the engine** (all run by `npm test`):
+
+- `tests/generatorGolden.test.ts` records the generated design for a set of boats
+  (`tests/sampleBoats.ts`). If a change to the generator alters any design, the test shows the
+  changed components and wires line by line. When the change is intended, update the record with
+  `npx vitest run -u tests/generatorGolden.test.ts` and commit it.
+- `tests/auditRules.test.ts` has, for every design-check rule, one small drawing that breaks it and
+  one that does not. It fails if a rule is added to `audit.ts` without a case.
+- `tests/idealPassesAudit.test.ts` checks that every generated design passes the design check.
 
 **Download size:** the page loads only the app, React and React Flow up front (about 170 KB gzipped).
 The layout engine, Firebase, PDF import, the help guide, Compare and Reports load on first use.

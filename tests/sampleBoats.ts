@@ -142,8 +142,8 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
     p.equipment.push(newEquipment('battery-bank', { name: 'Second house bank', props: { role: 'house', chemistry: 'lifepo4', unitVolts: 12, unitAh: 100, units: 2 } }));
   }),
   boat('three 12 V batteries on a 24 V boat (cannot be arranged)', (p) => {
+    p.profile.systemVoltage = 24;
     the(p, 'battery-bank', 'house').props.units = 3;
-    return { id: 'v24', name: '24 V', systemVoltage: 24 };
   }),
   boat('lithium start battery', (p) => {
     the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';

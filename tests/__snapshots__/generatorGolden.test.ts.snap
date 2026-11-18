@@ -1649,7 +1649,7 @@ exports[`more generated designs are unchanged (fingerprint only) > template: Lar
 
 exports[`more generated designs are unchanged (fingerprint only) > template: Offshore cruiser, lithium and solar 1`] = `"60 components, 93 wires, 5 findings, 6d00206133f24e1d"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > three 12 V batteries on a 24 V boat (cannot be arranged) 1`] = `"62 components, 90 wires, 2 findings, 909ad8d801984e1a"`;
+exports[`more generated designs are unchanged (fingerprint only) > three 12 V batteries on a 24 V boat (cannot be arranged) 1`] = `"62 components, 90 wires, 3 findings, fae5696e41432509"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > thruster and winch on their own banks 1`] = `"81 components, 118 wires, 1 findings, f92e991f1907ec43"`;
 
