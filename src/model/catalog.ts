@@ -124,7 +124,7 @@ export const CATALOG: CatalogItem[] = [
     category: 'engine',
     glyph: 'ENG',
     zone: 'engine',
-    props: { starterAmps: 150, alternatorAmps: 90, regulator: 'internal', chargeSplit: 'auto' },
+    props: { starterAmps: 150, alternatorAmps: 90, regulator: 'internal', chargeSplit: 'auto', isolatorSense: 'excite' },
     defs: [
       { key: 'starterAmps', label: 'Starter current (at 12 V)', type: 'number', unit: 'A', min: 0, help: 'Typical 30–50 hp diesel: 120–200 A at 12 V. Halved automatically for 24 V.' },
       { key: 'alternatorAmps', label: 'Alternator output', type: 'number', unit: 'A', min: 0 },
@@ -138,6 +138,11 @@ export const CATALOG: CatalogItem[] = [
         { value: 'relay-run', label: 'Charging relay (engine-run / D+ triggered)' },
         { value: 'isolator-fet', label: 'FET isolator (zero-drop)' },
         { value: 'isolator-diode', label: 'Diode isolator' },
+      ] },
+      { key: 'isolatorSense', label: 'Diode isolator compensation', type: 'select', help: 'Only used with a diode isolator and the stock regulator. A diode isolator loses ~0.7 V, so the regulator must be made to see battery voltage, not alternator voltage, or the batteries are always undercharged. Most diode isolators have an "E" (excitation) terminal for this; alternators with a remote-sense terminal can instead have the sense lead moved to the battery side.', options: [
+        { value: 'excite', label: 'Isolator "E" terminal to alternator excitation (recommended)' },
+        { value: 'sense', label: 'Alternator sense lead moved to the battery side' },
+        { value: 'none', label: 'Not compensated (stock wiring)' },
       ] },
     ],
   },

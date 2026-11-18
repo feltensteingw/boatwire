@@ -142,12 +142,75 @@ describe('battery isolators', () => {
     expect(d.findings.some((f) => f.rule === 'isolator')).toBe(false);
   });
 
-  it('diode isolator with stock regulator warns about voltage drop', () => {
+  const isoWarnings = (d: Design) => [...d.findings, ...audit(d)].filter((f) => f.rule === 'isolator' && f.severity === 'warning');
+
+  it('uncompensated diode isolator with stock regulator warns about voltage drop', () => {
     const p = withSplit('isolator-diode');
+    p.equipment.find((e) => e.kind === 'engine')!.props.isolatorSense = 'none';
     const d = generateIdeal(p);
-    const all = [...d.findings, ...audit(d)];
-    expect(all.filter((f) => f.rule === 'isolator' && f.severity === 'warning')).toHaveLength(1);
+    expect(isoWarnings(d)).toHaveLength(1);
+    expect(d.wires.some((w) => w.notes?.includes('isolator-compensation'))).toBe(false);
     expect(errorsOf(d, p)).toEqual([]);
+  });
+
+  it('diode isolator defaults to the "E" excitation wire and then does not warn', () => {
+    const p = withSplit('isolator-diode');
+    delete p.equipment.find((e) => e.kind === 'engine')!.props.isolatorSense; // older projects have no setting
+    const d = generateIdeal(p);
+    const iso = d.nodes.find((n) => n.type === 'isolator')!;
+    expect(iso.data.compensation).toBe('excite');
+    expect(iso.terminals.some((t) => t.id === 'exc' && t.pol === 'sig')).toBe(true);
+    const ew = d.wires.find((w) => w.kind === 'sig' && w.from.node === iso.id && w.from.term === 'exc')!;
+    expect(ew.to).toEqual({ node: 'alternator', term: 'exc' });
+    expect(isoWarnings(d)).toEqual([]);
+    expect(errorsOf(d, p)).toEqual([]);
+  });
+
+  it('diode isolator with the sense lead moved runs alternator sense to the house bus', () => {
+    const p = withSplit('isolator-diode');
+    p.equipment.find((e) => e.kind === 'engine')!.props.isolatorSense = 'sense';
+    const d = generateIdeal(p);
+    const sw = d.wires.find((w) => w.kind === 'sig' && w.from.node === 'alternator' && w.from.term === 'sense')!;
+    expect(d.nodes.find((n) => n.id === sw.to.node)!.type).toBe('bus-pos');
+    expect(d.wires.some((w) => w.to.term === 'exc' || w.from.term === 'exc')).toBe(false);
+    expect(isoWarnings(d)).toEqual([]);
+    expect(errorsOf(d, p)).toEqual([]);
+  });
+
+  it('FET isolator and external regulator get no compensation wire', () => {
+    const p = withSplit('isolator-fet');
+    expect(generateIdeal(p).wires.some((w) => w.notes?.includes('isolator-compensation'))).toBe(false);
+    const q = withSplit('isolator-diode');
+    q.equipment.find((e) => e.kind === 'engine')!.props.regulator = 'external';
+    const d = generateIdeal(q);
+    expect(d.wires.some((w) => w.notes?.includes('isolator-compensation'))).toBe(false);
+    expect(isoWarnings(d)).toEqual([]);
+  });
+
+  it('audit: a hand-drawn diode isolator is compensated by an E wire, a sense wire or the inspector setting', () => {
+    const alt = makeNode('alternator', 'alt', 'Alternator', { data: { amps: 90 } });
+    const iso = makeNode('isolator', 'iso', 'Isolator', { data: { isolatorType: 'diode', rating: 120 } });
+    const base: Design = { id: 'x', name: 'x', systemVoltage: 12, findings: [], nodes: [alt, iso], wires: [{ id: 'a', kind: 'pos', domain: 'dc', from: { node: 'alt', term: 'b' }, to: { node: 'iso', term: 'in' }, lengthFt: 3, gauge: '4' }] };
+    const warns = (d: Design) => audit(d).filter((f) => f.rule === 'isolator');
+    expect(warns(base)).toHaveLength(1);
+
+    const byE = structuredClone(base);
+    byE.nodes[0].terminals.push({ id: 'exc', pol: 'sig', side: 'N' });
+    byE.nodes[1].terminals.push({ id: 'exc', pol: 'sig', side: 'N' });
+    byE.wires.push({ id: 'e', kind: 'sig', domain: 'dc', from: { node: 'iso', term: 'exc' }, to: { node: 'alt', term: 'exc' }, lengthFt: 3, gauge: '18' });
+    expect(warns(byE)).toEqual([]);
+
+    const bySense = structuredClone(base);
+    const bus = makeNode('bus-pos', 'bus', 'Bus');
+    bus.terminals.push({ id: 's1', pol: 'sig', side: 'W' });
+    bySense.nodes.push(bus);
+    bySense.nodes[0].terminals.push({ id: 'sense', pol: 'sig', side: 'N' });
+    bySense.wires.push({ id: 's', kind: 'sig', domain: 'dc', from: { node: 'alt', term: 'sense' }, to: { node: 'bus', term: 's1' }, lengthFt: 3, gauge: '18' });
+    expect(warns(bySense)).toEqual([]);
+
+    const bySetting = structuredClone(base);
+    bySetting.nodes[1].data.compensation = 'excite';
+    expect(warns(bySetting)).toEqual([]);
   });
 
   it('lithium house ignores the isolator choice and keeps the DC-DC charger', () => {

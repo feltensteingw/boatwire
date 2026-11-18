@@ -151,6 +151,24 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
               />
             </Field>
           )}
+          {node.type === 'isolator' && data.isolatorType !== 'fet' && (
+            <Field label="Voltage compensation" help={'How the alternator regulator is made to see battery voltage despite the ~0.7 V diode drop. If you draw a wire to the isolator\'s "E" terminal or the alternator\'s sense terminal, that also counts.'}>
+              <Select
+                value={String(data.compensation ?? 'none')}
+                options={[
+                  { value: 'none', label: 'None / not sure' },
+                  { value: 'excite', label: 'Isolator "E" terminal to alternator excitation' },
+                  { value: 'sense', label: 'Alternator sense lead on the battery side' },
+                ]}
+                onChange={(v) =>
+                  edit((n) => {
+                    if (v === 'none') delete n.data.compensation;
+                    else n.data.compensation = v;
+                  })
+                }
+              />
+            </Field>
+          )}
           {['fuse', 'breaker', 'switch', 'elci', 'contactor', 'acr', 'dcdc', 'converter', 'isolator'].includes(node.type) && (
             <Field label="Rating" help="Current rating in amps: the fuse or breaker size, or the device's continuous rating. The wire it protects must be able to carry at least this much.">
               <NumInput value={data.rating} unit="A" onChange={(v) => edit((n) => void (n.data.rating = v))} />
