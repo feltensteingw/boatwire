@@ -263,6 +263,25 @@ export interface Design {
   wires: Wire[];
   /** Notes produced while generating (design decisions). */
   findings: Finding[];
+  /** A user-supplied picture of their wiring diagram, shown faded behind the drawing for tracing. */
+  underlay?: Underlay;
+}
+
+/** Trace-over image, positioned in diagram (flow) coordinates. */
+export interface Underlay {
+  /** Downscaled image as a data URL (kept small so the project still fits in cloud storage). */
+  src: string;
+  /** Original file name, for display. */
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** 0–1 */
+  opacity: number;
+  visible: boolean;
+  /** When locked the image ignores the mouse, so clicks and pans reach the canvas. */
+  locked: boolean;
 }
 
 export interface Project {

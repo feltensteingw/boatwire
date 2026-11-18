@@ -18,6 +18,7 @@ import { CloudControls, CloudSync } from './cloud/CloudControls';
 import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
 import { HelpButton, HelpGuide, HelpLink } from './ui/Help';
+import { UNDERLAY_ACCEPT, underlayFromFile } from './ui/underlayFile';
 
 const VIEWS: { id: View; label: string; tip: string }[] = [
   { id: 'ideal', label: 'Ideal design', tip: 'The best-practice wiring for your equipment list, drawn automatically. Change equipment on the left and it redraws instantly.' },
@@ -293,6 +294,7 @@ function ExistingView() {
   const setView = useStore((s) => s.setView);
   const setReportTab = useStore((s) => s.setReportTab);
   const [busy, setBusy] = useState(false);
+  const traceRef = useRef<HTMLInputElement>(null);
 
   if (!existing) {
     return (
@@ -328,6 +330,30 @@ function ExistingView() {
             <b>Blank canvas</b>
             <span>Add every component yourself from the palette.</span>
           </button>
+          <button className="start" disabled={busy} onClick={() => traceRef.current?.click()}>
+            <b>{busy ? 'Reading your diagram…' : 'Trace over my wiring diagram'}</b>
+            <span>Upload a photo, scan or PDF of your boat's wiring diagram. It shows faded behind a blank canvas so you can place components and wires on top of it.</span>
+          </button>
+          <input
+            ref={traceRef}
+            type="file"
+            accept={UNDERLAY_ACCEPT}
+            hidden
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (!f) return;
+              setBusy(true);
+              try {
+                const underlay = await underlayFromFile(f);
+                setExisting({ id: 'existing', name: 'Existing', systemVoltage: project.profile.systemVoltage, nodes: [], wires: [], findings: [], underlay });
+              } catch (err) {
+                alert(`Could not use that file: ${(err as Error).message}`);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
         </div>
       </div>
     );

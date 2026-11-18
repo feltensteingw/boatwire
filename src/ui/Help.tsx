@@ -340,15 +340,24 @@ const SECTIONS: Section[] = [
   {
     id: 'existing',
     title: 'Existing boat & upgrade plan',
-    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete',
+    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram',
     body: (
       <>
         <p>Use this when you're improving a boat you already own. Draw the wiring as it really is; BoatWire checks it and lists the changes needed to reach the ideal design.</p>
-        <h4>Three ways to start</h4>
+        <h4>Four ways to start</h4>
         <ul>
           <li><b>From my equipment list</b>: places your batteries, chargers and loads, and you draw the wires, fuses and switches.</li>
           <li><b>From the ideal design</b>: copies the ideal design, and you delete or change what's different. This is fastest for a fairly standard boat.</li>
           <li><b>Blank canvas</b>: you add everything yourself.</li>
+          <li><b>Trace over my wiring diagram</b>: upload a photo, scan or PDF of your boat's diagram and draw on top of it.</li>
+        </ul>
+        <h4>Tracing over your own diagram</h4>
+        <ul>
+          <li>Use <b>⤒ Trace over my diagram…</b> at the top right of the canvas to upload a photo, scan or PDF. A PDF uses its first page. The picture shows faded behind your drawing.</li>
+          <li>While it is unlocked, drag it to move it and drag the corner handle to resize it. Click <b>Lock</b> when it lines up, so clicks and panning go to your drawing.</li>
+          <li>The slider sets how faint the picture is, the checkbox hides it, <b>Fit</b> zooms to it, and <b>Replace</b> swaps in a new file in the same place.</li>
+          <li>BoatWire does not read the picture. It is only a guide, so the checks and upgrade plan use the components and wires you draw.</li>
+          <li>The picture is shrunk and saved with your project, so it is included in cloud saves and project files.</li>
         </ul>
         <h4>Drawing</h4>
         <ul>
