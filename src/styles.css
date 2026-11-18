@@ -417,11 +417,7 @@ h4 {
 .theme-pick {
   max-width: 170px;
 }
-@media (max-width: 1100px) {
-  .theme-pick {
-    max-width: 40px;
-  }
-}
+
 .views {
   display: flex;
   gap: 2px;
@@ -1643,12 +1639,6 @@ table.cmp td.best {
 }
 
 @media (max-width: 1100px) {
-  .inspector {
-    width: 270px;
-  }
-  .sidebar {
-    width: 260px;
-  }
   .starts {
     grid-template-columns: 1fr;
   }
@@ -2142,6 +2132,291 @@ table.cmp td.best {
 }
 @media print {
   .underlay-panel {
+    display: none;
+  }
+}
+
+/* ================================================================ narrow screens (tablets and phones)
+   Below 1200 px the equipment list and the details panel no longer fit beside the diagram. They
+   become panels that slide over it, switched from a bar at the bottom of the screen (see
+   ui/panes.ts, NARROW_PX). Below 700 px (phones) the equipment list takes the whole screen and
+   the details panel is a sheet over the lower half, so the diagram stays in view above it. */
+.panebar,
+.pane-backdrop,
+.menu-theme {
+  display: none;
+}
+@media (max-width: 1199px) {
+  /* -- header: two rows. Brand and actions above, views and scenario below. */
+  .header {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 6px 10px;
+    padding: 6px 10px;
+  }
+  .header::after {
+    content: '';
+    order: 9;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .brand .version {
+    display: none;
+  }
+  .undo {
+    margin-right: auto;
+  }
+  .views {
+    order: 10;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .scen {
+    order: 11;
+    min-width: 0;
+  }
+  .scen select {
+    min-width: 0;
+    max-width: 240px;
+  }
+  .theme-pick {
+    max-width: 150px;
+  }
+
+  /* -- side panels slide over the diagram */
+  .main,
+  .workspace {
+    position: relative;
+    overflow: hidden;
+  }
+  .sidebar,
+  .inspector {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(340px, 88vw);
+    transition: transform 0.18s ease;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.22);
+  }
+  .sidebar {
+    left: 0;
+    transform: translateX(-105%);
+  }
+  .inspector {
+    right: 0;
+    z-index: 25;
+    transform: translateX(105%);
+  }
+  .pane-left .sidebar,
+  .pane-right .inspector {
+    transform: none;
+  }
+  /* closed panels must not be reachable by keyboard or screen reader */
+  .app:not(.pane-left) .sidebar,
+  .app:not(.pane-right) .inspector {
+    visibility: hidden;
+    transition:
+      transform 0.18s ease,
+      visibility 0s 0.18s;
+  }
+  .pane-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 29;
+    background: rgba(10, 20, 30, 0.35);
+  }
+
+  /* -- the bar that switches panels */
+  .panebar {
+    display: flex;
+    flex-shrink: 0;
+    height: 48px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .panebar button {
+    flex: 1;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .panebar button.on {
+    color: var(--accent);
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  /* -- option bars: one line that scrolls sideways, instead of wrapping into several */
+  .layerbar,
+  .toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+  }
+  .layerbar > *,
+  .toolbar > * {
+    flex-shrink: 0;
+  }
+  .toolbar .spacer {
+    display: none;
+  }
+  .canvas-title .hint {
+    display: none;
+  }
+  .toasts {
+    bottom: 64px;
+  }
+  .report-body,
+  .compare-scroll {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .report-body table,
+  .compare-scroll table {
+    min-width: 640px;
+  }
+}
+@media (max-width: 899px) {
+  .react-flow__minimap {
+    display: none;
+  }
+  .starts {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 699px) {
+  /* -- header: third row for the scenario; the colour scheme moves into the File menu */
+  .header {
+    gap: 4px 6px;
+    padding: 5px 8px;
+  }
+  .header > .theme-pick {
+    display: none;
+  }
+  .menu-theme {
+    display: block;
+    padding: 2px 4px 6px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .menu-theme .theme-pick {
+    max-width: none;
+    width: 100%;
+    color: var(--text);
+    border-color: var(--border-2);
+  }
+  .views {
+    flex: 1 1 100%;
+  }
+  .views button {
+    flex: 1;
+    padding: 7px 4px;
+    font-size: 12.5px;
+  }
+  .scen {
+    flex: 1 1 100%;
+    order: 12;
+  }
+  .scen .hint {
+    display: none;
+  }
+  .scen select {
+    flex: 1;
+    max-width: none;
+  }
+  .cloud-status,
+  .brand > span:not(.version) {
+    display: none;
+  }
+  .signin {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  /* the header already names the boat's scenario and voltage; give the room to the diagram */
+  .canvas-title {
+    display: none;
+  }
+
+  /* -- equipment: the whole screen. Details: a sheet over the lower half. */
+  .sidebar {
+    width: 100%;
+    box-shadow: none;
+  }
+  .pane-backdrop {
+    display: none;
+  }
+  .inspector {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 55%;
+    transform: translateY(105%);
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.22);
+  }
+  .modal {
+    max-height: 86vh;
+    padding: 14px;
+  }
+  .underlay-bar {
+    flex-wrap: wrap;
+    max-width: calc(100vw - 32px);
+  }
+  .refusal {
+    top: 8px;
+  }
+}
+
+/* -- fingers, not a mouse: larger targets, and text large enough that iOS does not zoom on focus */
+@media (pointer: coarse) {
+  button,
+  select,
+  input[type='text'],
+  input[type='number'] {
+    min-height: 38px;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  .toggle {
+    min-height: 38px;
+  }
+  button.icon,
+  .header .undo button {
+    min-width: 38px;
+  }
+  .view-existing .react-flow__handle.h {
+    width: 15px;
+    height: 15px;
+  }
+  /* An invisible margin beside each terminal dot, so it can be hit with a fingertip. Sideways
+     only: dots are stacked 16 px apart, and a taller margin would steal taps meant for the next one. */
+  .view-existing .react-flow__handle.h::after {
+    content: '';
+    position: absolute;
+    inset: -1px -14px;
+  }
+}
+/* A terminal that has been tapped and is waiting for the other end of the wire. */
+.view-existing .react-flow__handle.h.clickconnecting,
+.view-existing .react-flow__handle.h.connectingfrom {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+@media print {
+  .panebar {
     display: none;
   }
 }

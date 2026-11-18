@@ -419,7 +419,7 @@ const SECTIONS: Section[] = [
   {
     id: 'shortcuts',
     title: 'Keyboard & mouse',
-    keywords: 'keyboard shortcuts mouse delete zoom pan help undo redo mistake restore',
+    keywords: 'keyboard shortcuts mouse delete zoom pan help undo redo mistake restore touch tablet phone ipad tap hold mobile',
     body: (
       <table className="g-table">
         <tbody>
@@ -430,8 +430,10 @@ const SECTIONS: Section[] = [
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Remove the selected component or wire (Existing boat)</td></tr>
           <tr><td>Scroll / pinch</td><td>Zoom the diagram</td></tr>
           <tr><td>Drag background</td><td>Pan</td></tr>
-          <tr><td>Drag terminal → terminal</td><td>Draw a wire (Existing boat)</td></tr>
+          <tr><td>Drag terminal → terminal</td><td>Draw a wire (Existing boat). Clicking or tapping one terminal and then another does the same.</td></tr>
           <tr><td>Hover</td><td>Explanation of most buttons and options</td></tr>
+          <tr><td>Press and hold (touch screens)</td><td>The same explanation, without pressing the button. Tapping the small <b>?</b> beside a field explains that field.</td></tr>
+          <tr><td>Bar at the bottom (tablets and phones)</td><td>Switches between the equipment list, the diagram and the details panel, which slide over the diagram on smaller screens. Tapping a component opens its details.</td></tr>
         </tbody>
       </table>
     ),

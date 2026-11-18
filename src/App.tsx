@@ -17,6 +17,7 @@ import { CloudControls, CloudNotice, CloudSync } from './cloud/CloudControls';
 import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
 import { ToastLayer } from './ui/Toasts';
+import { isNarrow, usePane } from './ui/panes';
 import { redo, undo, useHistory } from './state/history';
 import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
 import { parseProject } from './model/validate';
@@ -37,11 +38,19 @@ const VIEWS: { id: View; label: string; tip: string }[] = [
 
 export default function App() {
   const view = useStore((s) => s.view);
+  const pane = usePane((s) => s.pane);
+  const setPane = usePane((s) => s.setPane);
+  const selection = useStore((s) => s.selection);
   useApplyTheme(useStore((s) => s.theme));
   useUndoKeys();
+  // Narrow screens: tapping a component or wire brings up its details; changing view goes back to the main panel.
+  useEffect(() => {
+    if (selection && isNarrow()) setPane('right');
+  }, [selection, setPane]);
+  useEffect(() => setPane('main'), [view, setPane]);
   return (
     <ErrorBoundary scope="app">
-      <div className={`app view-${view}`}>
+      <div className={`app view-${view} pane-${pane}`}>
         <CloudSync />
         <TipLayer />
         <ToastLayer />
@@ -53,6 +62,8 @@ export default function App() {
         <ErrorBoundary scope="view" key={view}>
           <div className="main">
             <Sidebar />
+            {/* Tablet: tap outside the equipment panel to close it. Hidden by CSS everywhere else. */}
+            {pane === 'left' && <div className="pane-backdrop" onClick={() => setPane('main')} />}
             <div className="center">
               {view === 'ideal' && <IdealView />}
               {view === 'existing' && <ExistingView />}
@@ -63,8 +74,31 @@ export default function App() {
             </div>
           </div>
         </ErrorBoundary>
+        <PaneBar />
       </div>
     </ErrorBoundary>
+  );
+}
+
+/** Narrow screens only: switch between the equipment list, the main view and the details panel. */
+function PaneBar() {
+  const view = useStore((s) => s.view);
+  const hasSelection = useStore((s) => !!s.selection);
+  const { pane, setPane } = usePane();
+  const hasDetails = view === 'ideal' || view === 'existing';
+  const main = { ideal: 'Diagram', existing: 'Drawing', compare: 'Compare', reports: 'Reports' }[view];
+  return (
+    <nav className="panebar" aria-label="Panels">
+      <button className={pane === 'left' ? 'on' : ''} aria-pressed={pane === 'left'} onClick={() => setPane(pane === 'left' ? 'main' : 'left')}>
+        Equipment
+      </button>
+      <button className={pane === 'main' ? 'on' : ''} aria-pressed={pane === 'main'} onClick={() => setPane('main')}>
+        {main}
+      </button>
+      <button className={pane === 'right' ? 'on' : ''} aria-pressed={pane === 'right'} disabled={!hasDetails} onClick={() => setPane(pane === 'right' ? 'main' : 'right')}>
+        {hasSelection ? 'Details' : 'Design check'}
+      </button>
+    </nav>
   );
 }
 
@@ -119,6 +153,9 @@ function Header() {
         <button onClick={() => setMenu(!menu)} data-tip="New boat, example boat, open / save a project file, and export the diagram or reports.">File ▾</button>
         {menu && (
           <div className="menu" onMouseLeave={() => setMenu(false)}>
+            <div className="menu-theme">
+              <ThemePicker />
+            </div>
             <button
               onClick={() => {
                 newProject();
@@ -511,7 +548,7 @@ function ExistingView() {
         <LayerBar manual />
         <div className="canvas-title">
           <b>Existing boat</b>
-          <span className="hint"> — drag from one terminal dot to another to draw a wire. Click a wire to set its size and length. Delete removes the selection.</span>
+          <span className="hint"> — drag from one terminal dot to another to draw a wire, or tap one dot and then the other. Click a wire to set its size and length. Delete removes the selection.</span>
         </div>
         <Diagram design={existing} findings={findings} mode="manual" />
       </div>
