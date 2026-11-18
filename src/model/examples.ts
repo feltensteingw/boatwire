@@ -18,11 +18,14 @@ export function newEquipment(kind: EquipmentKind, overrides: { name?: string; zo
   };
 }
 
+/** Name a new, empty boat starts with. */
+export const BLANK_NAME = 'My boat';
+
 export function blankProject(): Project {
   return {
     version: 1,
     profile: {
-      name: 'My boat',
+      name: BLANK_NAME,
       lengthFt: 40,
       systemVoltage: 12,
       acStandard: 'us120',

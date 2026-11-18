@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { arrangePositions, autoLayout } from './layout/layout';
 import { existingFromEquipment, existingFromIdeal, equipmentNode, paletteNode } from './engine/existing';
 import { activeScenario } from './engine/scenario';
@@ -16,6 +16,8 @@ import { Toggle } from './ui/fields';
 import { CloudControls, CloudSync } from './cloud/CloudControls';
 import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
+import { ToastLayer } from './ui/Toasts';
+import { redo, undo, useHistory } from './state/history';
 import { HelpButton, HelpGuide, HelpLink } from './ui/Help';
 import { UNDERLAY_ACCEPT, underlayFromFile } from './ui/underlayFile';
 
@@ -33,10 +35,12 @@ const VIEWS: { id: View; label: string; tip: string }[] = [
 export default function App() {
   const view = useStore((s) => s.view);
   useApplyTheme(useStore((s) => s.theme));
+  useUndoKeys();
   return (
     <div className={`app view-${view}`}>
       <CloudSync />
       <TipLayer />
+      <ToastLayer />
       <HelpGuide />
       <Header />
       <div className="main">
@@ -86,6 +90,7 @@ function Header() {
           </button>
         ))}
       </nav>
+      <UndoRedo />
       <div className="scen">
         <span className="hint">Scenario</span>
         <select data-tip="Which what-if version of the boat to draw. Scenarios can change system voltage, house battery chemistry and capacity without touching your equipment list. Manage them under Compare." value={project.activeScenario} onChange={(e) => setScenario(e.target.value)}>
@@ -106,7 +111,7 @@ function Header() {
           <div className="menu" onMouseLeave={() => setMenu(false)}>
             <button
               onClick={() => {
-                if (confirmReplace()) newProject();
+                newProject();
                 setMenu(false);
               }}
             >
@@ -114,7 +119,7 @@ function Header() {
             </button>
             <button
               onClick={() => {
-                if (confirmReplace()) loadExample();
+                loadExample();
                 setMenu(false);
               }}
             >
@@ -175,6 +180,49 @@ function Header() {
   );
 }
 
+/** Undo / Redo buttons. The tooltip says what each would do. */
+function UndoRedo() {
+  const { undoLabel, redoLabel } = useHistory();
+  const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
+  return (
+    <div className="undo">
+      <button className="icon" disabled={!undoLabel} onClick={undo} aria-label="Undo" data-tip={undoLabel ? `Undo: ${undoLabel} (${mod}Z)` : `Nothing to undo (${mod}Z)`}>
+        <TurnArrow />
+      </button>
+      <button className="icon" disabled={!redoLabel} onClick={redo} aria-label="Redo" data-tip={redoLabel ? `Redo: ${redoLabel} (${mod}Shift+Z)` : `Nothing to redo (${mod}Shift+Z)`}>
+        <TurnArrow flip />
+      </button>
+    </div>
+  );
+}
+
+/** Curved "go back" arrow; flipped it is "go forward". */
+function TurnArrow({ flip }: { flip?: boolean }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 20 20" aria-hidden style={flip ? { transform: 'scaleX(-1)' } : undefined}>
+      <path d="M7.5 4 3.5 8l4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 8h7.5a5 5 0 0 1 0 10H8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes, anywhere except inside a dialog (the guide's search box keeps its own undo). */
+function useUndoKeys() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'z' && k !== 'y') return;
+      if ((e.target as HTMLElement | null)?.closest?.('.modal')) return;
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
 const BUILD_TIME = new Date(__APP_BUILD_TIME__);
 
 /** Version + commit + build time, so you can see when a new deploy has landed. */
@@ -182,7 +230,8 @@ function VersionStamp() {
   const when = BUILD_TIME.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   return (
     <span className="version" data-tip={`Version ${__APP_VERSION__}\nCommit ${__APP_COMMIT__}\nBuilt ${BUILD_TIME.toLocaleString()}`}>
-      v{__APP_VERSION__} · {__APP_COMMIT__} · {when}
+      v{__APP_VERSION__} · {__APP_COMMIT__}
+      <span className="v-time"> · {when}</span>
     </span>
   );
 }
@@ -200,10 +249,6 @@ function ThemePicker() {
       ))}
     </select>
   );
-}
-
-function confirmReplace() {
-  return window.confirm('Replace the current boat? Save it first if you want to keep it (File → Save project file).');
 }
 
 function exportDiagram(fmt: 'png' | 'svg') {
@@ -441,10 +486,8 @@ function ExistingView() {
           </button>
           <button
             className="link danger"
-            data-tip="Delete this drawing and start over. Your equipment list is not affected."
-            onClick={() => {
-              if (window.confirm('Discard the existing-system drawing?')) setExisting(undefined);
-            }}
+            data-tip="Delete this drawing and start over. Your equipment list is not affected. You can undo this."
+            onClick={() => setExisting(undefined)}
           >
             Discard drawing
           </button>

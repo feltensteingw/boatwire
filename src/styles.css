@@ -437,6 +437,33 @@ h4 {
   color: #fff;
   box-shadow: inset 0 -2px 0 var(--w-ac);
 }
+.undo {
+  display: flex;
+  gap: 2px;
+}
+.header .undo button {
+  border: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+/* Keep the header on one line: nothing in it wraps, and the build time gives way first. */
+.header button,
+.header .pill,
+.brand .version {
+  white-space: nowrap;
+}
+@media (max-width: 1640px) {
+  .brand .v-time {
+    display: none;
+  }
+}
+.header .undo button:disabled {
+  opacity: 0.35;
+}
 .scen {
   display: flex;
   align-items: center;
@@ -791,6 +818,50 @@ table.zones td:nth-child(3) {
 }
 @media print {
   .refusal {
+    display: none;
+  }
+}
+/* ---- toasts: brief messages with an optional action, bottom centre ---- */
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 8px 8px 8px 14px;
+  border-radius: 8px;
+  background: var(--navy);
+  color: #e8f0f7;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+.toast button {
+  background: transparent;
+  color: inherit;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.toast .toast-action {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.toast button.icon {
+  border: none;
+  opacity: 0.7;
+}
+@media print {
+  .toasts {
     display: none;
   }
 }

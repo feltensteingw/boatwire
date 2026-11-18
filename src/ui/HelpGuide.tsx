@@ -419,12 +419,14 @@ const SECTIONS: Section[] = [
   {
     id: 'shortcuts',
     title: 'Keyboard & mouse',
-    keywords: 'keyboard shortcuts mouse delete zoom pan help',
+    keywords: 'keyboard shortcuts mouse delete zoom pan help undo redo mistake restore',
     body: (
       <table className="g-table">
         <tbody>
           <tr><td><kbd>?</kbd></td><td>Open this guide</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>Close the guide or dialogs</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Z</kbd></td><td>Undo the last change. The ↶ ↷ buttons in the header do the same and say what they will undo.</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td><td>Redo (also <kbd>Ctrl</kbd> + <kbd>Y</kbd>)</td></tr>
           <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Remove the selected component or wire (Existing boat)</td></tr>
           <tr><td>Scroll / pinch</td><td>Zoom the diagram</td></tr>
           <tr><td>Drag background</td><td>Pan</td></tr>

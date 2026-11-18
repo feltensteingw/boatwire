@@ -69,6 +69,9 @@ interface State {
 
 const mutate = (p: Project, fn: (p: Project) => void): Project => {
   const copy: Project = structuredClone(p);
+  // structuredClone makes a fresh copy of the trace-over image (hundreds of KB of text). Point the
+  // copy back at the original string, so edits and the undo history all share one copy of it.
+  if (p.existing?.underlay && copy.existing?.underlay) copy.existing.underlay.src = p.existing.underlay.src;
   fn(copy);
   return copy;
 };
