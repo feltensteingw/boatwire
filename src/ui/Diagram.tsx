@@ -12,6 +12,7 @@ import {
   useNodesInitialized,
   useNodesState,
   useReactFlow,
+  useStoreApi,
   type Connection,
 } from '@xyflow/react';
 import { toPng, toSvg } from 'html-to-image';
@@ -56,7 +57,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   const { fitView, fitBounds, getViewport, setViewport } = useReactFlow();
   const [layout, setLayout] = useState<Layout | null>(null);
   const layoutRef = useRef<Layout | null>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
+  const flow = useStoreApi();
   /** What the view was last fitted for. The view is only re-fitted when this changes. */
   const fittedFor = useRef('');
   const [busy, setBusy] = useState(false);
@@ -116,10 +117,10 @@ function DiagramInner({ design, findings, mode }: Props) {
    * the screen stays where it was, instead of the diagram jumping under the user.
    */
   function holdView(before: Layout, after: Layout) {
-    const box = boxRef.current?.getBoundingClientRect();
-    if (!box) return;
+    const { width, height } = flow.getState();
+    if (!width || !height) return;
     const vp = getViewport();
-    const shift = viewShift(before, after, { x: (box.width / 2 - vp.x) / vp.zoom, y: (box.height / 2 - vp.y) / vp.zoom });
+    const shift = viewShift(before, after, { x: (width / 2 - vp.x) / vp.zoom, y: (height / 2 - vp.y) / vp.zoom });
     if (shift.x || shift.y) setViewport({ x: vp.x - shift.x * vp.zoom, y: vp.y - shift.y * vp.zoom, zoom: vp.zoom });
   }
 
@@ -221,7 +222,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   }, [mode, deleteSelection]);
 
   return (
-    <div className="diagram" ref={boxRef}>
+    <div className="diagram">
       {busy && <div className="busy">Laying out…</div>}
       <ReactFlow
         nodes={nodes}
