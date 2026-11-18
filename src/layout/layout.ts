@@ -244,8 +244,8 @@ async function runElk(graph: ElkNode): Promise<ElkNode> {
   }
 }
 
-/** Automatic layered layout (used for generated designs). */
-export async function autoLayout(design: Design, layers: LayerSettings): Promise<Layout> {
+/** Everything ELK needs for one design, plus what is needed to turn its answer into a Layout. */
+function elkInput(design: Design, layers: LayerSettings) {
   const { nodes, wires, negHidden, hiddenCircuits } = visibleSubset(design, layers);
   const N = new Map(nodes.map((n) => [n.id, n]));
   // ports: one per wire end, side chosen by relative column
@@ -333,6 +333,14 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
     edges: edges.map((e) => ({ id: e.id, sources: [e.sourcePort], targets: [e.targetPort] }) as ElkExtendedEdge),
   };
 
+  return { graph, nodes, N, ports, edges, negHidden, hiddenCircuits };
+}
+
+type ElkInput = ReturnType<typeof elkInput>;
+
+/** Run ELK (two passes). Mutates `graph`, so take the cache key first. */
+async function solve({ graph, nodes, N }: ElkInput): Promise<ElkNode> {
+  const sideName = { W: 'WEST', E: 'EAST' } as const;
   let res = await runElk(graph);
   // Pass 2: pin panel / bus ports at evenly spaced positions below the header,
   // in the order ELK chose in pass 1 (pass 1 ignores header padding).
@@ -357,6 +365,11 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
     }
     res = await runElk(graph);
   }
+  return res;
+}
+
+/** Combine ELK's positions with the design's current nodes and wires. */
+function assemble({ N, ports, edges, negHidden, hiddenCircuits }: ElkInput, res: ElkNode): Layout {
   const laid: LaidNode[] = [];
   for (const c of res.children ?? []) {
     const n = N.get(c.id)!;
@@ -381,6 +394,49 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
     if (s) e.points = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
   }
   return { nodes: laid, edges };
+}
+
+// ELK's answer depends only on the graph's shape: which components exist, their sizes and what
+// connects to what. Most edits (a wattage, a name, a wire length) change labels but not the shape,
+// so the last answer is kept and reused. That makes those edits redraw instantly, with nothing moving.
+let solved: { key: string; res: ElkNode } | undefined;
+
+/** The layout for this design if its shape matches the last one laid out; otherwise null. Never runs ELK. */
+export function cachedLayout(design: Design, layers: LayerSettings): Layout | null {
+  if (!solved) return null;
+  const inp = elkInput(design, layers);
+  return JSON.stringify(inp.graph) === solved.key ? assemble(inp, solved.res) : null;
+}
+
+/** Automatic layered layout (used for generated designs). */
+export async function autoLayout(design: Design, layers: LayerSettings): Promise<Layout> {
+  const inp = elkInput(design, layers);
+  const key = JSON.stringify(inp.graph);
+  const res = solved?.key === key ? solved.res : await solve(inp);
+  solved = { key, res };
+  return assemble(inp, res);
+}
+
+/**
+ * How far the component nearest `center` moved between two layouts of the same diagram
+ * (diagram units). Used to keep the user's view steady when an edit re-arranges things.
+ * Components that exist in only one of the layouts are ignored; no shared component means no shift.
+ */
+export function viewShift(before: Layout, after: Layout, center: { x: number; y: number }): { x: number; y: number } {
+  const now = new Map(after.nodes.map((n) => [n.id, n]));
+  let best: LaidNode | undefined;
+  let bestD = Infinity;
+  for (const n of before.nodes) {
+    if (!now.has(n.id)) continue;
+    const d = Math.hypot(n.x + n.w / 2 - center.x, n.y + n.h / 2 - center.y);
+    if (d < bestD) {
+      bestD = d;
+      best = n;
+    }
+  }
+  if (!best) return { x: 0, y: 0 };
+  const to = now.get(best.id)!;
+  return { x: to.x - best.x, y: to.y - best.y };
 }
 
 /** Layout for hand-drawn designs: user positions, one port per terminal. */

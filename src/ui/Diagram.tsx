@@ -18,7 +18,7 @@ import { toPng, toSvg } from 'html-to-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { joinTerminals } from '../engine/connect';
 import { estimateCurrents } from '../engine/audit';
-import { autoLayout, manualLayout, type Layout } from '../layout/layout';
+import { autoLayout, cachedLayout, manualLayout, viewShift, type Layout } from '../layout/layout';
 import type { Design, Finding } from '../model/types';
 import { severityByNode } from '../state/derived';
 import { useStore } from '../state/store';
@@ -28,6 +28,9 @@ import { WireEdge, type WireFlowEdge } from './WireEdge';
 
 const nodeTypes = { sym: SymbolNode };
 const edgeTypes = { wire: WireEdge };
+
+/** Pause after the last edit before the diagram is re-arranged, so typing a value does not redraw per key. */
+const RELAYOUT_DELAY_MS = 300;
 
 interface Props {
   design: Design;
@@ -51,8 +54,12 @@ function DiagramInner({ design, findings, mode }: Props) {
   const updateExisting = useStore((s) => s.updateExisting);
   const connectExisting = useStore((s) => s.connectExisting);
   const deleteSelection = useStore((s) => s.deleteSelection);
-  const { fitView, fitBounds } = useReactFlow();
+  const { fitView, fitBounds, getViewport, setViewport } = useReactFlow();
   const [layout, setLayout] = useState<Layout | null>(null);
+  const layoutRef = useRef<Layout | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  /** What the view was last fitted for. The view is only re-fitted when this changes. */
+  const fittedFor = useRef('');
   const [busy, setBusy] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<SymbolFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<WireFlowEdge>([]);
@@ -63,25 +70,59 @@ function DiagramInner({ design, findings, mode }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-    if (mode === 'auto') {
-      setBusy(true);
-      autoLayout(design, layers)
-        .then((l) => {
-          if (!cancelled) {
-            setLayout(l);
-            fitPending.current = true;
-          }
-        })
-        .catch((e) => console.error('layout failed', e))
-        .finally(() => !cancelled && setBusy(false));
-    } else {
+    // Fit the whole diagram only when the user asked for a different picture: first draw, another
+    // scenario, a Show option, or Re-arrange. An equipment edit keeps the zoom and position.
+    const fitKey = `${design.id}|${structural}|${nonce}`;
+    const apply = (l: Layout) => {
+      if (fittedFor.current !== fitKey) {
+        fittedFor.current = fitKey;
+        fitPending.current = true;
+      } else if (layoutRef.current) {
+        holdView(layoutRef.current, l);
+      }
+      layoutRef.current = l;
+      setLayout(l);
+    };
+    if (mode !== 'auto') {
       setLayout(manualLayout(design, layers));
+      return;
     }
+    // Same shape as the last layout (only labels or sizes of wire changed): redraw at once, nothing moves.
+    const hit = cachedLayout(design, layers);
+    if (hit) {
+      setBusy(false);
+      apply(hit);
+      return;
+    }
+    // The shape changed. Wait for a pause in typing before re-arranging; the first draw is immediate.
+    const timer = setTimeout(
+      () => {
+        setBusy(true);
+        autoLayout(design, layers)
+          .then((l) => !cancelled && apply(l))
+          .catch((e) => console.error('layout failed', e))
+          .finally(() => !cancelled && setBusy(false));
+      },
+      layoutRef.current ? RELAYOUT_DELAY_MS : 0,
+    );
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [design, mode, structural, nonce]);
+
+  /**
+   * After a re-arrange caused by an edit, shift the view so the component nearest the middle of
+   * the screen stays where it was, instead of the diagram jumping under the user.
+   */
+  function holdView(before: Layout, after: Layout) {
+    const box = boxRef.current?.getBoundingClientRect();
+    if (!box) return;
+    const vp = getViewport();
+    const shift = viewShift(before, after, { x: (box.width / 2 - vp.x) / vp.zoom, y: (box.height / 2 - vp.y) / vp.zoom });
+    if (shift.x || shift.y) setViewport({ x: vp.x - shift.x * vp.zoom, y: vp.y - shift.y * vp.zoom, zoom: vp.zoom });
+  }
 
   const severities = useMemo(() => severityByNode(findings), [findings]);
   const currents = useMemo(() => estimateCurrents(design), [design]);
@@ -196,7 +237,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   }, [mode, deleteSelection]);
 
   return (
-    <div className="diagram">
+    <div className="diagram" ref={boxRef}>
       {busy && <div className="busy">Laying out…</div>}
       <ReactFlow
         nodes={nodes}
