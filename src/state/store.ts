@@ -175,7 +175,8 @@ export const useStore = create<State>()(
           }),
           selection: { kind: 'node', id: n.id, design: 'existing' },
         }),
-      connectExisting: (a, b) =>
+      connectExisting: (a, b) => {
+        const before = get().project.existing?.wires.length ?? 0;
         set({
           project: mutate(get().project, (p) => {
             const d = p.existing;
@@ -209,7 +210,11 @@ export const useStore = create<State>()(
               }
             }
           }),
-        }),
+        });
+        // Open the new wire in the inspector straight away, so its size and length get entered while the user is looking at it.
+        const wires = get().project.existing?.wires ?? [];
+        if (wires.length > before) set({ selection: { kind: 'wire', id: wires[wires.length - 1].id, design: 'existing' } });
+      },
       deleteSelection: () => {
         const s = get().selection;
         if (!s || s.design !== 'existing') return;

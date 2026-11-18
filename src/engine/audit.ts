@@ -3,7 +3,7 @@
 import { NODE_DEFS } from '../model/nodeDefs';
 import { BATTERY_FUSE_MAX_IN, BATTERY_FUSE_SHEATHED_MAX_IN, SHORE_MAIN_MAX_FT, VDROP } from '../model/standards';
 import type { Design, DNode, Finding, Severity, Wire } from '../model/types';
-import { ampacity, vdropPct } from './calc';
+import { ampacity, isUnsized, vdropPct } from './calc';
 import { AC_SOURCE_TERMS, buildGraph, key, passThrough, positiveNets, SOURCE_TERMS, walk, type Graph, type Reach } from './graph';
 import { joinTerminals } from './connect';
 
@@ -153,6 +153,20 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
         }
       }
     }
+  }
+
+  // 8a. A wire with no size cannot be checked at all. Say so, rather than let the drawing read as clean.
+  const unsized = design.wires.filter(isUnsized);
+  if (unsized.length) {
+    const one = unsized.length === 1;
+    add(
+      'warning',
+      'unsized-wire',
+      `${unsized.length} wire${one ? ' has' : 's have'} no size set, so ${one ? 'it is' : 'they are'} not checked for ampacity, fuse match or voltage drop.`,
+      `Click ${one ? 'the dotted wire' : 'each dotted wire'} and choose its conductor size.`,
+      undefined,
+      unsized.map((w) => w.id),
+    );
   }
 
   // 8. Wire ampacity, protection and voltage drop

@@ -12,7 +12,7 @@ import {
   type FuseClass,
   type GaugeSpec,
 } from '../model/standards';
-import type { BoatProfile, Zone } from '../model/types';
+import type { BoatProfile, Wire, Zone } from '../model/types';
 
 export function gaugeSpec(awg: string): GaugeSpec | undefined {
   return GAUGES.find((g) => g.awg === awg);
@@ -80,6 +80,11 @@ export function sizeConductor(opts: {
   const limitedBy = idx === minIdx && minIdx > Math.max(a, v) ? 'minimum' : v >= a ? 'vdrop' : 'ampacity';
   const awg = GAUGES[idx].awg;
   return { gauge: awg, vdropPct: vdropPct(opts.designAmps, opts.oneWayFt, awg, opts.volts), limitedBy, overflow };
+}
+
+/** A power wire with no conductor size recorded. Nothing about it can be checked until it has one. */
+export function isUnsized(w: Pick<Wire, 'gauge' | 'kind'>): boolean {
+  return !w.gauge && (w.kind === 'pos' || w.kind === 'neg' || w.kind === 'ac');
 }
 
 export function nextStandard(amps: number, list: number[]): number {
