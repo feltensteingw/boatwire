@@ -1,0 +1,172 @@
+// The AC side: shore power inlet and generator, the inverter or inverter/charger, AC panels and
+// their circuits, battery chargers, and the grounding that ties it to the DC negative.
+
+import { CATALOG_BY_KIND } from '../../model/catalog';
+import type { DNode } from '../../model/types';
+import { fuseClassFor, protectionFor } from '../calc';
+import { num } from '../energy';
+import { fuseLabel, type Builder, type End } from './builder';
+import type { Core } from './houseBank';
+import type { Plan } from './plan';
+
+export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undefined) {
+  const { V, acStd, BZ, PZ, run, kinds, lfp, ic, inv, acLoads, chargers, invDcAmps } = p;
+  const { posBus, negBus, bms } = core;
+
+  const shore = kinds('shore-power')[0];
+  const genset = kinds('generator')[0];
+  const anyAc = !!(shore || genset || ic || inv || acLoads.length || chargers.length);
+  if (!anyAc) return;
+
+  const acV = acStd.volts;
+  const minBrk = b.us ? 15 : 10;
+  const acBrk = (a: number) => Math.max(minBrk, protectionFor(a, 'breaker-ac'));
+  const acGnd = b.add('ac-ground-bus', 'ac-gnd', 'AC grounding bus', { zone: PZ, notes: ['ac-dc-bond'] });
+  let sourceOut: End | undefined;
+  let sourceAmps = 0;
+  let shoreCableGauge = '10';
+  const groundTo = (from: End, len: number, equipmentGround = true) =>
+    b.wire('gnd', from, [acGnd, b.stud(acGnd)], { amps: 0, len, gauge: shoreCableGauge, equipmentGround });
+
+  let elci: DNode | undefined;
+  if (shore) {
+    const A = num(shore, 'amps', 30);
+    sourceAmps = A;
+    const inlet = b.add('shore-inlet', 'shore-inlet', shore.name, { zone: shore.zone, equipmentId: shore.id, sublabel: `${A} A ${acV} V`, data: { amps: A, volts: acV } });
+    elci = b.add('elci', 'shore-elci', 'Shore main breaker + ELCI', { zone: shore.zone, sublabel: `${A} A · 30 mA ELCI`, data: { rating: A, part: `${A} A double-pole main breaker with ELCI` }, notes: ['shore-main'] });
+    const gi = b.add('galvanic-isolator', 'galv-iso', 'Galvanic isolator', { zone: shore.zone, data: { rating: A, part: `Galvanic isolator, ${A} A, fail-safe` }, notes: ['galvanic-isolator'] });
+    const w = b.wire('ac', [inlet, 'l'], [elci, 'in'], { amps: A, protect: A, len: 3, notes: ['shore-main'] });
+    shoreCableGauge = w.gauge!;
+    b.wire('gnd', [inlet, 'g'], [gi, 'a'], { amps: 0, len: 1, gauge: shoreCableGauge, notes: ['galvanic-isolator'] });
+    b.wire('gnd', [gi, 'b'], [acGnd, b.stud(acGnd)], { amps: 0, len: run(shore.zone, PZ), gauge: shoreCableGauge, notes: ['galvanic-isolator'] });
+    sourceOut = [elci, 'out'];
+  }
+  // AC ground ↔ DC negative bond
+  b.wire('gnd', [acGnd, b.stud(acGnd)], [negBus, b.stud(negBus)], { amps: 0, len: run(PZ, BZ), gauge: shoreCableGauge, notes: ['ac-dc-bond'] });
+
+  if (genset) {
+    const GW = num(genset, 'watts');
+    const GA = GW / acV;
+    const gR = acBrk(GA);
+    const g = b.add('generator', 'genset', genset.name, { zone: genset.zone, equipmentId: genset.id, sublabel: `${GW} W`, data: { watts: GW, amps: GA } });
+    const gb = b.add('elci', 'gen-brk', 'Generator main breaker', { zone: genset.zone, sublabel: `${gR} A`, data: { rating: gR } });
+    b.wire('ac', [g, 'l'], [gb, 'in'], { amps: GA, protect: gR, len: 2 });
+    groundTo([g, 'g'], run(genset.zone, PZ), false);
+    if (sourceOut) {
+      const sel = b.add('selector', 'ac-selector', 'AC source selector', { zone: PZ, sublabel: 'Off / Shore / Generator (break-before-make)', data: { rating: Math.max(sourceAmps, gR) }, notes: ['source-selector'] });
+      b.wire('ac', sourceOut, [sel, 'in1'], { amps: sourceAmps, protect: sourceAmps, len: run(shore!.zone, PZ) });
+      b.wire('ac', [gb, 'out'], [sel, 'in2'], { amps: GA, protect: gR, len: run(genset.zone, PZ) });
+      sourceOut = [sel, 'out'];
+      sourceAmps = Math.max(sourceAmps, gR);
+    } else {
+      sourceOut = [gb, 'out'];
+      sourceAmps = gR;
+    }
+  }
+  const srcZone = shore && !genset ? shore.zone : PZ;
+
+  const shoreOnlyLoads = acLoads.filter((e) => !!e.props.shoreOnly);
+
+  const acPanel = (id: string, label: string, mainA: number, sub: string) =>
+    b.add('ac-panel', id, label, { zone: PZ, sublabel: `${sub} · main ${mainA} A`, data: { rating: mainA, part: `AC panel, ${mainA} A main` } });
+
+  let mainPanel: DNode | undefined;
+  let shorePanel: DNode | undefined;
+
+  const dcInverter = (n: DNode, dcAmps: number) => {
+    const r = protectionFor(dcAmps);
+    const cls = fuseClassFor(r, { lithium: lfp, mainFeeder: true, atBattery: lfp });
+    const f = b.add('fuse', `${n.id}-fuse`, `${n.label} DC fuse`, { zone: BZ, col: 4, sublabel: fuseLabel(r, cls), data: { rating: r, fuseClass: cls }, notes: ['inverter-fuse', ...(cls === 'Class T' ? ['class-t'] : [])] });
+    b.wire('pos', [posBus, b.stud(posBus)], [f, 'in'], { amps: dcAmps, protect: r, len: 0.5 });
+    b.pair([[f, 'out'], [n, 'dcpos']], [[negBus, b.stud(negBus)], [n, 'dcneg']], { amps: dcAmps, protect: r, len: run(BZ, n.zone) + 1, protectedBy: f.id, notes: ['inverter-fuse', 'conductor-sizing'] });
+    groundTo([n, 'g'], run(n.zone, PZ));
+    if (bms && n.terminals.some((t) => t.id === 'atc')) b.wire('sig', [bms, 'atc'], [n, 'atc'], { amps: 0, len: 2 });
+  };
+
+  if (ic) {
+    const W = num(ic, 'watts');
+    const chA = num(ic, 'chargeAmps');
+    const node = b.add('inverter-charger', 'ic', ic.name, { zone: ic.zone || BZ, equipmentId: ic.id, sublabel: `${W} W · ${chA} A charger`, data: { watts: W, amps: chA, part: `Inverter/charger ${V} V ${W} W` }, notes: ['source-selector', 'inverter-fuse'] });
+    dcInverter(node, Math.max(invDcAmps, chA));
+    const outA = W / acV;
+    if (sourceOut) {
+      b.wire('ac', sourceOut, [node, 'acin'], { amps: sourceAmps, protect: sourceAmps, len: run(srcZone, node.zone) });
+    }
+    const mainA = sourceOut ? sourceAmps : acBrk(outA);
+    mainPanel = acPanel('ac-panel', 'AC panel', mainA, sourceOut ? 'Inverter-backed' : 'Inverter only');
+    b.wire('ac', [node, 'acout'], [mainPanel, 'in'], { amps: Math.max(outA, sourceAmps), protect: mainA, len: run(node.zone, PZ) });
+    if (sourceOut && (shoreOnlyLoads.length || chargers.length)) {
+      shorePanel = acPanel('ac-panel-shore', 'AC panel — shore/gen only', sourceAmps, 'Not powered by inverter');
+      b.wire('ac', sourceOut, [shorePanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: 2, notes: ['shore-only'] });
+    }
+  } else if (inv) {
+    const W = num(inv, 'watts');
+    const node = b.add('inverter', 'inv', inv.name, { zone: inv.zone || BZ, equipmentId: inv.id, sublabel: `${W} W`, data: { watts: W, part: `Inverter ${V} V ${W} W` }, notes: ['inverter-fuse'] });
+    dcInverter(node, invDcAmps);
+    const outA = W / acV;
+    if (sourceOut) {
+      const ats = b.add('transfer-switch', 'ats', 'Automatic transfer switch', { zone: PZ, sublabel: 'Shore/gen priority', data: { rating: sourceAmps }, notes: ['source-selector'] });
+      b.wire('ac', sourceOut, [ats, 'in1'], { amps: sourceAmps, protect: sourceAmps, len: run(srcZone, PZ) });
+      b.wire('ac', [node, 'acout'], [ats, 'in2'], { amps: outA, protect: acBrk(outA), len: run(node.zone, PZ) });
+      mainPanel = acPanel('ac-panel', 'AC panel', sourceAmps, 'Inverter-backed');
+      b.wire('ac', [ats, 'out'], [mainPanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: 2 });
+      if (shoreOnlyLoads.length || chargers.length) {
+        shorePanel = acPanel('ac-panel-shore', 'AC panel — shore/gen only', sourceAmps, 'Not powered by inverter');
+        b.wire('ac', sourceOut, [shorePanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: 2, notes: ['shore-only', 'charger-not-on-inverter'] });
+      }
+    } else {
+      mainPanel = acPanel('ac-panel', 'AC panel', acBrk(outA), 'Inverter only');
+      b.wire('ac', [node, 'acout'], [mainPanel, 'in'], { amps: outA, protect: acBrk(outA), len: run(node.zone, PZ) });
+    }
+  } else if (sourceOut) {
+    mainPanel = acPanel('ac-panel', 'AC panel', sourceAmps, 'Shore/gen');
+    b.wire('ac', sourceOut, [mainPanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: run(srcZone, PZ) });
+  }
+
+  const acCircuit = (panel: DNode, label: string, amps: number, target: End, zone: string, notes: string[] = []) => {
+    const r = acBrk(amps);
+    const t = b.stud(panel, { pol: 'ac', rating: r, label: `${r} A · ${label}` });
+    b.wire('ac', [panel, t], target, { amps, protect: r, len: run(PZ, zone), protectedBy: panel.id, notes: ['branch-protection', ...notes] });
+  };
+
+  for (const e of acLoads) {
+    const W = num(e, 'watts');
+    const A = W / acV;
+    const target = e.props.shoreOnly ? shorePanel ?? (inv || ic ? undefined : mainPanel) : mainPanel;
+    const node = b.add('ac-load', `ac-${e.id}`, e.name, { zone: e.zone, equipmentId: e.id, sublabel: `${W} W · ${A.toFixed(1)} A`, data: { watts: W, amps: A, kind: e.kind, shoreOnly: !!e.props.shoreOnly, glyph: CATALOG_BY_KIND[e.kind]?.glyph }, notes: e.props.shoreOnly ? ['shore-only'] : [] });
+    if (!target) {
+      b.find('warning', 'shore-only', `${e.name} is shore-only but there is no shore power or generator to feed it.`);
+      continue;
+    }
+    acCircuit(target, e.name, A, [node, 'l'], e.zone, e.props.shoreOnly ? ['shore-only'] : []);
+    groundTo([node, 'g'], run(e.zone, PZ));
+  }
+  for (const c of chargers) {
+    const A = num(c, 'amps');
+    const outputs = Math.max(1, num(c, 'outputs', 1));
+    const node = b.add('charger', `chg-${c.id}`, c.name, { zone: c.zone || BZ, equipmentId: c.id, sublabel: `${A} A · ${outputs} output${outputs > 1 ? 's' : ''}`, data: { amps: A, part: `Battery charger ${V} V ${A} A` }, notes: ['charger-not-on-inverter'] });
+    const feedPanel = shorePanel ?? (ic || inv ? undefined : mainPanel);
+    const acA = (A * V * 1.2) / acV / 0.85;
+    if (feedPanel) {
+      acCircuit(feedPanel, c.name, acA, [node, 'acin'], node.zone, ['charger-not-on-inverter']);
+    } else {
+      b.find('warning', 'charger-not-on-inverter', `${c.name} has no shore/generator-only AC circuit to feed it.`);
+    }
+    groundTo([node, 'g'], run(node.zone, PZ));
+    const fr = protectionFor(A);
+    const f = b.add('fuse', `chgfuse-${c.id}`, 'Charger output fuse', { zone: BZ, sublabel: fuseLabel(fr, fuseClassFor(fr, {})), data: { rating: fr, fuseClass: fuseClassFor(fr, {}) }, notes: ['charging-source-fuse'] });
+    b.pair([[node, 'out1'], [f, 'in']], [[node, 'neg'], [negBus, b.stud(negBus)]], { amps: A, protect: fr, len: run(node.zone, BZ) + 1, protectedBy: f.id });
+    b.wire('pos', [f, 'out'], [posBus, b.stud(posBus)], { amps: A, protect: fr, len: 0.5 });
+    if (startBus && outputs >= 2) {
+      node.terminals.push({ id: 'out2', pol: 'pos', side: 'E', label: 'OUT2+' });
+      const sA = Math.min(A, 10);
+      const fr2 = protectionFor(sA);
+      const f2 = b.add('fuse', `chgfuse2-${c.id}`, 'Charger start output fuse', { zone: startBus.zone, sublabel: fuseLabel(fr2, fuseClassFor(fr2, {})), data: { rating: fr2, fuseClass: fuseClassFor(fr2, {}) }, notes: ['charging-source-fuse'] });
+      b.wire('pos', [node, 'out2'], [f2, 'in'], { amps: sA, protect: fr2, len: run(node.zone, startBus.zone) + 1, protectedBy: f2.id });
+      b.wire('pos', [f2, 'out'], [startBus, b.stud(startBus)], { amps: sA, protect: fr2, len: 0.5 });
+    }
+  }
+  if (!shore && !genset && (chargers.length || shoreOnlyLoads.length)) {
+    b.find('info', 'shore-main', 'There are AC chargers or shore-only loads but no shore power inlet or generator.');
+  }
+}
