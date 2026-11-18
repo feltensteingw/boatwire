@@ -48,6 +48,7 @@ export default defineConfig(({ command }) => {
     },
     // The layout tests run the real ELK engine. On a busy CI machine one can take well over the
     // 5 s default, so allow plenty: a slow test is not a failed test.
-    test: { globals: true, environment: 'node', testTimeout: 60000 },
+    // (Browser tests live in e2e/ and are run by Playwright, not by vitest.)
+    test: { globals: true, environment: 'node', testTimeout: 60000, include: ['tests/**/*.test.ts'] },
   } as never;
 });

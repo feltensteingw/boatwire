@@ -16,6 +16,8 @@ hand-drawn diagrams of existing boats.
 npm install
 npm run dev        # http://localhost:5173
 npm test           # engine + layout tests (vitest)
+npm run lint       # ESLint (TypeScript + React hook rules)
+npm run test:e2e   # browser tests (Playwright) against a production build; uses your installed Chrome
 npm run build      # static site in dist/ — host anywhere, no backend (fails if the initial download exceeds the size budget)
 npm run size       # re-check the bundle-size budget for an existing dist/
 ```
