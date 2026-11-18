@@ -548,7 +548,8 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
       const s = bankSummary(startBank, V);
       const sbat = b.add('battery', 'start-bat', startBank.name, { zone: startBank.zone || BZ, equipmentId: startBank.id, sublabel: s.text, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['house-start-split'] });
       const sfRating = nextStandard(starterA * 2, [100, 150, 200, 250, 300]);
-      const sfuse = b.add('fuse', 'start-fuse', 'Start battery fuse', { zone: sbat.zone, sublabel: fuseLabel(sfRating, 'MRBF'), data: { rating: sfRating, fuseClass: 'MRBF' }, notes: ['battery-fuse', 'starter-exempt'] });
+      const sfClass = fuseClassFor(sfRating, { atBattery: true, lithium: s.chem === 'lifepo4' });
+      const sfuse = b.add('fuse', 'start-fuse', 'Start battery fuse', { zone: sbat.zone, sublabel: fuseLabel(sfRating, sfClass), data: { rating: sfRating, fuseClass: sfClass }, notes: ['battery-fuse', 'starter-exempt', ...(sfClass === 'Class T' ? ['class-t'] : [])] });
       const ssw = b.add('switch', 'start-switch', 'Start battery switch', { zone: sbat.zone, data: { rating: 300 }, notes: ['battery-switch'] });
       startBus = b.add('bus-pos', 'start-bus', 'Start positive bus', { zone: sbat.zone });
       const so: WOpts = { amps: starterA, protect: starterA, len: 0.5, vdLen: crankLen + 3, notes: ['starter-exempt'] };

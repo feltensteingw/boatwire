@@ -15,7 +15,7 @@ export const RULES: Record<string, RuleInfo> = {
   },
   'class-t': {
     title: 'Class T fuse for lithium / large banks',
-    why: 'LiFePO4 banks can deliver 10,000–20,000 A into a dead short. A Class T fuse has a ~20 kA interrupt rating, so it actually breaks the arc; ANL fuses (~6 kA) may not.',
+    why: 'LiFePO4 banks can deliver 10,000–20,000 A into a dead short. A Class T fuse has a ~20 kA interrupt rating, so it actually breaks the arc; ANL fuses (~6 kA), terminal fuses (~10 kA) and blade or MIDI fuses (1–2 kA) may not. BoatWire therefore asks for Class T on every fuse connected straight to a lithium battery. Other fuses belong downstream of it.',
     ref: REFS.E13,
   },
   'battery-switch': {

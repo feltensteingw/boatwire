@@ -3,7 +3,7 @@ import { estimateCurrents } from '../engine/audit';
 import { ampacity, fmtGauge, gaugeSpec, vdropPct } from '../engine/calc';
 import { ruleInfo } from '../engine/rules';
 import { growTerminal, NODE_DEFS } from '../model/nodeDefs';
-import { GAUGES, VDROP } from '../model/standards';
+import { FUSE_CLASSES, GAUGES, VDROP, type FuseClass } from '../model/standards';
 import type { Design, DNode, Finding, Wire } from '../model/types';
 import { acVoltsOf } from '../state/derived';
 import { useStore } from '../state/store';
@@ -153,7 +153,34 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
           )}
           {['fuse', 'breaker', 'switch', 'elci', 'contactor', 'acr', 'dcdc', 'converter', 'isolator'].includes(node.type) && (
             <Field label="Rating" help="Current rating in amps: the fuse or breaker size, or the device's continuous rating. The wire it protects must be able to carry at least this much.">
-              <NumInput value={data.rating} unit="A" onChange={(v) => edit((n) => void (n.data.rating = v))} />
+              <NumInput
+                value={data.rating}
+                unit="A"
+                onChange={(v) =>
+                  edit((n) => {
+                    n.data.rating = v;
+                    if (n.type === 'fuse') n.sublabel = fuseSublabel(n);
+                  })
+                }
+              />
+            </Field>
+          )}
+          {node.type === 'fuse' && (
+            <Field label="Fuse type" help="The kind of fuse fitted. It decides how large a short-circuit current the fuse can safely interrupt. A fuse on a lithium battery must be Class T; the check flags anything else.">
+              <Select
+                value={String(data.fuseClass ?? '')}
+                options={[
+                  { value: '', label: 'Not set' },
+                  ...(Object.keys(FUSE_CLASSES) as FuseClass[]).map((c) => ({ value: c as string, label: `${FUSE_NAMES[c]} · interrupts ${FUSE_CLASSES[c].aic.toLocaleString('en-US')} A` })),
+                ]}
+                onChange={(v) =>
+                  edit((n) => {
+                    if (v) n.data.fuseClass = v;
+                    else delete n.data.fuseClass;
+                    n.sublabel = fuseSublabel(n);
+                  })
+                }
+              />
             </Field>
           )}
           {node.type === 'battery' && (
@@ -422,4 +449,12 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
       <Why notes={wire.notes} />
     </div>
   );
+}
+
+/** Fuse types as a boat owner would recognise them. */
+const FUSE_NAMES: Record<FuseClass, string> = { ATC: 'Blade (ATC / ATO)', MIDI: 'MIDI / AMI', MRBF: 'Terminal (MRBF)', ANL: 'ANL', 'Class T': 'Class T' };
+
+/** Text under a hand-drawn fuse, kept in step with its rating and type, e.g. "300 A Class T". */
+function fuseSublabel(n: DNode): string | undefined {
+  return [n.data.rating ? `${n.data.rating} A` : '', n.data.fuseClass ?? ''].filter(Boolean).join(' ') || undefined;
 }
