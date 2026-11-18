@@ -149,6 +149,10 @@ export const RULES: Record<string, RuleInfo> = {
     title: '24 → 12 V converter',
     why: 'In a 24 V system, equipment only built for 12 V (most electronics and nav lights) is fed through a DC-DC converter and a 12 V sub-panel.',
   },
+  'not-drawn': {
+    title: 'Equipment left out of the design',
+    why: 'The ideal design is built around one propulsion engine, one inverter or inverter/charger, one shore power inlet, one AC generator, one engine start battery and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',
+  },
   'voltage-choice': {
     title: 'System voltage',
     why: 'Doubling voltage halves current for the same power, so cables can be much smaller — very useful for big inverters, windlasses and thrusters. The cost is converters for 12 V-only equipment.',

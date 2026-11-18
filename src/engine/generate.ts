@@ -191,6 +191,28 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     return design;
   }
 
+  // The design has one of each of these. Every extra is reported, never left out silently.
+  const drawnOnce: [Equipment[], string][] = [
+    [kinds('engine'), 'engine'],
+    [kinds('inverter-charger'), 'inverter/charger'],
+    // a separate inverter is not drawn when there is an inverter/charger
+    [[...kinds('inverter-charger').slice(0, 1), ...kinds('inverter')], 'inverter'],
+    [kinds('shore-power'), 'shore power inlet'],
+    [kinds('generator'), 'AC generator'],
+    [banks.filter((e) => e.props.role === 'start'), 'engine start battery'],
+    ...Object.entries(DEDICATED_BANK_ROLES).map(([r, def]): [Equipment[], string] => [banks.filter((e) => e.props.role === r), `${def.label.toLowerCase()} battery`]),
+  ];
+  for (const [list, what] of drawnOnce) {
+    for (const e of list.slice(1)) {
+      b.find(
+        'warning',
+        'not-drawn',
+        `${e.name} is not in this design. BoatWire draws one ${what} per boat and used ${list[0].name}.`,
+        'Its wiring, fuses and cables are missing from the diagram, wire schedule and bill of materials. Work those out separately, or remove it from the equipment list.',
+      );
+    }
+  }
+
   const houseChem = (house[0].props.chemistry as Chemistry) ?? 'agm';
   const lfp = houseChem === 'lifepo4';
   if (house.some((h) => h.props.chemistry !== houseChem)) {
