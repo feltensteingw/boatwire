@@ -30,6 +30,17 @@ describe('layout', () => {
       expect(l.edges.every((e) => e.points && e.points.length >= 2)).toBe(true);
     }
   });
+  it('routes the diode isolator compensation wire for both methods', async () => {
+    for (const how of ['excite', 'sense']) {
+      const p = exampleProject();
+      Object.assign(p.equipment.find((e) => e.kind === 'engine')!.props, { chargeSplit: 'isolator-diode', isolatorSense: how });
+      const d = generateIdeal(p);
+      const l = await autoLayout(d, layers);
+      const comp = d.wires.find((w) => w.notes?.includes('isolator-compensation'))!;
+      const e = l.edges.find((x) => x.wire.id === comp.id);
+      expect(e?.points?.length ?? 0).toBeGreaterThanOrEqual(2);
+    }
+  });
   it('DC-only and AC-only views', async () => {
     const p = exampleProject();
     const d = generateIdeal(p);

@@ -124,7 +124,7 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
     }
     if (iso.data.isolatorType === 'diode') {
       const hasReg = design.nodes.some((n) => n.type === 'regulator');
-      if (!hasReg) add('warning', 'isolator', `${label(iso)} is a diode isolator: its ~0.7 V drop leaves the batteries undercharged with a stock regulator.`, 'Use a FET (zero-drop) isolator, an ACR, or a regulator that senses battery voltage after the isolator.', [iso.id]);
+      if (!hasReg && !diodeCompensated(g, iso)) add('warning', 'isolator', `${label(iso)} is a diode isolator: its ~0.7 V drop leaves the batteries undercharged with a stock regulator.`, 'Wire the isolator\'s "E" terminal to the alternator excitation terminal, move the alternator sense lead to the battery side of the isolator, or use a FET (zero-drop) isolator or an ACR.', [iso.id]);
     }
   }
 
@@ -220,6 +220,17 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
   }
 
   return out;
+}
+
+/**
+ * Does something make a stock regulator see battery voltage despite a diode isolator's drop?
+ * Either the isolator's excitation ("E") terminal is wired, an alternator's remote-sense lead is wired
+ * (it can only usefully go to the battery side), or the user recorded the compensation on the isolator.
+ */
+function diodeCompensated(g: Graph, iso: DNode): boolean {
+  if (iso.data.compensation === 'excite' || iso.data.compensation === 'sense') return true;
+  if ((g.at.get(key(iso.id, 'exc')) ?? []).length > 0) return true;
+  return g.design.nodes.some((n) => n.type === 'alternator' && (g.at.get(key(n.id, 'sense')) ?? []).length > 0);
 }
 
 function walkGround(g: Graph, inletId: string): boolean {

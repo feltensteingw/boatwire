@@ -262,7 +262,7 @@ const SECTIONS: Section[] = [
   {
     id: 'charging',
     title: 'Charging choices explained',
-    keywords: 'charge splitting acr isolator diode fet dc-dc charger relay engine run d+ alternator regulator lithium lifepo4 bms apd external regulator start battery',
+    keywords: 'charge splitting acr isolator diode fet excitation sense compensation dc-dc charger relay engine run d+ alternator regulator lithium lifepo4 bms apd external regulator start battery',
     body: (
       <>
         <p>
@@ -274,7 +274,7 @@ const SECTIONS: Section[] = [
             <tr><td><b>ACR / voltage-sensitive relay</b></td><td>Joins the banks whenever either is being charged (by any source), and separates them when voltage falls. Simple and cheap.</td></tr>
             <tr><td><b>Charging relay (engine-run / D+)</b></td><td>Joins the banks only while the engine runs (the alternator's D+ signal). Predictable, but solar or shore charging won't reach the start battery through it.</td></tr>
             <tr><td><b>FET isolator</b></td><td>Electronic one-way valves: one alternator feeds both banks, which are never connected to each other. Almost no voltage loss.</td></tr>
-            <tr><td><b>Diode isolator</b></td><td>Same idea, but loses ~0.7 V, so with a stock regulator the batteries are always undercharged. Shown for older boats that have one.</td></tr>
+            <tr><td><b>Diode isolator</b></td><td>Same idea, but loses ~0.7 V. A stock regulator must be compensated, or the batteries are always undercharged. <b>Diode isolator compensation</b> picks how: a thin wire from the isolator's "E" terminal to the alternator's excitation terminal (the default), or the alternator's sense lead moved to the house bus. Shown for older boats that have one.</td></tr>
           </tbody>
         </table>
         <h4>Lithium (LiFePO4)</h4>

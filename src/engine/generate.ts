@@ -612,9 +612,24 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
           const iso = b.add('isolator', 'alt-isolator', diode ? 'Diode battery isolator' : 'FET battery isolator', {
             zone: BZ,
             sublabel: `${isoR} A · ${diode ? '~0.7 V drop' : 'near-zero drop'}`,
-            data: { rating: isoR, isolatorType: diode ? 'diode' : 'fet', part: `${diode ? 'Diode' : 'MOSFET (zero-drop)'} battery isolator, 1 input / 2 outputs, ${isoR} A` },
+            data: { rating: isoR, isolatorType: diode ? 'diode' : 'fet', part: `${diode ? 'Diode' : 'MOSFET (zero-drop)'} battery isolator, 1 input / 2 outputs, ${isoR} A${diode ? ', with excitation (E) terminal' : ''}` },
             notes: ['isolator', 'charging-source-fuse'],
           });
+          // A diode isolator drops ~0.7 V, so a stock regulator must see battery voltage, not its own output.
+          // (An external regulator already senses at the house bus, below.)
+          const comp = String(engine.props.isolatorSense ?? 'excite');
+          if (diode && !extReg && comp !== 'none') {
+            iso.data.compensation = comp === 'sense' ? 'sense' : 'excite';
+            if (comp === 'sense') {
+              alt.terminals.push({ id: 'sense', pol: 'sig', side: 'N', label: 'S' });
+              b.wire('sig', [alt, 'sense'], [posBus, b.stud(posBus, { pol: 'sig', label: 'sense' })], { amps: 0, len: altLen, notes: ['isolator-compensation'] });
+            } else {
+              alt.terminals.push({ id: 'exc', pol: 'sig', side: 'N', label: 'EXC' });
+              iso.terminals.push({ id: 'exc', pol: 'sig', side: 'N', label: 'E' });
+              b.wire('sig', [iso, 'exc'], [alt, 'exc'], { amps: 0, len: altLen, notes: ['isolator-compensation'] });
+            }
+            iso.notes = [...(iso.notes ?? []), 'isolator-compensation'];
+          }
           const [aw] = b.pair([[alt, 'b'], [iso, 'in']], [[alt, 'neg'], [negBus, b.stud(negBus)]], { amps: altA, protect: altFuseR, len: altLen, engine: true, notes: ['isolator'] });
           const outs: [string, DNode, string][] = [['out1', posBus, 'house'], ['out2', startBus, 'start']];
           for (const [term, bus, which] of outs) {

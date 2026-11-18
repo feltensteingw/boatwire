@@ -37,7 +37,11 @@ export const RULES: Record<string, RuleInfo> = {
   },
   'isolator': {
     title: 'Battery isolator (diode / FET)',
-    why: 'An isolator lets one alternator charge several banks through one-way diodes or MOSFETs, so the banks are never connected to each other and a flat house bank cannot drain the start battery. Diode isolators drop about 0.6–0.8 V, so with a stock regulator that senses at the alternator the batteries are chronically undercharged. Use a FET (zero-drop) isolator or a regulator that senses on the battery side. Isolators give every bank the same voltage, so they are unsuitable for lithium mixed with lead-acid.',
+    why: 'An isolator lets one alternator charge several banks through one-way diodes or MOSFETs, so the banks are never connected to each other and a flat house bank cannot drain the start battery. Diode isolators drop about 0.6–0.8 V, so with a stock regulator that senses at the alternator the batteries are chronically undercharged. Fix it by compensating the regulator (see "Diode isolator compensation"), or use a FET (zero-drop) isolator. Isolators give every bank the same voltage, so they are unsuitable for lithium mixed with lead-acid.',
+  },
+  'isolator-compensation': {
+    title: 'Diode isolator compensation',
+    why: 'A stock alternator regulator holds its own output at the charge voltage, but a diode isolator drops about 0.7 V on the way to the batteries, so they never get fully charged. Two common fixes: (1) most diode isolators have an "E" (excitation) terminal. Wire it to the alternator\'s excitation terminal so the regulator is fed through a matching diode and raises its output by the same amount. (2) If the alternator has a remote voltage-sense terminal, run the sense lead to the battery side of the isolator (the house bus) so the regulator measures battery voltage directly. Check the isolator and alternator instructions for which your units support. An external smart regulator that senses at the battery already does this.',
   },
   'dcdc': {
     title: 'DC-DC charger between banks',
