@@ -5,7 +5,7 @@ import { activeScenario } from './engine/scenario';
 import { generateIdeal } from './engine/generate';
 import { billOfMaterials, wireSchedule } from './engine/reports';
 import { NODE_DEFS } from './model/nodeDefs';
-import type { NodeType, Project } from './model/types';
+import type { NodeType } from './model/types';
 import { useExisting, useFindings, useIdeal } from './state/derived';
 import { DEFAULT_LAYERS, useStore, type View } from './state/store';
 import { Diagram } from './ui/Diagram';
@@ -18,6 +18,9 @@ import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
 import { ToastLayer } from './ui/Toasts';
 import { redo, undo, useHistory } from './state/history';
+import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
+import { parseProject } from './model/validate';
+import { toast } from './ui/toastStore';
 import { HelpButton, HelpGuide, HelpLink } from './ui/Help';
 import { UNDERLAY_ACCEPT, underlayFromFile } from './ui/underlayFile';
 
@@ -37,24 +40,30 @@ export default function App() {
   useApplyTheme(useStore((s) => s.theme));
   useUndoKeys();
   return (
-    <div className={`app view-${view}`}>
-      <CloudSync />
-      <TipLayer />
-      <ToastLayer />
-      <HelpGuide />
-      <Header />
-      <div className="main">
-        <Sidebar />
-        <div className="center">
-          {view === 'ideal' && <IdealView />}
-          {view === 'existing' && <ExistingView />}
-          <Suspense fallback={<div className="hint view-loading">Loading…</div>}>
-            {view === 'compare' && <Compare />}
-            {view === 'reports' && <Reports />}
-          </Suspense>
-        </div>
+    <ErrorBoundary scope="app">
+      <div className={`app view-${view}`}>
+        <CloudSync />
+        <TipLayer />
+        <ToastLayer />
+        <HelpGuide />
+        <Header />
+        <RecoveryBanner />
+        {/* A crash in the working area leaves the header, File menu and undo usable. `key` clears it when the view changes. */}
+        <ErrorBoundary scope="view" key={view}>
+          <div className="main">
+            <Sidebar />
+            <div className="center">
+              {view === 'ideal' && <IdealView />}
+              {view === 'existing' && <ExistingView />}
+              <Suspense fallback={<div className="hint view-loading">Loading…</div>}>
+                {view === 'compare' && <Compare />}
+                {view === 'reports' && <Reports />}
+              </Suspense>
+            </div>
+          </div>
+        </ErrorBoundary>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
 
@@ -165,11 +174,17 @@ function Header() {
             const f = e.target.files?.[0];
             if (!f) return;
             try {
-              const p = JSON.parse(await f.text()) as Project;
-              if (p.version !== 1 || !p.profile || !Array.isArray(p.equipment)) throw new Error('Not a BoatWire project');
-              loadProject(p);
+              let raw: unknown;
+              try {
+                raw = JSON.parse(await f.text());
+              } catch {
+                throw new Error('It is not a BoatWire project file (.boatwire.json).');
+              }
+              const { project, notes } = parseProject(raw);
+              loadProject(project);
+              if (notes.length) toast(`Opened with repairs: ${notes.join(' ')}`, { ms: 15000 });
             } catch (err) {
-              alert(`Could not open file: ${(err as Error).message}`);
+              alert(`Could not open “${f.name}”. ${(err as Error).message}`);
             }
             e.target.value = '';
             setMenu(false);

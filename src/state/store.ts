@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { exampleProject, blankProject, newEquipment, uid } from '../model/examples';
 import { joinTerminals } from '../engine/connect';
 import { growTerminal, terminal } from '../model/nodeDefs';
 import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
 import { draftRunLength } from '../engine/existing';
 import type { ThemeId } from '../ui/themes';
+import { parseProject } from '../model/validate';
+import { stashUnreadable, useRecovery } from './recovery';
 
 export type View = 'ideal' | 'existing' | 'compare' | 'reports';
+const VIEW_IDS: View[] = ['ideal', 'existing', 'compare', 'reports'];
 export type ReportTab = 'findings' | 'changes' | 'wires' | 'bom' | 'energy';
 export type Selection = { kind: 'node' | 'wire'; id: string; design: 'ideal' | 'existing' } | null;
 
@@ -66,6 +69,40 @@ interface State {
   connectExisting(a: WireEnd, b: WireEnd): void;
   deleteSelection(): void;
 }
+
+/**
+ * Browser storage that survives its own contents. If what is stored is not even valid JSON, it is
+ * set aside for the user to download and the app starts fresh instead of failing to start.
+ */
+const checkedStorage: StateStorage = {
+  getItem: (name) => {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(name);
+      if (raw !== null) JSON.parse(raw);
+      return raw;
+    } catch (e) {
+      if (raw !== null) stashUnreadable(raw, `The saved data is damaged (${(e as Error).message}).`);
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      localStorage.setItem(name, value);
+      if (useRecovery.getState().notSaving) useRecovery.setState({ notSaving: undefined });
+    } catch (e) {
+      // Usually the browser's storage limit. Say so, instead of losing changes without a word.
+      useRecovery.setState({ notSaving: (e as Error).name === 'QuotaExceededError' ? 'This browser has run out of storage space for BoatWire.' : `This browser would not store the boat (${(e as Error).message}).` });
+    }
+  },
+  removeItem: (name) => {
+    try {
+      localStorage.removeItem(name);
+    } catch {
+      // nothing to remove from
+    }
+  },
+};
 
 const mutate = (p: Project, fn: (p: Project) => void): Project => {
   const copy: Project = structuredClone(p);
@@ -237,7 +274,31 @@ export const useStore = create<State>()(
     }),
     {
       name: 'boatwire:v1',
+      // Version of what is kept in browser storage (not of the project format, which has its own).
+      // Raise it and extend `migrate` when the stored fields change.
+      version: 1,
+      migrate: (stored) => stored as never,
+      storage: createJSONStorage(() => checkedStorage),
       partialize: (s) => ({ project: s.project, layers: s.layers, view: s.view, cloudId: s.cloudId, theme: s.theme }),
+      // Never trust what comes back from storage: check and repair the project, and fall back to
+      // a safe value for anything else that is not what it should be.
+      merge: (stored, current) => {
+        if (typeof stored !== 'object' || stored === null) return current;
+        const s = stored as Partial<State>;
+        const next = { ...current };
+        try {
+          const { project, notes } = parseProject(s.project);
+          next.project = project;
+          if (notes.length) useRecovery.setState({ notes });
+        } catch (e) {
+          stashUnreadable(JSON.stringify(s.project ?? null), (e as Error).message);
+        }
+        if (typeof s.layers === 'object' && s.layers !== null) next.layers = { ...DEFAULT_LAYERS, ...s.layers, labels: { ...DEFAULT_LAYERS.labels, ...(s.layers.labels ?? {}) } };
+        if (s.view && VIEW_IDS.includes(s.view)) next.view = s.view;
+        if (typeof s.cloudId === 'string') next.cloudId = s.cloudId;
+        if (typeof s.theme === 'string') next.theme = s.theme;
+        return next;
+      },
     },
   ),
 );

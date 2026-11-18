@@ -821,6 +821,53 @@ table.zones td:nth-child(3) {
     display: none;
   }
 }
+/* ---- crash screen and recovery banner ---- */
+.crash {
+  margin: 0 auto;
+  padding: 32px 24px;
+  max-width: 640px;
+  line-height: 1.5;
+}
+.crash-app {
+  padding-top: 12vh;
+}
+.crash h2 {
+  margin: 0 0 8px;
+}
+.crash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.crash pre {
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px;
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.recovery {
+  padding: 8px 14px;
+  background: var(--warn-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.recovery p {
+  margin: 2px 0;
+}
+.recovery .crash-actions {
+  margin: 6px 0 2px;
+}
+@media print {
+  .recovery {
+    display: none;
+  }
+}
 /* ---- toasts: brief messages with an optional action, bottom centre ---- */
 .toasts {
   position: fixed;

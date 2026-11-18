@@ -92,7 +92,13 @@ function hush() {
 // The store has already loaded the saved project by the time this module runs, so loading is not recorded.
 useStore.subscribe((s, prev) => {
   if (restoring || s.project === prev.project) return;
-  const change = describeChange(prev.project, s.project);
+  let change: Change | null;
+  try {
+    change = describeChange(prev.project, s.project);
+  } catch {
+    // A project too damaged to describe must still be undoable, and must never break the edit itself.
+    change = { label: 'Changed the boat' };
+  }
   if (!change) return;
   history.record({ project: prev.project, cloudId: prev.cloudId }, change, Date.now());
   publish();

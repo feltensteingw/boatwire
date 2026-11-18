@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import type { Project } from '../model/types';
 import { useStore } from '../state/store';
+import { parseProject } from '../model/validate';
+import { toast } from '../ui/toastStore';
 import { cloudEnabled } from './config';
 import type { BoatSummary } from './firebase';
 
@@ -220,13 +222,20 @@ function BoatsDialog() {
                   onClick={async () => {
                     setBusy(b.id);
                     try {
-                      const p = await (await fb()).loadBoat(user.uid, b.id);
-                      if (p) {
-                        loadProject(p, b.id);
-                        close();
+                      const saved = await (await fb()).loadBoat(user.uid, b.id);
+                      if (saved === null) throw new Error('It is no longer in your account.');
+                      let raw: unknown;
+                      try {
+                        raw = JSON.parse(saved);
+                      } catch {
+                        throw new Error('The saved copy is damaged and cannot be read.');
                       }
+                      const { project, notes } = parseProject(raw);
+                      loadProject(project, b.id);
+                      close();
+                      if (notes.length) toast(`Opened with repairs: ${notes.join(' ')}`, { ms: 15000 });
                     } catch (e) {
-                      alert(`Could not open: ${(e as Error).message}`);
+                      alert(`Could not open “${b.name}”. ${(e as Error).message}`);
                     } finally {
                       setBusy(null);
                     }

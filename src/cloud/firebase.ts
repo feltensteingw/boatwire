@@ -95,9 +95,10 @@ export async function saveBoat(uid: string, project: Project, id?: string): Prom
   return ref.id;
 }
 
-export async function loadBoat(uid: string, id: string): Promise<Project | null> {
+/** Raw saved text of a boat, or null if it no longer exists. The caller checks it with parseProject. */
+export async function loadBoat(uid: string, id: string): Promise<string | null> {
   const d = await getDoc(doc(boatsCol(uid), id));
-  return d.exists() ? (JSON.parse(String(d.get('data'))) as Project) : null;
+  return d.exists() ? String(d.get('data')) : null;
 }
 
 export async function deleteBoat(uid: string, id: string) {
