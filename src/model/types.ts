@@ -223,6 +223,8 @@ export interface Wire {
   to: WireEnd;
   /** One-way run length, feet. */
   lengthFt: number;
+  /** True while lengthFt is BoatWire's starting guess for a hand-drawn wire, not a length the user entered. */
+  lengthEstimated?: boolean;
   /** Design current, amps. */
   amps?: number;
   /** Conductor size, AWG string ("14", "1/0"...). */

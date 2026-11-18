@@ -8,6 +8,10 @@ import { AC_SOURCE_TERMS, buildGraph, key, passThrough, positiveNets, SOURCE_TER
 
 const LEAD = new Set(['flooded', 'agm', 'gel']);
 
+// Wording for a length BoatWire guessed from locations, as opposed to one the user entered.
+const guess = (w: Wire) => (w.lengthEstimated ? 'about ' : '');
+const guessed = (w: Wire) => (w.lengthEstimated ? ' (estimated from their locations; enter the measured length)' : '');
+
 export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[] {
   const g = buildGraph(design);
   const V = design.systemVoltage;
@@ -30,9 +34,12 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
       if (!NODE_DEFS[n.type].protective) {
         add('error', 'battery-fuse', `${label(bat)}: positive cable to ${label(n)} has no fuse at the battery.`, `Add a fuse (MRBF terminal fuse, or Class T for lithium) within ${BATTERY_FUSE_MAX_IN} in of the battery positive.`, [bat.id, n.id], [w.id]);
       } else if (inches > BATTERY_FUSE_SHEATHED_MAX_IN) {
-        add('error', 'battery-fuse', `${label(bat)}: fuse is ${Math.round(inches)} in from the battery.`, `Move it within ${BATTERY_FUSE_MAX_IN} in of the terminal.`, [bat.id, n.id], [w.id]);
+        add('error', 'battery-fuse', `${label(bat)}: fuse is ${guess(w)}${Math.round(inches)} in from the battery${guessed(w)}.`, `Move it within ${BATTERY_FUSE_MAX_IN} in of the terminal.`, [bat.id, n.id], [w.id]);
       } else if (inches > BATTERY_FUSE_MAX_IN) {
-        add('warning', 'battery-fuse', `${label(bat)}: fuse is ${Math.round(inches)} in from the battery — allowed only if the cable is sheathed.`, `Move it within ${BATTERY_FUSE_MAX_IN} in, or sheath the cable.`, [bat.id, n.id], [w.id]);
+        add('warning', 'battery-fuse', `${label(bat)}: fuse is ${guess(w)}${Math.round(inches)} in from the battery${guessed(w)} — allowed only if the cable is sheathed.`, `Move it within ${BATTERY_FUSE_MAX_IN} in, or sheath the cable.`, [bat.id, n.id], [w.id]);
+      } else if (w.lengthEstimated) {
+        // A freshly drawn wire: nobody has measured it yet, so ask rather than pass or fail it.
+        add('info', 'battery-fuse', `${label(bat)}: how far is ${label(n)} from the battery? The cable length has not been entered.`, `Measure the cable from the battery positive to the fuse and enter it as the wire's length. It must be within ${BATTERY_FUSE_MAX_IN} in (${BATTERY_FUSE_SHEATHED_MAX_IN} in if sheathed).`, [bat.id, n.id], [w.id]);
       }
     }
   }
