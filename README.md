@@ -49,6 +49,13 @@ in this browser. `window.fakeCloud` can then act as a second device (`remoteSave
 `offline`). It follows the same size limit and "has it changed since I looked?" rule as the real
 thing, but it is not Firestore: check real cloud behaviour on a PR preview.
 
+**Security headers** are set in `firebase.json` for every response: no MIME sniffing, no framing
+(`X-Frame-Options: DENY`; Firebase's own `/__/auth/*` sign-in pages are not affected by custom
+headers), a strict referrer policy, and device features switched off. A Content-Security-Policy is
+sent in **report-only** mode: it blocks nothing yet, but the browser console lists anything it
+would block. The browser tests enforce the same policy locally (`E2E_CSP`). Once sign-in and cloud
+saving show no reports on the live site, rename the header to `Content-Security-Policy` to enforce it.
+
 | Task | Command |
 |------|---------|
 | Deploy site manually | `npm run deploy` |
