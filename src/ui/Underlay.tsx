@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 
 import type { Underlay } from '../model/types';
 import { roundRect, scaleRect, type Rect } from '../model/underlay';
 import { useStore } from '../state/store';
+import { showMessage } from './dialogs';
 import { UNDERLAY_ACCEPT, underlayFromFile } from './underlayFile';
 
 /** The image itself, rendered in diagram coordinates beneath wires and components. */
@@ -82,7 +83,7 @@ export function UnderlayControls({ u }: { u?: Underlay }) {
       });
       fitBounds(next, { padding: 0.08, duration: 400 });
     } catch (err) {
-      alert(`Could not use that file: ${(err as Error).message}`);
+      void showMessage('Could not use that file', (err as Error).message);
     } finally {
       setBusy(false);
     }

@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { makeNode } from '../model/nodeDefs';
 import type { NodeType } from '../model/types';
 import { useHelp } from './Help';
+import { Modal } from './Modal';
 import { Icon } from './symbols';
 
 // ---------------------------------------------------------------- content
@@ -481,8 +482,7 @@ export default function HelpGuidePanel() {
   if (!topic) return null;
   const current = shown.find((s) => s.id === topic) ?? shown[0];
   return (
-    <div className="modal-back" onClick={close}>
-      <div className="modal guide" role="dialog" aria-label="BoatWire how-to guide" onClick={(e) => e.stopPropagation()}>
+    <Modal label="BoatWire how-to guide" className="guide" onClose={close}>
         <div className="modal-head">
           <h3>How to use BoatWire</h3>
           <button className="icon" onClick={close} aria-label="Close">
@@ -509,8 +509,7 @@ export default function HelpGuidePanel() {
             )}
           </article>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

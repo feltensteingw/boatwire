@@ -14,13 +14,15 @@ export function Field({ label, children, help }: { label: string; children: Reac
   );
 }
 
-export function NumInput({ value, onChange, unit, min, step }: { value: number | undefined; onChange: (v: number) => void; unit?: string; min?: number; step?: number }) {
+/** `label` names the control for screen readers when it has no visible label of its own (e.g. in a table cell). */
+export function NumInput({ value, onChange, unit, min, step, label }: { value: number | undefined; onChange: (v: number) => void; unit?: string; min?: number; step?: number; label?: string }) {
   const [text, setText] = useState(value === undefined ? '' : String(value));
   useEffect(() => setText(value === undefined ? '' : String(value)), [value]);
   return (
     <span className="num">
       <input
         type="number"
+        aria-label={label}
         value={text}
         min={min}
         step={step ?? 'any'}
@@ -34,13 +36,14 @@ export function NumInput({ value, onChange, unit, min, step }: { value: number |
   );
 }
 
-export function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return <input type="text" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
+export function TextInput({ value, onChange, placeholder, label }: { value: string; onChange: (v: string) => void; placeholder?: string; label?: string }) {
+  return <input type="text" aria-label={label} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
 }
 
-export function Select<T extends string | number>({ value, options, onChange }: { value: T | undefined; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+export function Select<T extends string | number>({ value, options, onChange, label }: { value: T | undefined; options: { value: T; label: string }[]; onChange: (v: T) => void; label?: string }) {
   return (
     <select
+      aria-label={label}
       value={value === undefined ? '' : String(value)}
       onChange={(e) => {
         const o = options.find((x) => String(x.value) === e.target.value);

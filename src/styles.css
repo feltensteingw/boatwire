@@ -7,7 +7,7 @@
   --border-2: #c9d2db;
   --text: #17222d;
   --muted: #5d6b79;
-  --faint: #8b97a3;
+  --faint: #68747f;
   --navy: #0f2b46;
   --navy-2: #173c60;
   --accent: #1f7a8c;
@@ -23,11 +23,11 @@
 
   --err: #c62828;
   --err-bg: #fdecea;
-  --warn: #b26a00;
+  --warn: #955800;
   --warn-bg: #fff4e0;
   --info: #2c6aa0;
   --info-bg: #e8f1fa;
-  --ok: #2b8a3e;
+  --ok: #267a37;
 
   --sym-bg: #ffffff;
   --sym-border: #9aa7b4;
@@ -54,7 +54,11 @@
     --border-2: #334452;
     --text: #e3e9ef;
     --muted: #9aa8b5;
-    --faint: #6d7c89;
+    --faint: #8a99a6;
+    --err: #ff8a80;
+    --warn: #f0b35a;
+    --info: #7fbcec;
+    --ok: #6fd08c;
     --navy: #0a1f33;
     --navy-2: #12304d;
     --accent: #4fb3c4;
@@ -88,7 +92,11 @@
   --border-2: #334452;
   --text: #e3e9ef;
   --muted: #9aa8b5;
-  --faint: #6d7c89;
+  --faint: #8a99a6;
+  --err: #ff8a80;
+  --warn: #f0b35a;
+  --info: #7fbcec;
+  --ok: #6fd08c;
   --navy: #0a1f33;
   --navy-2: #12304d;
   --accent: #4fb3c4;
@@ -840,6 +848,31 @@ table.zones td:nth-child(3) {
   flex: 1;
   min-width: 120px;
 }
+/* ---- in-app message and question dialogs ---- */
+/* A message or question always sits above any dialog that raised it. */
+.modal-back:has(> .ask) {
+  z-index: 200;
+}
+.modal.ask {
+  width: min(440px, calc(100vw - 32px));
+}
+.modal.ask h3 {
+  margin: 0 0 8px;
+}
+.modal.ask p {
+  margin: 0;
+  line-height: 1.5;
+}
+.modal.ask .modal-foot {
+  gap: 8px;
+}
+.modal:focus {
+  outline: none;
+}
+.modal button.danger {
+  color: var(--err);
+  border-color: var(--err);
+}
 /* ---- crash screen and recovery banner ---- */
 .crash {
   margin: 0 auto;
@@ -1142,6 +1175,26 @@ table.zones td:nth-child(3) {
 }
 .badge.info {
   background: var(--info);
+}
+/* A mark as well as a colour, so the three kinds can be told apart without relying on colour. */
+.badge::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 800 8px/1 Inter, sans-serif;
+  color: #fff;
+}
+.badge.error::after {
+  content: '×';
+  font-size: 10px;
+}
+.badge.warning::after {
+  content: '!';
+  color: #3b2600;
+}
+.badge.info::after {
+  content: 'i';
 }
 .react-flow__handle.h {
   width: 7px;

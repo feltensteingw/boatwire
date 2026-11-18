@@ -38,6 +38,7 @@ function EquipmentList() {
       <div className="eq-add">
         <select
           value=""
+          aria-label="Add equipment"
           data-tip="Add batteries, the engine, chargers, solar, AC sources, or any DC / AC appliance. Typical values are filled in; click the item to adjust them."
           onChange={(e) => {
             if (!e.target.value) return;
@@ -218,7 +219,7 @@ function MoveOutOfZone({ zoneId, done }: { zoneId: string; done: () => void }) {
         {use.roles.length > 0 && <> It is also {use.roles.join(' and ')}.</>} Cable lengths are measured from where things are, so choose where these move to.
       </p>
       <div className="zone-move-row">
-        <Select value={to} options={others.map((z) => ({ value: z.id, label: z.name }))} onChange={setTo} />
+        <Select label="Move to" value={to} options={others.map((z) => ({ value: z.id, label: z.name }))} onChange={setTo} />
         <button
           className="primary"
           onClick={() => {
@@ -279,17 +280,18 @@ function BoatPanel() {
           {profile.zones.map((z, i) => (
             <tr key={z.id}>
               <td>
-                <input value={z.name} onChange={(e) => up((p) => void (p.zones[i].name = e.target.value))} />
+                <input aria-label="Zone name" value={z.name} onChange={(e) => up((p) => void (p.zones[i].name = e.target.value))} />
               </td>
               <td>
-                <input type="number" value={z.x} onChange={(e) => up((p) => void (p.zones[i].x = +e.target.value))} />
+                <input type="number" aria-label={`${z.name}: distance aft of the bow, feet`} value={z.x} onChange={(e) => up((p) => void (p.zones[i].x = +e.target.value))} />
               </td>
               <td>
-                <input type="number" value={z.rise} onChange={(e) => up((p) => void (p.zones[i].rise = +e.target.value))} />
+                <input type="number" aria-label={`${z.name}: rise, feet`} value={z.rise} onChange={(e) => up((p) => void (p.zones[i].rise = +e.target.value))} />
               </td>
               <td>
                 <button
                   className="icon"
+                  aria-label={`Remove the zone ${z.name}`}
                   disabled={profile.zones.length <= 1}
                   data-tip={profile.zones.length <= 1 ? 'A boat needs at least one zone.' : 'Remove this zone. If anything is located in it, you are asked where to move it first.'}
                   onClick={() => (zoneInUse(zoneUse(project, z.id)) ? setRemoving(z.id) : removeZone(z.id))}

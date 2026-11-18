@@ -18,6 +18,8 @@ import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
 import { ToastLayer } from './ui/Toasts';
 import { isNarrow, usePane } from './ui/panes';
+import { DialogLayer, showMessage } from './ui/dialogs';
+import { useMenu } from './ui/useMenu';
 import { redo, undo, useHistory } from './state/history';
 import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
 import { parseProject } from './model/validate';
@@ -54,6 +56,7 @@ export default function App() {
         <CloudSync />
         <TipLayer />
         <ToastLayer />
+        <DialogLayer />
         <HelpGuide />
         <Header />
         <RecoveryBanner />
@@ -113,7 +116,8 @@ function Header() {
   const fileRef = useRef<HTMLInputElement>(null);
   const ideal = useIdeal();
   const existing = useExisting();
-  const [menu, setMenu] = useState(false);
+  const fileMenu = useMenu();
+  const { open: menu, setOpen: setMenu } = fileMenu;
   const diagramDesign = view === 'existing' && existing ? existing : ideal;
   const slug = project.profile.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
   return (
@@ -137,7 +141,7 @@ function Header() {
       <UndoRedo />
       <div className="scen">
         <span className="hint">Scenario</span>
-        <select data-tip="Which what-if version of the boat to draw. Scenarios can change system voltage, house battery chemistry and capacity without touching your equipment list. Manage them under Compare." value={project.activeScenario} onChange={(e) => setScenario(e.target.value)}>
+        <select aria-label="Scenario" data-tip="Which what-if version of the boat to draw. Scenarios can change system voltage, house battery chemistry and capacity without touching your equipment list. Manage them under Compare." value={project.activeScenario} onChange={(e) => setScenario(e.target.value)}>
           {project.scenarios.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -150,9 +154,11 @@ function Header() {
       <HelpButton />
       <CloudControls />
       <div className="file">
-        <button onClick={() => setMenu(!menu)} data-tip="New boat, example boat, open / save a project file, and export the diagram or reports.">File ▾</button>
+        <button {...fileMenu.trigger} data-tip="New boat, example boat, open / save a project file, and export the diagram or reports.">
+          File ▾
+        </button>
         {menu && (
-          <div className="menu" onMouseLeave={() => setMenu(false)}>
+          <div className="menu" aria-label="File" {...fileMenu.panel}>
             <div className="menu-theme">
               <ThemePicker />
             </div>
@@ -222,7 +228,7 @@ function Header() {
               loadProject(project);
               if (notes.length) toast(`Opened with repairs: ${notes.join(' ')}`, { ms: 15000 });
             } catch (err) {
-              alert(`Could not open “${f.name}”. ${(err as Error).message}`);
+              void showMessage(`Could not open “${f.name}”`, (err as Error).message);
             }
             e.target.value = '';
             setMenu(false);
@@ -307,7 +313,7 @@ function ThemePicker() {
 function exportDiagram(fmt: 'png' | 'svg') {
   const fn = (window as unknown as { boatwireExport?: (f: 'png' | 'svg') => Promise<void> }).boatwireExport;
   if (fn && document.querySelector('.react-flow__viewport')) fn(fmt);
-  else alert('Open a diagram (Ideal design or Existing boat) first.');
+  else toast('Open a diagram first (Ideal design or Existing boat), then export it.');
 }
 
 function LayerBar({ manual }: { manual?: boolean }) {
@@ -324,7 +330,7 @@ function LayerBar({ manual }: { manual?: boolean }) {
         <span className="lg-title">Show</span>
         <Toggle checked={layers.dc} label="DC" tip="Show the 12 / 24 V battery system: batteries, buses, panels, chargers and DC loads." onChange={(v) => setLayers((l) => ({ ...l, dc: v, ac: !v && !l.ac ? true : l.ac }))} />
         <Toggle checked={layers.ac} label="AC" tip="Show the 120 / 230 V mains system: shore power, generator, inverter, AC panel and outlets." onChange={(v) => setLayers((l) => ({ ...l, ac: v, dc: !v && !l.dc ? true : l.dc }))} />
-        <select value={layers.negatives} onChange={(e) => setLayers((l) => ({ ...l, negatives: e.target.value as typeof l.negatives }))} data-tip={'How to draw the negative (return) wires.\nAll: every negative wire.\nBuses only: hide the many short load returns, keep the main ones.\nHide: positives only, the cleanest view.'}>
+        <select aria-label="Negative wires" value={layers.negatives} onChange={(e) => setLayers((l) => ({ ...l, negatives: e.target.value as typeof l.negatives }))} data-tip={'How to draw the negative (return) wires.\nAll: every negative wire.\nBuses only: hide the many short load returns, keep the main ones.\nHide: positives only, the cleanest view.'}>
           <option value="full">All negatives</option>
           <option value="buses">Negatives: buses only</option>
           <option value="hidden">Hide negatives</option>
@@ -451,7 +457,7 @@ function ExistingView() {
                 const underlay = await underlayFromFile(f);
                 setExisting({ id: 'existing', name: 'Existing', systemVoltage: project.profile.systemVoltage, nodes: [], wires: [], findings: [], underlay });
               } catch (err) {
-                alert(`Could not use that file: ${(err as Error).message}`);
+                void showMessage('Could not use that file', (err as Error).message);
               } finally {
                 setBusy(false);
               }
@@ -478,6 +484,7 @@ function ExistingView() {
         <div className="toolbar">
           <select
             value=""
+            aria-label="Add a component to the drawing"
             data-tip="Add a generic component (fuse, switch, bus bar, panel…) to your drawing. Click it afterwards to set its rating."
             onChange={(e) => {
               if (!e.target.value) return;
@@ -500,6 +507,7 @@ function ExistingView() {
           <select
             value=""
             disabled={!missingEq.length}
+            aria-label="Place equipment from your list on the drawing"
             data-tip="Place an item from your equipment list that is not on the drawing yet."
             onChange={(e) => {
               const eq = project.equipment.find((x) => x.id === e.target.value);

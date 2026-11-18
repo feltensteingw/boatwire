@@ -129,9 +129,10 @@ export function Compare() {
 function ScenarioEditor({ s, onChange, onRemove }: { s: Scenario; onChange: (p: Partial<Scenario>) => void; onRemove?: () => void }) {
   return (
     <div className="scen-edit">
-      <TextInput value={s.name} onChange={(v) => onChange({ name: v })} />
+      <TextInput label="Scenario name" value={s.name} onChange={(v) => onChange({ name: v })} />
       <span data-tip="System voltage for this scenario. “Boat voltage” uses the one set on the Boat & zones tab.">
       <Select<string>
+        label={`${s.name}: system voltage`}
         value={String(s.systemVoltage ?? '')}
         options={[
           { value: '', label: 'Boat voltage' },
@@ -142,10 +143,10 @@ function ScenarioEditor({ s, onChange, onRemove }: { s: Scenario; onChange: (p: 
       />
       </span>
       <span data-tip="House battery chemistry for this scenario. “As specified” uses your equipment list.">
-        <Select<string> value={s.houseChemistry ?? ''} options={CHEM} onChange={(v) => onChange({ houseChemistry: (v || undefined) as Chemistry | undefined })} />
+        <Select<string> label={`${s.name}: house battery chemistry`} value={s.houseChemistry ?? ''} options={CHEM} onChange={(v) => onChange({ houseChemistry: (v || undefined) as Chemistry | undefined })} />
       </span>
       <span data-tip="House bank capacity in amp-hours at this scenario's system voltage (a 24 V 200 Ah bank stores the same energy as 12 V 400 Ah). Leave empty to keep your equipment list's size.">
-        <NumInput value={s.houseCapacityAh} unit="Ah @ sys V" onChange={(v) => onChange({ houseCapacityAh: v > 0 ? v : undefined })} />
+        <NumInput label={`${s.name}: house bank capacity, amp-hours`} value={s.houseCapacityAh} unit="Ah @ sys V" onChange={(v) => onChange({ houseCapacityAh: v > 0 ? v : undefined })} />
       </span>
       {onRemove && (
         <button className="link danger" onClick={onRemove}>
