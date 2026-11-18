@@ -337,7 +337,8 @@ const SECTIONS: Section[] = [
           <li><b>+ Add component…</b> adds fuses, switches, bus bars, panels and the rest. <b>+ Place equipment</b> adds items from your list that aren't drawn yet.</li>
           <li>Drag from one terminal dot to another to draw a wire. Red dots are positive, black are negative, orange are AC, green are ground, and blue are signal.</li>
           <li>Click a component to set its rating, chemistry or capacity. Panels and bus bars can have studs or circuits added.</li>
-          <li>Click a wire to set its real size, length and type, and whether it runs through the hot engine space.</li>
+          <li>A new wire opens on the right so you can set its real size, length and type, and whether it runs through the hot engine space. Click any wire to change these later.</li>
+          <li>A dotted wire labelled <b>size?</b> has no size yet. BoatWire cannot check it, and the status stays amber until every power wire has a size.</li>
           <li>Press <kbd>Delete</kbd> to remove the selection. <b>Auto-arrange</b> tidies the layout.</li>
         </ul>
         <h4>Upgrade plan</h4>

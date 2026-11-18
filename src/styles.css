@@ -1019,6 +1019,10 @@ table.zones td:nth-child(3) {
   white-space: nowrap;
   color: var(--muted);
 }
+.wlabel.wl-unsized {
+  color: var(--warn, #b45309);
+  font-weight: 600;
+}
 .wlabel.wl-pos {
   color: var(--w-pos);
 }

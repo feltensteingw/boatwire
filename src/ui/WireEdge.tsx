@@ -1,6 +1,6 @@
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type Edge, type EdgeProps } from '@xyflow/react';
 import { memo } from 'react';
-import { gaugeIndex } from '../engine/calc';
+import { gaugeIndex, isUnsized } from '../engine/calc';
 import type { LayerSettings, Wire } from '../model/types';
 
 export type WireData = {
@@ -31,6 +31,8 @@ export function wireLabel(d: WireData): string {
   const w = d.wire;
   const parts: string[] = [];
   const L = d.labels;
+  // A wire nobody has sized yet always says so: it is not being checked.
+  if (isUnsized(w)) parts.push('size?');
   if (L.gauge && w.gauge && w.kind !== 'sig') parts.push(w.cable ?? (w.kind === 'ac' ? `${w.gauge}/3` : `${w.gauge}`));
   if (L.current && d.amps !== undefined && w.kind !== 'sig' && w.kind !== 'gnd') parts.push(`${d.amps >= 10 ? Math.round(d.amps) : d.amps.toFixed(1)} A`);
   if (L.length && w.kind !== 'sig') parts.push(`${w.lengthFt} ft`);
@@ -109,13 +111,14 @@ function WireEdgeImpl(props: EdgeProps<WireFlowEdge>) {
         style={{
           stroke: STROKE[w.kind],
           strokeWidth: width,
-          strokeDasharray: w.kind === 'sig' ? '4 3' : w.kind === 'gnd' && w.equipmentGround ? '6 3' : undefined,
+          strokeDasharray: isUnsized(w) ? '1.5 5' : w.kind === 'sig' ? '4 3' : w.kind === 'gnd' && w.equipmentGround ? '6 3' : undefined,
+          strokeLinecap: isUnsized(w) ? 'round' : undefined,
           strokeLinejoin: 'round',
         }}
       />
       {label && (
         <EdgeLabelRenderer>
-          <div className={`wlabel wl-${w.kind}`} style={{ transform: `translate(-50%, -115%) translate(${lx}px, ${ly}px)` }}>
+          <div className={`wlabel wl-${w.kind}${isUnsized(w) ? ' wl-unsized' : ''}`} style={{ transform: `translate(-50%, -115%) translate(${lx}px, ${ly}px)` }}>
             {label}
           </div>
         </EdgeLabelRenderer>
