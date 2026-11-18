@@ -3,7 +3,7 @@
 import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A } from '../model/catalog';
 import { growTerminal, makeNode } from '../model/nodeDefs';
 import { missingZones } from '../model/zones';
-import { AC_STANDARDS, FUSE_CLASSES, GAUGES, STANDARD_BREAKERS_DC, VDROP } from '../model/standards';
+import { AC_STANDARDS, CONVERTER_EFFICIENCY, FUSE_CLASSES, GAUGES, STANDARD_BREAKERS_DC, VDROP } from '../model/standards';
 import type {
   Chemistry,
   Design,
@@ -17,7 +17,7 @@ import type {
   Wire,
   WireKind,
 } from '../model/types';
-import { fuseClassFor, MISSING_ZONE_RUN_FT, nextStandard, protectionFor, runLength, sizeConductor } from './calc';
+import { fuseClassFor, inverterDcAmps, MISSING_ZONE_RUN_FT, nextStandard, protectionFor, runLength, sizeConductor } from './calc';
 import { energyBudget, num } from './energy';
 import { effectiveEquipment, scenarioVoltage } from './scenario';
 
@@ -43,7 +43,6 @@ const CHEM_LABEL: Record<Chemistry, string> = { flooded: 'Flooded', agm: 'AGM', 
 const MPPT_SIZES = [10, 15, 20, 30, 50, 70, 85, 100];
 const CONVERTER_SIZES = [10, 20, 30, 40, 70];
 const SWITCH_SIZES = [300, 350, 600, 800];
-const INVERTER_EFF = 0.9;
 
 class Builder {
   nodes: DNode[] = [];
@@ -259,7 +258,7 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   const winds = [...kinds('wind'), ...kinds('hydro')];
 
   const invWatts = ic ? num(ic, 'watts') : inv ? num(inv, 'watts') : 0;
-  const invDcAmps = invWatts / (V * 0.875 * INVERTER_EFF); // at low battery voltage
+  const invDcAmps = inverterDcAmps(invWatts, V);
   const panelLoads = dcLoads.filter((l) => !l.heavy && !l.alwaysOn && !l.v12 && !l.ded);
   const v12Loads = dcLoads.filter((l) => l.v12 && !l.heavy);
   const heavyLoads = dcLoads.filter((l) => l.heavy && !l.ded);
@@ -452,7 +451,7 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   if (v12Loads.length) {
     const amps12 = v12Loads.reduce((s, l) => s + l.amps, 0);
     const convRating = nextStandard(amps12 * 1.25, CONVERTER_SIZES);
-    const inAmps = (convRating * 12) / V / INVERTER_EFF;
+    const inAmps = (convRating * 12) / V / CONVERTER_EFFICIENCY;
     const inFuseRating = protectionFor(inAmps);
     const conv = b.add('converter', 'conv-24-12', '24→12 V converter', {
       zone: PZ,

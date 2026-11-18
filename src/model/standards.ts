@@ -113,6 +113,36 @@ export const USABLE_DOD: Record<string, number> = {
   lifepo4: 0.8,
 };
 
+/** Share of the DC power an inverter draws that comes out as AC. One figure for the design, the check and the energy budget. */
+export const INVERTER_EFFICIENCY = 0.9;
+
+/**
+ * Battery voltage under heavy load, as a fraction of nominal (10.5 V on a 12 V system).
+ * Inverter cables and fuses are sized for the current drawn at this voltage, which is the
+ * highest it gets.
+ */
+export const LOW_BATTERY_FACTOR = 0.875;
+
+/** Efficiency of a DC-DC converter (24 → 12 V). */
+export const CONVERTER_EFFICIENCY = 0.9;
+
+/**
+ * Assumptions behind the energy budget. Typical cruising values: the real figures depend on
+ * latitude, season and how the boat is used.
+ */
+export const ENERGY_ASSUMPTIONS = {
+  /** Hours a day of full-strength sun. */
+  solarPeakHours: 4.5,
+  /** Share of a panel's rating actually delivered (heat, angle, shading, controller). */
+  solarDerate: 0.75,
+  /** Average output of a wind or hydro generator as a share of its rating. */
+  windHydroCapacityFactor: 0.2,
+  /** Days the house bank should last without charging. */
+  daysAutonomy: 2,
+  /** Share of the alternator's rating that ends up in the bank: lead-acid tapers as it fills, lithium takes nearly all of it. */
+  alternatorChargeEfficiency: { lead: 0.6, lifepo4: 0.85 },
+} as const;
+
 /** Charge voltage per 12 V nominal (used to estimate charger output current). */
 export const CHARGE_V_PER_12 = 14.2;
 

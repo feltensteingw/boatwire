@@ -3,7 +3,7 @@ import { estimateCurrents } from '../engine/audit';
 import { ampacity, fmtGauge, gaugeSpec, vdropPct } from '../engine/calc';
 import { ruleInfo } from '../engine/rules';
 import { growTerminal, NODE_DEFS } from '../model/nodeDefs';
-import { FUSE_CLASSES, GAUGES, VDROP, type FuseClass } from '../model/standards';
+import { FUSE_CLASSES, GAUGES, INVERTER_EFFICIENCY, VDROP, type FuseClass } from '../model/standards';
 import type { Design, DNode, Finding, Wire } from '../model/types';
 import { acVoltsOf } from '../state/derived';
 import { useStore } from '../state/store';
@@ -235,7 +235,7 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
             </Field>
           )}
           {(node.type === 'inverter' || node.type === 'inverter-charger') && (
-            <Field label="Inverter rating" help="Continuous AC output in watts. Sets the DC current it can draw (about watts ÷ volts ÷ 0.9 efficiency), and so the size of its cable and fuse.">
+            <Field label="Inverter rating" help={`Continuous AC output in watts. Sets the DC current it can draw (watts ÷ battery volts ÷ ${INVERTER_EFFICIENCY} efficiency, worked out at low battery voltage), and so the size of its cable and fuse.`}>
               <NumInput value={data.watts} unit="W" onChange={(v) => edit((n) => void (n.data.watts = v))} />
             </Field>
           )}

@@ -3,7 +3,7 @@
 import { NODE_DEFS } from '../model/nodeDefs';
 import { BATTERY_FUSE_MAX_IN, BATTERY_FUSE_SHEATHED_MAX_IN, FUSE_CLASSES, LITHIUM_FUSE_MIN_AIC, SHORE_MAIN_MAX_FT, VDROP, type FuseClass } from '../model/standards';
 import type { Design, DNode, Finding, Severity, Wire } from '../model/types';
-import { ampacity, isUnsized, vdropPct } from './calc';
+import { ampacity, inverterDcAmps, isUnsized, vdropPct } from './calc';
 import { AC_SOURCE_TERMS, buildGraph, key, passThrough, positiveNets, SOURCE_TERMS, walk, type Graph, type Reach } from './graph';
 import { joinTerminals } from './connect';
 
@@ -342,9 +342,14 @@ export function estimateCurrents(design: Design): Map<string, number> {
     for (const r of reach) {
       const t = r.node.type;
       if (t === 'battery') bat = true;
-      else if (SOURCE_TERMS[t]?.includes(r.term) || AC_SOURCE_TERMS[t]?.includes(r.term) || t === 'solar-panel' || t === 'wind-gen' || t === 'hydro-gen') src += Number(r.node.data.amps ?? r.node.data.rating ?? 0);
+      else if ((t === 'inverter' || t === 'inverter-charger') && (r.term === 'dcpos' || r.term === 'dcneg')) {
+        // The DC side of an inverter is a load when inverting. An inverter/charger is also a source
+        // when charging. This case must come before the general "source" case below, which would
+        // otherwise count only the (much smaller) charge current.
+        load += inverterDcAmps(Number(r.node.data.watts ?? 0), V);
+        if (t === 'inverter-charger') src += Number(r.node.data.amps ?? 0);
+      } else if (SOURCE_TERMS[t]?.includes(r.term) || AC_SOURCE_TERMS[t]?.includes(r.term) || t === 'solar-panel' || t === 'wind-gen' || t === 'hydro-gen') src += Number(r.node.data.amps ?? r.node.data.rating ?? 0);
       else if (t === 'load' || t === 'engine' || t === 'ac-load') load += loadAmps(r.node);
-      else if ((t === 'inverter' || t === 'inverter-charger') && (r.term === 'dcpos' || r.term === 'dcneg')) load += Number(r.node.data.watts ?? 0) / (V * 0.8);
       else if (t === 'converter' || t === 'dcdc') load += Number(r.node.data.rating ?? 0) * 0.6;
     }
     return { bat, load, src };
@@ -354,8 +359,9 @@ export function estimateCurrents(design: Design): Map<string, number> {
     const a = side(w.from, w);
     const b = side(w.to, w);
     let amps: number | undefined;
-    if (a.bat && !b.bat) amps = b.load || b.src;
-    else if (b.bat && !a.bat) amps = a.load || a.src;
+    // Away from the battery the wire carries the loads out or the charge in, whichever is larger.
+    if (a.bat && !b.bat) amps = Math.max(b.load, b.src);
+    else if (b.bat && !a.bat) amps = Math.max(a.load, a.src);
     else amps = Math.max(a.load, b.load, a.src, b.src) || undefined;
     if (amps !== undefined) res.set(w.id, amps);
   }

@@ -1,6 +1,8 @@
 import {
   AC_CABLE_AMPACITY,
   ENGINE_SPACE_DERATE,
+  INVERTER_EFFICIENCY,
+  LOW_BATTERY_FACTOR,
   MIN_GAUGE_AC,
   GAUGES,
   MIN_GAUGE,
@@ -80,6 +82,14 @@ export function sizeConductor(opts: {
   const limitedBy = idx === minIdx && minIdx > Math.max(a, v) ? 'minimum' : v >= a ? 'vdrop' : 'ampacity';
   const awg = GAUGES[idx].awg;
   return { gauge: awg, vdropPct: vdropPct(opts.designAmps, opts.oneWayFt, awg, opts.volts), limitedBy, overflow };
+}
+
+/**
+ * DC current an inverter draws at full output, in amps: its AC watts, divided by its efficiency,
+ * at low battery voltage. The ideal design and the check of a hand-drawn boat both use this.
+ */
+export function inverterDcAmps(watts: number, systemVolts: number): number {
+  return watts / (systemVolts * LOW_BATTERY_FACTOR * INVERTER_EFFICIENCY);
 }
 
 /** A power wire with no conductor size recorded. Nothing about it can be checked until it has one. */
