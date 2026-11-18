@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react';
 import { toPng, toSvg } from 'html-to-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { joinTerminals } from '../engine/connect';
 import { estimateCurrents } from '../engine/audit';
 import { autoLayout, manualLayout, type Layout } from '../layout/layout';
 import type { Design, Finding } from '../model/types';
@@ -159,13 +160,28 @@ function DiagramInner({ design, findings, mode }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [underlay?.src]);
 
+  /** Why the last wire the user tried to draw was refused. Shown briefly over the canvas. */
+  const [refusal, setRefusal] = useState<string | null>(null);
+  useEffect(() => {
+    if (!refusal) return;
+    const t = setTimeout(() => setRefusal(null), 8000);
+    return () => clearTimeout(t);
+  }, [refusal]);
+
   const onConnect = useCallback(
     (c: Connection) => {
       if (!c.source || !c.target || !c.sourceHandle || !c.targetHandle) return;
       if (c.source === c.target) return;
+      const pol = (node: string, term: string) => design.nodes.find((n) => n.id === node)?.terminals.find((t) => t.id === term)?.pol;
+      const joined = joinTerminals(pol(c.source, c.sourceHandle), pol(c.target, c.targetHandle));
+      if (!joined.ok) {
+        setRefusal(joined.why);
+        return;
+      }
+      setRefusal(null);
       connectExisting({ node: c.source, term: c.sourceHandle }, { node: c.target, term: c.targetHandle });
     },
-    [connectExisting],
+    [connectExisting, design],
   );
 
   useEffect(() => {
@@ -217,6 +233,14 @@ function DiagramInner({ design, findings, mode }: Props) {
         {mode === 'manual' && <UnderlayControls u={underlay} />}
         <ExportBridge />
       </ReactFlow>
+      {refusal && (
+        <div className="refusal" role="alert">
+          <b>Wire not added.</b> {refusal}
+          <button className="icon" aria-label="Dismiss" onClick={() => setRefusal(null)}>
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
