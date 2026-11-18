@@ -24,7 +24,8 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: `npm run build:e2e && npx vite preview --outDir dist-e2e --port ${PORT} --strictPort`,
+    // E2E_CSP makes the local server send firebase.json's Content-Security-Policy in enforcing mode.
+    command: `npm run build:e2e && E2E_CSP=1 npx vite preview --outDir dist-e2e --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

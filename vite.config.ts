@@ -18,9 +18,22 @@ function buildInfo() {
   return { version: pkg.version, sha, time: new Date().toISOString() };
 }
 
+/**
+ * The Content-Security-Policy from firebase.json, where it is the single source of truth.
+ * Hosting sends it in report-only mode for now; the browser tests enforce it (E2E_CSP), so a
+ * change to the app that the policy would block fails a test before it reaches the site.
+ */
+function hostingCsp(): string | undefined {
+  const cfg = JSON.parse(readFileSync(new URL('./firebase.json', import.meta.url), 'utf8')) as { hosting: { headers: { source: string; headers: { key: string; value: string }[] }[] } };
+  const all = cfg.hosting.headers.find((h) => h.source === '**')?.headers ?? [];
+  return all.find((h) => h.key.startsWith('Content-Security-Policy'))?.value;
+}
+
 export default defineConfig(({ command }) => {
   const info = buildInfo();
+  const csp = process.env.E2E_CSP ? hostingCsp() : undefined;
   return {
+    preview: csp ? { headers: { 'Content-Security-Policy': csp } } : undefined,
     plugins: [
       react(),
       // Offline support and "install as an app" (see src/pwa.ts).

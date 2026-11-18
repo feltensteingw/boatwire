@@ -264,3 +264,44 @@ test('new boat: a template gives a complete design; the questions build a custom
   expect(Math.max(...stored.profile.zones.map((z: { x: number }) => z.x))).toBeLessThan(28);
   expect(errors).toEqual([]);
 });
+
+test('the content-security policy from firebase.json is enforced here, and the app runs inside it', async ({ page }) => {
+  const violations: string[] = [];
+  await page.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (e) => {
+      (window as any).__csp = [...((window as any).__csp ?? []), `${e.violatedDirective} blocked ${e.blockedURI || 'inline'}`];
+    });
+  });
+  const errors = await openFresh(page);
+  const policy = (await page.request.get('/')).headers()['content-security-policy'];
+  expect(policy).toContain("default-src 'self'");
+  expect(policy).toContain("frame-ancestors 'none'");
+  // prove it bites: an inline script is refused
+  await page.evaluate(() => {
+    const s = document.createElement('script');
+    s.textContent = 'window.__inlineRan = true';
+    document.head.appendChild(s);
+  });
+  expect(await page.evaluate(() => (window as any).__inlineRan)).toBeUndefined();
+  await page.evaluate(() => ((window as any).__csp = []));
+
+  // the parts of the app most likely to trip a policy: workers, PDF import, picture export
+  await page.getByRole('button', { name: 'Existing boat', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Trace over my wiring diagram/ }).click();
+  await (await chooser).setFiles('e2e/fixtures/diagram.pdf');
+  await expect(page.locator('.underlay img')).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Ideal design', exact: true }).click();
+  await expect.poll(() => page.locator('.react-flow__node').count()).toBeGreaterThan(30);
+  for (const kind of ['PNG', 'SVG']) {
+    await page.locator('.file > button').click();
+    const download = page.waitForEvent('download');
+    await page.locator('.file .menu button', { hasText: `Export diagram (${kind})` }).click();
+    await download;
+  }
+  violations.push(...(await page.evaluate(() => (window as any).__csp as string[])));
+  expect(violations).toEqual([]);
+  // the only console error allowed is the one from the deliberate inline script above
+  expect(errors.filter((e) => !e.includes('Executing inline script'))).toEqual([]);
+  expect(errors.filter((e) => e.includes('Executing inline script'))).toHaveLength(1);
+});
