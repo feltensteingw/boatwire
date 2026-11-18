@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { arrangePositions, autoLayout } from './layout/layout';
 import { existingFromEquipment, existingFromIdeal, equipmentNode, paletteNode } from './engine/existing';
 import { activeScenario } from './engine/scenario';
@@ -8,10 +8,9 @@ import { NODE_DEFS } from './model/nodeDefs';
 import type { NodeType, Project } from './model/types';
 import { useExisting, useFindings, useIdeal } from './state/derived';
 import { DEFAULT_LAYERS, useStore, type View } from './state/store';
-import { Compare } from './ui/Compare';
 import { Diagram } from './ui/Diagram';
 import { Inspector } from './ui/Inspector';
-import { Reports, downloadText, toCsv } from './ui/Reports';
+import { downloadText, toCsv } from './ui/download';
 import { Sidebar } from './ui/Sidebar';
 import { Toggle } from './ui/fields';
 import { CloudControls, CloudSync } from './cloud/CloudControls';
@@ -19,6 +18,10 @@ import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
 import { HelpButton, HelpGuide, HelpLink } from './ui/Help';
 import { UNDERLAY_ACCEPT, underlayFromFile } from './ui/underlayFile';
+
+// Compare and Reports load on first use to keep the initial download small.
+const Compare = lazy(() => import('./ui/Compare').then((m) => ({ default: m.Compare })));
+const Reports = lazy(() => import('./ui/Reports').then((m) => ({ default: m.Reports })));
 
 const VIEWS: { id: View; label: string; tip: string }[] = [
   { id: 'ideal', label: 'Ideal design', tip: 'The best-practice wiring for your equipment list, drawn automatically. Change equipment on the left and it redraws instantly.' },
@@ -41,8 +44,10 @@ export default function App() {
         <div className="center">
           {view === 'ideal' && <IdealView />}
           {view === 'existing' && <ExistingView />}
-          {view === 'compare' && <Compare />}
-          {view === 'reports' && <Reports />}
+          <Suspense fallback={<div className="hint view-loading">Loading…</div>}>
+            {view === 'compare' && <Compare />}
+            {view === 'reports' && <Reports />}
+          </Suspense>
         </div>
       </div>
     </div>

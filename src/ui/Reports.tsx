@@ -5,6 +5,7 @@ import { ruleInfo } from '../engine/rules';
 import { activeScenario } from '../engine/scenario';
 import { acVoltsOf, useExisting, useFindings, useIdeal } from '../state/derived';
 import { useStore, type ReportTab } from '../state/store';
+import { downloadText, toCsv } from './download';
 import { FindingsList } from './Findings';
 
 const TABS: { id: ReportTab; label: string; tip: string }[] = [
@@ -14,18 +15,6 @@ const TABS: { id: ReportTab; label: string; tip: string }[] = [
   { id: 'bom', label: 'Bill of materials', tip: 'Shopping list: cable by size and length, fuses, breakers, bus bars and other parts.' },
   { id: 'energy', label: 'Energy budget', tip: 'Daily consumption per item compared with house bank capacity and charging.' },
 ];
-
-export function downloadText(name: string, text: string, type = 'text/csv') {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type }));
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
-export function toCsv(rows: (string | number | undefined)[][]): string {
-  return rows.map((r) => r.map((c) => (c === undefined ? '' : /[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(',')).join('\n');
-}
 
 export function Reports() {
   const tab = useStore((s) => s.reportTab);

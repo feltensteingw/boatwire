@@ -3,7 +3,26 @@ import { useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import type { Project } from '../model/types';
 import { useStore } from '../state/store';
-import { cloudEnabled, deleteBoat, loadBoat, saveBoat, signInWithGoogle, signOutUser, watchBoats, watchUser, type BoatSummary } from './firebase';
+import { cloudEnabled } from './config';
+import type { BoatSummary } from './firebase';
+
+/** The Firebase SDK is large: load it after first paint, only when cloud storage is configured. */
+const fb = () => import('./firebase');
+
+/** Start a Firebase subscription once the SDK has loaded; returns a cleanup usable from useEffect. */
+function subscribeLater(start: (m: Awaited<ReturnType<typeof fb>>) => () => void, onError: (e: Error) => void): () => void {
+  let stop: (() => void) | undefined;
+  let cancelled = false;
+  fb()
+    .then((m) => {
+      if (!cancelled) stop = start(m);
+    })
+    .catch(onError);
+  return () => {
+    cancelled = true;
+    stop?.();
+  };
+}
 
 type Status = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -37,22 +56,22 @@ export function CloudSync() {
   const setCloudId = useStore((s) => s.setCloudId);
   const lastSaved = useRef<Project | null>(null);
 
-  useEffect(
-    () =>
-      watchUser((u) => {
-        setCloud({ user: u, ready: true, boats: u ? useCloud.getState().boats : [] });
-        if (!u) setCloudId(undefined);
-      }),
-    [setCloud, setCloudId],
-  );
+  useEffect(() => {
+    if (!cloudEnabled) return;
+    return subscribeLater(
+      (m) =>
+        m.watchUser((u) => {
+          setCloud({ user: u, ready: true, boats: u ? useCloud.getState().boats : [] });
+          if (!u) setCloudId(undefined);
+        }),
+      (e) => console.warn('Cloud storage unavailable:', e.message),
+    );
+  }, [setCloud, setCloudId]);
 
   useEffect(() => {
     if (!user) return;
-    return watchBoats(
-      user.uid,
-      (boats) => setCloud({ boats }),
-      (e) => setCloud({ status: 'error', error: e.message }),
-    );
+    const onError = (e: Error) => setCloud({ status: 'error', error: e.message });
+    return subscribeLater((m) => m.watchBoats(user.uid, (boats) => setCloud({ boats }), onError), onError);
   }, [user, setCloud]);
 
   // Autosave the open boat (debounced). New boats are only uploaded on request.
@@ -61,7 +80,7 @@ export function CloudSync() {
     setCloud({ status: 'saving' });
     const t = setTimeout(async () => {
       try {
-        await saveBoat(user.uid, project, cloudId);
+        await (await fb()).saveBoat(user.uid, project, cloudId);
         lastSaved.current = project;
         setCloud({ status: 'saved', error: undefined });
       } catch (e) {
@@ -93,7 +112,7 @@ export function CloudControls() {
         onClick={async () => {
           setBusy(true);
           try {
-            await signInWithGoogle();
+            await (await fb()).signInWithGoogle();
           } catch (e) {
             const msg = (e as Error).message;
             if (!msg.includes('popup-closed')) alert(`Sign-in failed: ${msg}`);
@@ -129,7 +148,7 @@ export function CloudControls() {
           onClick={async () => {
             setBusy(true);
             try {
-              const id = await saveBoat(user.uid, project);
+              const id = await (await fb()).saveBoat(user.uid, project);
               setCloudId(id);
               set({ status: 'saved' });
             } catch (e) {
@@ -156,7 +175,7 @@ export function CloudControls() {
           <button
             onClick={async () => {
               setMenu(false);
-              await signOutUser();
+              await (await fb()).signOutUser();
             }}
           >
             Sign out
@@ -201,7 +220,7 @@ function BoatsDialog() {
                   onClick={async () => {
                     setBusy(b.id);
                     try {
-                      const p = await loadBoat(user.uid, b.id);
+                      const p = await (await fb()).loadBoat(user.uid, b.id);
                       if (p) {
                         loadProject(p, b.id);
                         close();
@@ -221,7 +240,7 @@ function BoatsDialog() {
                 disabled={!!busy}
                 onClick={async () => {
                   if (!window.confirm(`Delete “${b.name}” from your cloud boats? This cannot be undone.`)) return;
-                  await deleteBoat(user.uid, b.id);
+                  await (await fb()).deleteBoat(user.uid, b.id);
                   if (b.id === cloudId) useStore.getState().setCloudId(undefined);
                 }}
               >
@@ -235,7 +254,7 @@ function BoatsDialog() {
             className="primary"
             onClick={async () => {
               newProject();
-              const id = await saveBoat(user.uid, useStore.getState().project);
+              const id = await (await fb()).saveBoat(user.uid, useStore.getState().project);
               useStore.getState().setCloudId(id);
               close();
             }}

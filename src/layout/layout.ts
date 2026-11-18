@@ -1,4 +1,4 @@
-import ELK, { type ElkNode, type ElkExtendedEdge } from 'elkjs/lib/elk.bundled.js';
+import type { ElkNode, ElkExtendedEdge } from 'elkjs/lib/elk-api.js';
 import { isBridge } from '../model/nodeDefs';
 import type { Design, DNode, LayerSettings, Polarity, Wire } from '../model/types';
 
@@ -192,7 +192,57 @@ function termOf(n: DNode, term: string) {
   return n.terminals.find((t) => t.id === term);
 }
 
-const elk = new ELK();
+// ---------------------------------------------------------------- ELK engine
+//
+// ELK is the largest part of the app, and a layout of a big boat takes long enough to freeze
+// the page. In the browser it runs in a Web Worker (elkjs's own worker build), loaded on first
+// use. Where workers are unavailable (tests in Node) or the worker fails to start, it falls
+// back to the in-thread bundled build, which gives identical results.
+
+interface ElkEngine {
+  layout(graph: ElkNode): Promise<ElkNode>;
+}
+
+let engine: Promise<ElkEngine> | undefined;
+
+async function inThreadElk(): Promise<ElkEngine> {
+  const { default: ELK } = await import('elkjs/lib/elk.bundled.js');
+  return new ELK();
+}
+
+async function workerElk(): Promise<ElkEngine> {
+  const [{ default: ELK }, { default: workerUrl }] = await Promise.all([import('elkjs/lib/elk-api.js'), import('elkjs/lib/elk-worker.min.js?url')]);
+  // elkjs never rejects if the worker script fails to load, so surface worker errors ourselves.
+  let fail: (e: unknown) => void = () => {};
+  const broken = new Promise<never>((_, reject) => (fail = reject));
+  broken.catch(() => {});
+  const elk = new ELK({
+    workerUrl,
+    workerFactory: (url) => {
+      const w = new Worker(url!);
+      w.addEventListener('error', (e) => fail(new Error(`ELK worker failed: ${e.message || 'could not load'}`)));
+      return w;
+    },
+  });
+  return { layout: (g) => Promise.race([elk.layout(g), broken]) };
+}
+
+function getElk(): Promise<ElkEngine> {
+  return (engine ??= typeof Worker === 'undefined' ? inThreadElk() : workerElk().catch(inThreadElk));
+}
+
+/** Run ELK, dropping to the in-thread build for good if the worker breaks. */
+async function runElk(graph: ElkNode): Promise<ElkNode> {
+  const e = await getElk();
+  try {
+    return await e.layout(graph);
+  } catch (err) {
+    if (typeof Worker === 'undefined') throw err;
+    console.warn('Layout worker unavailable, running layout on the page instead:', err);
+    engine = inThreadElk();
+    return (await engine).layout(graph);
+  }
+}
 
 /** Automatic layered layout (used for generated designs). */
 export async function autoLayout(design: Design, layers: LayerSettings): Promise<Layout> {
@@ -283,7 +333,7 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
     edges: edges.map((e) => ({ id: e.id, sources: [e.sourcePort], targets: [e.targetPort] }) as ElkExtendedEdge),
   };
 
-  let res = await elk.layout(graph);
+  let res = await runElk(graph);
   // Pass 2: pin panel / bus ports at evenly spaced positions below the header,
   // in the order ELK chose in pass 1 (pass 1 ignores header padding).
   const freeIds = new Set(nodes.filter((n) => ['dc-panel', 'ac-panel', 'fuse-block', 'bus-pos', 'bus-neg', 'ac-ground-bus'].includes(n.type)).map((n) => n.id));
@@ -305,7 +355,7 @@ export async function autoLayout(design: Design, layers: LayerSettings): Promise
         });
       }
     }
-    res = await elk.layout(graph);
+    res = await runElk(graph);
   }
   const laid: LaidNode[] = [];
   for (const c of res.children ?? []) {
