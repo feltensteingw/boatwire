@@ -1,6 +1,6 @@
 // Ideal-design generator: equipment list + boat profile + scenario → Design.
 
-import { CATALOG_BY_KIND, HEAVY_DC_THRESHOLD_A } from '../model/catalog';
+import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A } from '../model/catalog';
 import { growTerminal, makeNode } from '../model/nodeDefs';
 import { AC_STANDARDS, FUSE_CLASSES, GAUGES, STANDARD_BREAKERS_DC, VDROP } from '../model/standards';
 import type {
@@ -56,7 +56,7 @@ class Builder {
     public us: boolean,
   ) {}
 
-  add(type: NodeType, id: string, label: string, opts: Partial<DNode> = {}): DNode {
+  add(type: NodeType, id: string, label: string, opts: Parameters<typeof makeNode>[3] = {}): DNode {
     const n = makeNode(type, id, label, { role: id, ...opts });
     this.nodes.push(n);
     return n;
@@ -178,8 +178,12 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   const banks = kinds('battery-bank');
   const house = banks.filter((e) => (e.props.role ?? 'house') === 'house');
   const startBank = banks.find((e) => e.props.role === 'start');
-  const wlBank = banks.find((e) => e.props.role === 'windlass');
-  const thBank = banks.find((e) => e.props.role === 'thruster');
+  // Dedicated banks (windlass, thruster, winch, refrigeration): role → bank equipment
+  const dedBanks = new Map<string, Equipment>();
+  for (const r of Object.keys(DEDICATED_BANK_ROLES)) {
+    const e = banks.find((x) => x.props.role === r);
+    if (e) dedBanks.set(r, e);
+  }
   const engine = kinds('engine')[0];
 
   if (house.length === 0) {
@@ -195,7 +199,8 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   const extBms = lfp && house.some((h) => h.props.bms === 'external');
 
   // ---------------------------------------------------------------- loads
-  type LoadInfo = { e: Equipment; amps: number; watts: number; critical: boolean; v12: boolean; heavy: boolean; alwaysOn: boolean };
+  /** `ded` = role of the dedicated bank that powers this load (if the boat has one). */
+  type LoadInfo = { e: Equipment; amps: number; watts: number; critical: boolean; v12: boolean; heavy: boolean; alwaysOn: boolean; ded?: string };
   const dcLoads: LoadInfo[] = eq
     .filter((e) => CATALOG_BY_KIND[e.kind]?.category === 'dc-load')
     .map((e) => {
@@ -203,7 +208,9 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
       const v12 = V === 24 && e.props.v24ok === false;
       const amps = watts / (v12 ? 12 : V);
       const heavy = ['windlass', 'bow-thruster', 'electric-winch'].includes(e.kind) || (!v12 && amps > HEAVY_DC_THRESHOLD_A);
-      return { e, amps, watts, critical: !!e.props.critical, v12, heavy, alwaysOn: !!e.props.alwaysOn && !heavy };
+      const role = dedicatedRoleFor(e.kind);
+      const ded = role && !v12 && dedBanks.has(role) ? role : undefined;
+      return { e, amps, watts, critical: !!e.props.critical, v12, heavy, alwaysOn: !!e.props.alwaysOn && !heavy && !ded, ded };
     });
   const acLoads = eq.filter((e) => CATALOG_BY_KIND[e.kind]?.category === 'ac-load');
   const ic = kinds('inverter-charger')[0];
@@ -214,17 +221,13 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
 
   const invWatts = ic ? num(ic, 'watts') : inv ? num(inv, 'watts') : 0;
   const invDcAmps = invWatts / (V * 0.875 * INVERTER_EFF); // at low battery voltage
-  const panelLoads = dcLoads.filter((l) => !l.heavy && !l.alwaysOn && !l.v12);
+  const panelLoads = dcLoads.filter((l) => !l.heavy && !l.alwaysOn && !l.v12 && !l.ded);
   const v12Loads = dcLoads.filter((l) => l.v12 && !l.heavy);
-  const heavyLoads = dcLoads.filter((l) => l.heavy);
+  const heavyLoads = dcLoads.filter((l) => l.heavy && !l.ded);
+  const dedLoads = dcLoads.filter((l) => l.ded);
   const aoLoads = dcLoads.filter((l) => l.alwaysOn);
   const continuous = dcLoads.filter((l) => !l.heavy).reduce((s, l) => s + l.watts / V, 0) * 0.6;
-  const maxHeavyFromHouse = Math.max(
-    0,
-    ...heavyLoads
-      .filter((l) => !(l.e.kind === 'windlass' && wlBank) && !(l.e.kind === 'bow-thruster' && thBank))
-      .map((l) => l.amps),
-  );
+  const maxHeavyFromHouse = Math.max(0, ...heavyLoads.map((l) => l.amps));
   const chargeTotal =
     chargers.reduce((s, c) => s + num(c, 'amps'), 0) +
     (ic ? num(ic, 'chargeAmps') : 0) +
@@ -401,9 +404,11 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     return { panel, pneg };
   }
 
-  if (panelLoads.length) {
-    buildPanel('dc-panel', 'DC panel', panelLoads, { from: [posBus, b.stud(posBus)], neg: [negBus, b.stud(negBus)], volts: V, feederRunFrom: BZ });
-  }
+  // The house panel also carries the control (relay) circuits for loads on dedicated banks.
+  const housePanel =
+    panelLoads.length || dedLoads.length
+      ? buildPanel('dc-panel', 'DC panel', panelLoads, { from: [posBus, b.stud(posBus)], neg: [negBus, b.stud(negBus)], volts: V, feederRunFrom: BZ })
+      : undefined;
 
   if (v12Loads.length) {
     const amps12 = v12Loads.reduce((s, l) => s + l.amps, 0);
@@ -424,23 +429,36 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     b.find('info', 'converter-24-12', `${v12Loads.length} load(s) only run on 12 V; they are fed through a ${convRating} A 24→12 V converter and a 12 V sub-panel.`);
   }
 
-  // ---------------------------------------------------------------- dedicated banks (windlass / thruster)
-  function dedicatedBank(e: Equipment, key: string, label: string) {
+  // ---------------------------------------------------------------- dedicated banks (windlass / thruster / winch / refrigeration)
+  // The bank sits beside its equipment and supplies the load current through short cables. It is recharged
+  // from the house bank by a DC-DC charger, and the load is switched from the house panel through a relay.
+  const DED_KEYS: Record<string, string> = { windlass: 'wl', thruster: 'th', winch: 'wn', fridge: 'fr' };
+  function dedicatedBank(e: Equipment, role: string) {
+    const key = DED_KEYS[role] ?? role;
+    const label = DEDICATED_BANK_ROLES[role].label;
+    const served = dedLoads.filter((l) => l.ded === role);
+    if (!served.length) {
+      b.find('info', 'dedicated-bank', `${e.name} is a dedicated ${label.toLowerCase()} battery, but there is no ${label.toLowerCase()} equipment for it to power.`, 'Add the equipment, or change the battery\'s role.');
+    }
     const s = bankSummary(e, V);
-    const bat = b.add('battery', `${key}-bat`, e.name, { zone: e.zone, sublabel: s.text, equipmentId: e.id, data: { chemistry: s.chem, ah: s.ah, volts: V } });
+    const lfpBank = s.chem === 'lifepo4';
+    const dcA = V === 12 ? 30 : 15;
+    const loadAmps = Math.max(dcA, served.reduce((sum, l) => sum + l.amps, 0));
+    const rating = protectionFor(loadAmps);
+    const cls = fuseClassFor(rating, { atBattery: true, lithium: lfpBank });
+    const swRating = nextStandard(rating, SWITCH_SIZES);
+    const bat = b.add('battery', `${key}-bat`, e.name, { zone: e.zone, sublabel: s.text, equipmentId: e.id, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['dedicated-bank'] });
     const bus = b.add('bus-pos', `${key}-bus`, `${label} positive bus`, { zone: e.zone });
     const nbus = b.add('bus-neg', `${key}-nbus`, `${label} negative bus`, { zone: e.zone });
-    const rating = 300;
-    const fuse = b.add('fuse', `${key}-fuse`, `${label} battery fuse`, { zone: e.zone, sublabel: fuseLabel(rating, s.chem === 'lifepo4' ? 'Class T' : 'MRBF'), data: { rating, fuseClass: s.chem === 'lifepo4' ? 'Class T' : 'MRBF' }, notes: ['battery-fuse'] });
-    const sw = b.add('switch', `${key}-switch`, `${label} battery switch`, { zone: e.zone, data: { rating: 300 }, notes: ['battery-switch'] });
-    const o = { amps: 200, protect: rating, len: 0.5 };
-    b.wire('pos', [bat, 'pos'], [fuse, 'in'], o);
-    b.wire('pos', [fuse, 'out'], [sw, 'in'], { ...o, len: 1, protectedBy: fuse.id });
-    b.wire('pos', [sw, 'out'], [bus, b.stud(bus)], { ...o, len: 1, protectedBy: fuse.id });
-    b.wire('neg', [bat, 'neg'], [nbus, b.stud(nbus)], { ...o, len: 1.5 });
+    const fuse = b.add('fuse', `${key}-fuse`, `${label} battery fuse`, { zone: e.zone, sublabel: fuseLabel(rating, cls), data: { rating, fuseClass: cls }, notes: ['battery-fuse'] });
+    const sw = b.add('switch', `${key}-switch`, `${label} battery switch`, { zone: e.zone, data: { rating: swRating, part: `Battery switch, ${swRating} A continuous` }, notes: ['battery-switch'] });
+    const o = { amps: loadAmps, protect: rating, len: 0.5 };
+    const bw = b.wire('pos', [bat, 'pos'], [fuse, 'in'], o);
+    b.wire('pos', [fuse, 'out'], [sw, 'in'], { ...o, len: 1, gauge: bw.gauge, protectedBy: fuse.id });
+    b.wire('pos', [sw, 'out'], [bus, b.stud(bus)], { ...o, len: 1, gauge: bw.gauge, protectedBy: fuse.id });
+    b.wire('neg', [bat, 'neg'], [nbus, b.stud(nbus)], { ...o, len: 1.5, gauge: bw.gauge, notes: ['negative-same-size'] });
     // charge from house via DC-DC
-    const dcA = V === 12 ? 30 : 15;
-    const dcdc = b.add('dcdc', `${key}-dcdc`, `DC-DC charger (house → ${label.toLowerCase()})`, { zone: BZ, sublabel: `${dcA} A`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}` }, notes: ['dcdc'] });
+    const dcdc = b.add('dcdc', `${key}-dcdc`, `DC-DC charger (house → ${label.toLowerCase()})`, { zone: BZ, sublabel: `${dcA} A`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}` }, notes: ['dcdc', 'dedicated-bank'] });
     const fIn = b.add('fuse', `${key}-dcdc-in`, 'DC-DC input fuse', { zone: BZ, col: 5, sublabel: fuseLabel(protectionFor(dcA * 1.1), 'MIDI'), data: { rating: protectionFor(dcA * 1.1), fuseClass: 'MIDI' }, notes: ['charging-source-fuse'] });
     const fOut = b.add('fuse', `${key}-dcdc-out`, 'DC-DC output fuse', { zone: e.zone, sublabel: fuseLabel(protectionFor(dcA), 'MIDI'), data: { rating: protectionFor(dcA), fuseClass: 'MIDI' }, notes: ['charging-source-fuse'] });
     const len = run(BZ, e.zone);
@@ -454,33 +472,59 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     b.wire('neg', [nbus, b.stud(nbus)], [negBus, b.stud(negBus)], { amps: dcA, len, gauge: ow.gauge, notes: ['common-negative'] });
     return { bus, nbus };
   }
-  const wl = wlBank ? dedicatedBank(wlBank, 'wl', 'Windlass') : undefined;
-  const th = thBank ? dedicatedBank(thBank, 'th', 'Thruster') : undefined;
+  const dedBuilt = new Map<string, { bus: DNode; nbus: DNode }>();
+  for (const [role, e] of dedBanks) dedBuilt.set(role, dedicatedBank(e, role));
 
-  // ---------------------------------------------------------------- heavy loads
-  for (const l of heavyLoads) {
-    const ded = l.e.kind === 'windlass' ? wl : l.e.kind === 'bow-thruster' ? th : undefined;
+  // ---------------------------------------------------------------- heavy loads and loads on dedicated banks
+  for (const l of [...heavyLoads, ...dedLoads]) {
+    const ded = l.ded ? dedBuilt.get(l.ded) : undefined;
     const srcBus = ded?.bus ?? posBus;
     const srcNeg = ded?.nbus ?? negBus;
     const srcZone = ded ? srcBus.zone : BZ;
-    const useFuse = l.amps * 1.25 > STANDARD_BREAKERS_DC[STANDARD_BREAKERS_DC.length - 1];
-    const rating = useFuse ? protectionFor(l.amps) : protectionFor(l.amps, 'breaker-dc');
-    const cls = useFuse ? fuseClassFor(rating, { lithium: lfp, mainFeeder: true }) : undefined;
-    const prot = useFuse
-      ? b.add('fuse', `prot-${l.e.id}`, `${l.e.name} fuse`, { zone: srcZone, col: 6, sublabel: fuseLabel(rating, cls!), data: { rating, fuseClass: cls }, notes: ['heavy-load'] })
-      : b.add('breaker', `prot-${l.e.id}`, `${l.e.name} breaker`, { zone: srcZone, sublabel: `${rating} A (manual reset)`, data: { rating, part: `Surface-mount breaker ${rating} A` }, notes: ['heavy-load'] });
-    const cont = b.add('contactor', `cont-${l.e.id}`, `${l.e.name} contactor`, { zone: l.e.zone, data: { rating: nextStandard(l.amps, [100, 150, 250, 400, 600]), part: l.e.kind === 'windlass' ? 'Reversing solenoid / control box' : 'Solenoid' }, notes: ['heavy-load'] });
-    const helm = b.add('helm-switch', `helm-${l.e.id}`, `${l.e.name} control`, { zone: 'cockpit', notes: ['heavy-load'] });
+    let prot: DNode;
+    let rating: number;
+    if (l.heavy) {
+      const useFuse = l.amps * 1.25 > STANDARD_BREAKERS_DC[STANDARD_BREAKERS_DC.length - 1];
+      rating = useFuse ? protectionFor(l.amps) : protectionFor(l.amps, 'breaker-dc');
+      const cls = useFuse ? fuseClassFor(rating, { lithium: lfp, mainFeeder: true }) : undefined;
+      prot = useFuse
+        ? b.add('fuse', `prot-${l.e.id}`, `${l.e.name} fuse`, { zone: srcZone, col: 6, sublabel: fuseLabel(rating, cls!), data: { rating, fuseClass: cls }, notes: ['heavy-load'] })
+        : b.add('breaker', `prot-${l.e.id}`, `${l.e.name} breaker`, { zone: srcZone, sublabel: `${rating} A (manual reset)`, data: { rating, part: `Surface-mount breaker ${rating} A` }, notes: ['heavy-load'] });
+    } else {
+      rating = protectionFor(l.amps);
+      const cls = fuseClassFor(rating, {});
+      prot = b.add('fuse', `prot-${l.e.id}`, `${l.e.name} fuse`, { zone: srcZone, col: 6, sublabel: fuseLabel(rating, cls), data: { rating, fuseClass: cls }, notes: ['dedicated-bank'] });
+    }
+    const relayPart = l.e.kind === 'windlass' ? 'Reversing solenoid / control box' : l.heavy ? 'Solenoid' : `Relay ${nextStandard(l.amps * 1.25, [30, 40, 70, 100])} A`;
+    const cont = b.add('contactor', `cont-${l.e.id}`, `${l.e.name} ${l.heavy ? 'contactor' : 'relay'}`, {
+      zone: l.e.zone,
+      data: { rating: nextStandard(l.amps, l.heavy ? [100, 150, 250, 400, 600] : [30, 40, 70, 100]), part: relayPart },
+      notes: l.ded ? ['dedicated-bank'] : ['heavy-load'],
+    });
     const load = loadNode(l);
     const len = runLength(profile, srcZone, l.e.zone);
-    const o: WOpts = { amps: l.amps, protect: rating, len, limit: VDROP.nonCritical, protectedBy: prot.id, notes: ['heavy-load', 'conductor-sizing'] };
+    const o: WOpts = { amps: l.amps, protect: rating, len, limit: l.heavy ? VDROP.nonCritical : l.critical ? VDROP.critical : VDROP.nonCritical, protectedBy: prot.id, notes: [l.heavy ? 'heavy-load' : 'dedicated-bank', 'conductor-sizing'] };
     const pw = b.wire('pos', [prot, 'out'], [cont, 'in'], { ...o, vdLen: len + 1 });
     b.wire('pos', [srcBus, b.stud(srcBus)], [prot, 'in'], { ...o, len: 0.5, gauge: pw.gauge });
     b.wire('pos', [cont, 'out'], [load, 'pos'], { ...o, len: 1, gauge: pw.gauge });
     b.wire('neg', [srcNeg, b.stud(srcNeg)], [load, 'neg'], { ...o, gauge: pw.gauge, protectedBy: undefined, notes: ['negative-same-size'] });
-    b.wire('sig', [helm, 'out'], [cont, 'coil'], { amps: 0, len: run('cockpit', l.e.zone) });
+    // Control: a helm switch for motors, and for loads on a dedicated bank the relay is
+    // powered from a small breaker on the house DC panel.
+    const ctl = ded && housePanel ? { panel: housePanel.panel, t: b.stud(housePanel.panel, { rating: 5, label: `5 A · ${l.e.name} control` }) } : undefined;
+    if (l.heavy) {
+      const helm = b.add('helm-switch', `helm-${l.e.id}`, `${l.e.name} control`, {
+        zone: 'cockpit',
+        notes: ['heavy-load'],
+        extraTerminals: ctl ? [['in', 'pos', 'W', '+']] : undefined,
+      });
+      if (ctl) b.wire('sig', [ctl.panel, ctl.t], [helm, 'in'], { amps: 0, len: run(PZ, 'cockpit'), notes: ['dedicated-bank'] });
+      b.wire('sig', [helm, 'out'], [cont, 'coil'], { amps: 0, len: run('cockpit', l.e.zone) });
+    } else if (ctl) {
+      b.wire('sig', [ctl.panel, ctl.t], [cont, 'coil'], { amps: 0, len: run(PZ, l.e.zone), notes: ['dedicated-bank'] });
+    }
     if (!ded && GAUGES.findIndex((g) => g.awg === pw.gauge) >= GAUGES.findIndex((g) => g.awg === '2/0')) {
-      b.find('info', 'voltage-choice', `${l.e.name}: a ${Math.round(len)} ft run at ${Math.round(l.amps)} A needs ${pw.gauge} AWG cable.`, 'A dedicated battery near the load (charged by DC-DC), or 24 V, would cut this substantially.');
+      const role = dedicatedRoleFor(l.e.kind);
+      b.find('info', 'voltage-choice', `${l.e.name}: a ${Math.round(len)} ft run at ${Math.round(l.amps)} A needs ${pw.gauge} AWG cable.`, role ? `A dedicated battery near the load would cut this substantially: add a Battery bank with the role "${DEDICATED_BANK_ROLES[role].label} (dedicated)". 24 V would also help.` : 'A dedicated battery near the load (charged by DC-DC), or 24 V, would cut this substantially.');
     }
   }
 

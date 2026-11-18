@@ -91,6 +91,10 @@ export const RULES: Record<string, RuleInfo> = {
     title: 'Heavy loads straight from the bus',
     why: 'Windlass, thruster and winch motors draw hundreds of amps. They are fed from the main bus through their own breaker (a manual reset is preferred for motors) and a contactor controlled from the helm, not through the house panel.',
   },
+  'dedicated-bank': {
+    title: 'Dedicated battery for one piece of equipment',
+    why: 'A windlass, bow thruster, electric winch or refrigerator can have its own battery right beside it. The heavy current then flows only through short cables from that battery, instead of long, thick cables from the house bank. The equipment is still switched from the house DC panel: a small breaker there powers the relay (or helm switch and contactor), which connects the equipment to its own battery. A DC-DC charger refills the dedicated battery from the house bank, and the two banks share a common negative.',
+  },
   'inverter-fuse': {
     title: 'Inverter feed',
     why: 'An inverter is fed directly from the main bus with a dedicated (Class T on lithium) fuse sized to its maximum DC input, using short, heavy cable.',

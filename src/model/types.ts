@@ -31,7 +31,7 @@ export interface BoatProfile {
   zones: Zone[];
 }
 
-export type BankRole = 'house' | 'start' | 'windlass' | 'thruster';
+export type BankRole = 'house' | 'start' | 'windlass' | 'thruster' | 'winch' | 'fridge';
 
 /** Every catalog kind. Batteries and engine are equipment like anything else. */
 export type EquipmentKind =
