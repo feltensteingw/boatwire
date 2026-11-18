@@ -52,6 +52,7 @@ export function paletteNode(type: NodeType, zone: string): DNode {
   if (type === 'load') {
     n.data.amps = 5;
   }
+  if (type === 'note') n.label = 'Note: click to edit this text';
   return n;
 }
 

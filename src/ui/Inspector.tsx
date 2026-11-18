@@ -9,6 +9,7 @@ import { acVoltsOf, useUnits } from '../state/derived';
 import { awgForMetric, cableLabel, cableText, fmtLen, fromLen, lenUnit, METRIC_SIZES, metricSize, toLen } from '../model/units';
 import { useStore } from '../state/store';
 import { EquipmentEditor } from './Sidebar';
+import { copyOf, GRID } from '../engine/drawing';
 import { Field, NumInput, Select, TextInput, Toggle } from './fields';
 import { FindingItem } from './Findings';
 
@@ -104,6 +105,7 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
   const updateEquipment = useStore((s) => s.updateEquipment);
   const updateExisting = useStore((s) => s.updateExisting);
   const deleteSelection = useStore((s) => s.deleteSelection);
+  const pasteExisting = useStore((s) => s.pasteExisting);
   const select = useStore((s) => s.select);
   const equipment = node.equipmentId ? project.equipment.find((e) => e.id === node.equipmentId) : undefined;
   const mine = findings.filter((f) => f.nodes?.includes(node.id));
@@ -117,6 +119,32 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
   const zones = project.profile.zones.map((z) => ({ value: z.id, label: z.name }));
   const def = NODE_DEFS[node.type];
   const data = node.data;
+  const duplicateThis = () => {
+    const [copy] = pasteExisting(copyOf(design, [node.id]), { x: 3 * GRID, y: 3 * GRID });
+    if (copy) select({ kind: 'node', id: copy, design: 'existing' });
+  };
+  if (node.type === 'note') {
+    return (
+      <div>
+        <div className="insp-kind">Note</div>
+        {editable ? (
+          <div className="eq-edit">
+            <Field label="Text" help="A label for anything BoatWire has no symbol for. Notes are shown on the drawing and in exported pictures. They take no part in the checks or the reports.">
+              <textarea className="note-edit" rows={5} aria-label="Note text" value={node.label} onChange={(e) => edit((n) => void (n.label = e.target.value))} />
+            </Field>
+            <div className="row-actions">
+              <button onClick={duplicateThis}>Duplicate</button>
+              <button className="danger" onClick={deleteSelection}>
+                Delete note
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="note-read">{node.label}</p>
+        )}
+      </div>
+    );
+  }
   return (
     <div>
       <div className="insp-kind">{def.label}</div>
@@ -288,6 +316,9 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
             </div>
           )}
           <div className="row-actions">
+            <button data-tip="Add a copy of this component next to it (Ctrl+D)." onClick={duplicateThis}>
+              Duplicate
+            </button>
             <button className="danger" onClick={deleteSelection}>
               Delete component
             </button>

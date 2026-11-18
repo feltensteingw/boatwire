@@ -105,7 +105,7 @@ export function billOfMaterials(design: Design, units: Units = 'imperial'): BomR
     else rows.set(k, { category, item, spec, qty, unit });
   };
   for (const n of design.nodes) {
-    if (n.type === 'load' || n.type === 'ac-load' || n.type === 'engine') continue;
+    if (n.type === 'load' || n.type === 'ac-load' || n.type === 'engine' || n.type === 'note') continue;
     const def = NODE_DEFS[n.type];
     let spec = String(n.data.part ?? '');
     if (!spec && n.type === 'fuse' && n.data.fuseClass) {
@@ -194,7 +194,7 @@ export function designMetrics(design: Design, acVolts: number, units: Units = 'i
     largestCable: largest >= 0 ? fmtSize(GAUGES[largest].awg, units) : '—',
     copperLb: Math.round(copper * 10) / 10,
     cableFt: Math.round(ft),
-    components: design.nodes.filter((n) => !['load', 'ac-load', 'engine'].includes(n.type)).length,
+    components: design.nodes.filter((n) => !['load', 'ac-load', 'engine', 'note'].includes(n.type)).length,
     errors: all.filter((x) => x.severity === 'error').length,
     warnings: all.filter((x) => x.severity === 'warning').length,
     roles: new Set(design.nodes.map((n) => `${NODE_DEFS[n.type].label}`)),

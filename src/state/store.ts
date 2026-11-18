@@ -10,6 +10,7 @@ import type { ThemeId } from '../ui/themes';
 import { parseProject } from '../model/validate';
 import { removeZone } from '../model/zones';
 import { storable } from './imageStore';
+import { nudge, paste, reconnect, removeItems, type Clip } from '../engine/drawing';
 import { stashUnreadable, useRecovery } from './recovery';
 import type { CloudBase } from '../cloud/sync';
 
@@ -77,6 +78,13 @@ interface State {
   addExistingNode(n: DNode): void;
   connectExisting(a: WireEnd, b: WireEnd): void;
   deleteSelection(): void;
+  /** Remove several components and wires from the drawing at once. */
+  removeFromExisting(nodeIds: string[], wireIds: string[]): void;
+  nudgeExisting(nodeIds: string[], dx: number, dy: number): void;
+  /** Add copies to the drawing; returns the new components' ids. */
+  pasteExisting(clip: Clip, offset: { x: number; y: number }): string[];
+  /** Move one end of a wire to another terminal, if the two may be joined. */
+  reconnectExisting(wireId: string, end: 'from' | 'to', to: WireEnd): { ok: true } | { ok: false; why: string };
 }
 
 const VIEW_IDS: View[] = ['ideal', 'existing', 'compare', 'reports'];
@@ -269,6 +277,38 @@ export const useStore = create<State>()(
         // Open the new wire in the inspector straight away, so its size and length get entered while the user is looking at it.
         const wires = get().project.existing?.wires ?? [];
         if (wires.length > before) set({ selection: { kind: 'wire', id: wires[wires.length - 1].id, design: 'existing' } });
+      },
+      removeFromExisting: (nodeIds, wireIds) =>
+        set({
+          project: mutate(get().project, (p) => {
+            if (p.existing) removeItems(p.existing, nodeIds, wireIds);
+          }),
+          selection: null,
+        }),
+      nudgeExisting: (nodeIds, dx, dy) =>
+        set({
+          project: mutate(get().project, (p) => {
+            if (p.existing) nudge(p.existing, nodeIds, dx, dy);
+          }),
+        }),
+      pasteExisting: (clip, offset) => {
+        let made: string[] = [];
+        set({
+          project: mutate(get().project, (p) => {
+            if (p.existing) made = paste(p.existing, clip, offset);
+          }),
+          selection: null,
+        });
+        return made;
+      },
+      reconnectExisting: (wireId, end, to) => {
+        let result: { ok: true } | { ok: false; why: string } = { ok: false, why: 'There is no drawing.' };
+        const project = mutate(get().project, (p) => {
+          if (p.existing) result = reconnect(p.existing, wireId, end, to);
+        });
+        // only an accepted move changes the boat (and becomes an undo step)
+        if (result.ok) set({ project });
+        return result;
       },
       deleteSelection: () => {
         const s = get().selection;

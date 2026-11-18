@@ -60,6 +60,8 @@ export const NODE_DEFS: Record<NodeType, NodeDef> = {
   'ac-load': { label: 'AC load', domain: 'ac', col: 8, terminals: [['l', 'ac', 'W', 'L/N'], ['g', 'gnd', 'W', 'G']], conducts: false, palette: 'Loads' },
   'bilge-switch': { label: 'Bilge switch (Auto/Off/Man)', domain: 'dc', col: 7, terminals: [['in', 'pos', 'W'], ['out', 'pos', 'E']], conducts: true, palette: 'Switching' },
   'helm-switch': { label: 'Helm control switch', domain: 'dc', col: 6, terminals: [['out', 'sig', 'E', 'ctl']], conducts: false, palette: 'Switching' },
+  // A label for anything BoatWire has no symbol for. It has no terminals and takes no part in the checks or reports.
+  note: { label: 'Note', domain: 'dc', col: 8, terminals: [], conducts: false, palette: 'Notes' },
 };
 
 export function makeNode(

@@ -74,6 +74,9 @@ export function describeChange(a: Project, b: Project): Change | null {
   return null;
 }
 
+/** What to call a component in a sentence. A note's label is its whole text, so it is just "a note". */
+const called = (n: { type: string; label: string }) => (n.type === 'note' ? 'a note' : n.label);
+
 function describeDrawing(a: Design | undefined, b: Design | undefined): Change | null {
   if (!a && !b) return null;
   if (!a) return { label: 'Started the existing-boat drawing' };
@@ -82,13 +85,14 @@ function describeDrawing(a: Design | undefined, b: Design | undefined): Change |
   const na = ids(a.nodes);
   const nb = ids(b.nodes);
   const removedNodes = a.nodes.filter((n) => !nb.has(n.id));
-  if (removedNodes.length) return { label: removedNodes.length === 1 ? `Deleted ${removedNodes[0].label}` : `Deleted ${removedNodes.length} components`, destructive: true };
+  if (removedNodes.length) return { label: removedNodes.length === 1 ? `Deleted ${called(removedNodes[0])}` : `Deleted ${removedNodes.length} components`, destructive: true };
   const addedNodes = b.nodes.filter((n) => !na.has(n.id));
-  if (addedNodes.length) return { label: addedNodes.length === 1 ? `Added ${addedNodes[0].label}` : `Added ${addedNodes.length} components` };
+  if (addedNodes.length) return { label: addedNodes.length === 1 ? `Added ${called(addedNodes[0])}` : `Added ${addedNodes.length} components` };
 
   const wa = ids(a.wires);
   const wb = ids(b.wires);
-  if (a.wires.some((w) => !wb.has(w.id))) return { label: 'Deleted a wire', destructive: true };
+  const removedWires = a.wires.filter((w) => !wb.has(w.id)).length;
+  if (removedWires) return { label: removedWires === 1 ? 'Deleted a wire' : `Deleted ${removedWires} wires`, destructive: true };
   if (b.wires.some((w) => !wa.has(w.id))) return { label: 'Drew a wire' };
 
   // The trace-over picture: compare by reference and by fields, never by serialising the image.
@@ -109,10 +113,18 @@ function describeDrawing(a: Design | undefined, b: Design | undefined): Change |
       const o = b.nodes.find((x) => x.id === n.id)!;
       return same({ ...n, pos: undefined }, { ...o, pos: undefined });
     });
-    if (onlyMoved) return changedNodes.length === 1 ? { label: `Moved ${changedNodes[0].label}`, mergeKey: `move:${changedNodes[0].id}` } : { label: 'Arranged the drawing' };
-    return changedNodes.length === 1 ? { label: `Edited ${changedNodes[0].label}`, mergeKey: `node:${changedNodes[0].id}` } : { label: 'Edited the drawing' };
+    if (onlyMoved) {
+      return changedNodes.length === 1
+        ? { label: `Moved ${called(changedNodes[0])}`, mergeKey: `move:${changedNodes[0].id}` }
+        : { label: `Moved ${changedNodes.length} components`, mergeKey: `move:${changedNodes.map((n) => n.id).join(',')}` };
+    }
+    return changedNodes.length === 1 ? { label: `Edited ${called(changedNodes[0])}`, mergeKey: `node:${changedNodes[0].id}` } : { label: 'Edited the drawing' };
   }
   const changedWire = b.wires.find((w) => !same(w, a.wires.find((x) => x.id === w.id)));
-  if (changedWire) return { label: 'Edited a wire', mergeKey: `wire:${changedWire.id}` };
+  if (changedWire) {
+    const was = a.wires.find((x) => x.id === changedWire.id)!;
+    if (!same(was.from, changedWire.from) || !same(was.to, changedWire.to)) return { label: 'Moved a wire end' };
+    return { label: 'Edited a wire', mergeKey: `wire:${changedWire.id}` };
+  }
   return null;
 }

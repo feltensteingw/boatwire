@@ -80,6 +80,11 @@ export function baseSize(n: DNode): { w: number; h: number } {
       return { w: 200, h: 60 };
     case 'helm-switch':
       return { w: 120, h: 40 };
+    case 'note': {
+      // tall enough for its text at about 26 characters a line
+      const lines = n.label.split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / 26)), 0);
+      return { w: 190, h: Math.max(40, 16 + lines * 16) };
+    }
     default:
       return { w: 150, h: 60 };
   }
@@ -87,7 +92,7 @@ export function baseSize(n: DNode): { w: number; h: number } {
 
 /** Which nodes and wires are visible under the current layer settings. */
 export function visibleSubset(design: Design, layers: LayerSettings) {
-  const nodeVisible = (n: DNode) => (n.domain === 'dc' ? layers.dc : layers.ac) || (isBridge(n) && (layers.dc || layers.ac));
+  const nodeVisible = (n: DNode) => n.type === 'note' || (n.domain === 'dc' ? layers.dc : layers.ac) || (isBridge(n) && (layers.dc || layers.ac));
   let nodes = design.nodes.filter(nodeVisible);
   let allWires = design.wires;
   // Optionally fold inline fuses into their wires: in-wire + fuse + out-wire → one wire.

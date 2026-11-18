@@ -170,7 +170,8 @@ export type NodeType =
   | 'load'
   | 'ac-load'
   | 'bilge-switch'
-  | 'helm-switch';
+  | 'helm-switch'
+  | 'note'; // free text on the existing-boat drawing; not part of the circuit
 
 export type Polarity = 'pos' | 'neg' | 'ac' | 'gnd' | 'sig';
 
