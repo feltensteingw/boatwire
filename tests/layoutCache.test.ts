@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateIdeal } from '../src/engine/generate';
-import { autoLayout, cachedLayout, viewShift, type Layout } from '../src/layout/layout';
+import { autoLayout, cachedLayout, sameFootprint, viewShift, type Layout } from '../src/layout/layout';
 import { exampleProject } from '../src/model/examples';
 import type { LayerSettings } from '../src/model/types';
 
@@ -49,5 +49,28 @@ describe('viewShift', () => {
     const before = lay(node('a', 0, 0), node('gone', 500, 300));
     expect(viewShift(before, lay(node('a', 10, 20)), { x: 550, y: 325 })).toEqual({ x: 10, y: 20 });
     expect(viewShift(before, lay(node('new', 1, 1)), { x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('keeping what the canvas measured for a component', () => {
+  it('an edit that only changes labels leaves every component with the same box and terminals', async () => {
+    const p = exampleProject();
+    const first = await autoLayout(generateIdeal(p, p.scenarios[0]), layers);
+    p.equipment.find((e) => e.kind === 'cabin-lights')!.props.watts = 31;
+    const second = cachedLayout(generateIdeal(p, p.scenarios[0]), layers)!;
+    expect(second).toBeTruthy();
+    const before = new Map(first.nodes.map((n) => [n.id, n]));
+    expect(second.nodes.filter((n) => !sameFootprint(before.get(n.id)!, n)).map((n) => n.id)).toEqual([]);
+  });
+
+  it('a moved, added or removed terminal, or a different size, is noticed', async () => {
+    const p = exampleProject();
+    const l = await autoLayout(generateIdeal(p, p.scenarios[0]), layers);
+    const n = l.nodes.find((x) => x.ports.length >= 2)!;
+    expect(sameFootprint(n, { ...n, ports: n.ports.map((q) => ({ ...q })) })).toBe(true);
+    expect(sameFootprint(n, { ...n, w: n.w + 10 })).toBe(false);
+    expect(sameFootprint(n, { ...n, ports: n.ports.slice(1) })).toBe(false);
+    expect(sameFootprint(n, { ...n, ports: n.ports.map((q, i) => (i === 0 ? { ...q, y: q.y + 4 } : q)) })).toBe(false);
+    expect(sameFootprint(n, { ...n, ports: n.ports.map((q, i) => (i === 0 ? { ...q, id: 'other' } : q)) })).toBe(false);
   });
 });
