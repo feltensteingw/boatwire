@@ -6,7 +6,8 @@ import { energyBudget } from '../engine/energy';
 import { CATALOG_BY_KIND } from '../model/catalog';
 import { AC_STANDARDS } from '../model/standards';
 import { buildBoat, CUSTOM_ANSWERS, LOAD_GROUPS, TEMPLATES, type BoatAnswers } from '../model/templates';
-import type { Chemistry, EquipmentKind, SystemVoltage } from '../model/types';
+import type { Chemistry, EquipmentKind, SystemVoltage, Units } from '../model/types';
+import { fromLen, lenUnit, toLen } from '../model/units';
 import { useStore } from '../state/store';
 import { Field, NumInput, Select, TextInput, Toggle } from './fields';
 import { Modal } from './Modal';
@@ -40,6 +41,7 @@ function Wizard({ close, then }: { close: () => void; then?: () => void }) {
   const [step, setStep] = useState(0);
   const [a, setA] = useState<BoatAnswers>(CUSTOM_ANSWERS);
   const set = (patch: Partial<BoatAnswers>) => setA((x) => ({ ...x, ...patch }));
+  const units: Units = a.units ?? (a.acStandard === 'eu230' ? 'metric' : 'imperial');
 
   // What these answers add up to, so the battery question can be answered with the appliances in view.
   const budget = useMemo(() => energyBudget(buildBoat(a)), [a]);
@@ -124,7 +126,7 @@ function Wizard({ close, then }: { close: () => void; then?: () => void }) {
             <TextInput value={a.name} onChange={(name) => set({ name })} />
           </Field>
           <Field label="Length overall" help="Sets how far apart things are, and so how long the cables are. You can fine-tune each location later under Boat & zones.">
-            <NumInput value={a.lengthFt} unit="ft" min={10} onChange={(lengthFt) => set({ lengthFt })} />
+            <NumInput value={toLen(a.lengthFt, units)} unit={lenUnit(units)} min={3} onChange={(v) => set({ lengthFt: fromLen(v, units) })} />
           </Field>
           <Field label="Battery system voltage" help="Most boats under about 45 ft are 12 V. 24 V halves the current, so cables are much smaller: worth it with a big inverter, windlass or thruster.">
             <Select<SystemVoltage>
@@ -140,7 +142,17 @@ function Wizard({ close, then }: { close: () => void; then?: () => void }) {
             <Select
               value={a.acStandard}
               options={Object.entries(AC_STANDARDS).map(([k, v]) => ({ value: k as BoatAnswers['acStandard'], label: v.label }))}
-              onChange={(acStandard) => set({ acStandard, shoreAmps: a.shoreAmps ? AC_STANDARDS[acStandard].shoreOptions[0] : 0 })}
+              onChange={(acStandard) => set({ acStandard, units: acStandard === 'eu230' ? 'metric' : 'imperial', shoreAmps: a.shoreAmps ? AC_STANDARDS[acStandard].shoreOptions[0] : 0 })}
+            />
+          </Field>
+          <Field label="Units" help="How lengths and wire sizes are shown and entered. You can change this later under Boat & zones.">
+            <Select<Units>
+              value={units}
+              options={[
+                { value: 'imperial', label: 'Feet and AWG' },
+                { value: 'metric', label: 'Metres and mm²' },
+              ]}
+              onChange={(u) => set({ units: u })}
             />
           </Field>
         </div>

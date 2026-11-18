@@ -69,13 +69,16 @@ function useReportDesign() {
 
 function WireTable() {
   const design = useReportDesign();
-  const rows = useMemo(() => wireSchedule(design), [design]);
+  const units = useStore((s) => s.project.profile.units);
+  const metric = units === 'metric';
+  const rows = useMemo(() => wireSchedule(design, units), [design, units]);
+  // Metric boats get the cable to buy in mm² and metres, with the AWG design size alongside for reference.
   const csv = () =>
     downloadText(
       'wire-schedule.csv',
       toCsv([
-        ['Circuit', 'From', 'To', 'Type', 'Colour', 'Size (AWG)', 'mm²', 'Length (ft)', 'Current (A)', 'Protection', 'V drop %', 'Limit %'],
-        ...rows.map((r) => [r.circuit, r.from, r.to, r.kind, r.color, r.gauge, r.mm2, r.lengthFt, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2), r.vdropLimit]),
+        ['Circuit', 'From', 'To', 'Type', 'Colour', metric ? 'Size (mm²)' : 'Size (AWG)', metric ? 'Design size (AWG)' : 'mm²', metric ? 'Length (m)' : 'Length (ft)', 'Current (A)', 'Protection', 'V drop %', 'Limit %'],
+        ...rows.map((r) => [r.circuit, r.from, r.to, r.kind, r.color, metric ? r.size : r.gauge, metric ? r.gauge : r.mm2, r.length, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2), r.vdropLimit]),
       ]),
     );
   return (
@@ -107,8 +110,10 @@ function WireTable() {
               <td>
                 <i className={`lw ${r.kind}`} /> {r.color}
               </td>
-              <td className="mono">{r.gauge}</td>
-              <td className="r">{r.lengthFt} ft</td>
+              <td className="mono">{r.size}</td>
+              <td className="r">
+                {r.length} {metric ? 'm' : 'ft'}
+              </td>
               <td className="r">{r.amps !== undefined ? `${r.amps.toFixed(1)} A` : ''}</td>
               <td>{r.protection}</td>
               <td className={`r ${r.vdrop !== undefined && r.vdropLimit !== undefined && r.vdrop > r.vdropLimit ? 'bad' : ''}`}>
@@ -124,7 +129,8 @@ function WireTable() {
 
 function Bom() {
   const design = useReportDesign();
-  const rows = useMemo(() => billOfMaterials(design), [design]);
+  const units = useStore((s) => s.project.profile.units);
+  const rows = useMemo(() => billOfMaterials(design, units), [design, units]);
   const csv = () => downloadText('bill-of-materials.csv', toCsv([['Category', 'Item', 'Specification', 'Qty', 'Unit'], ...rows.map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]));
   let lastCat = '';
   return (
@@ -238,7 +244,7 @@ function Changes() {
   const setView = useStore((s) => s.setView);
   const ideal = useIdeal();
   const existing = useExisting();
-  const changes = useMemo(() => (existing ? changeList(existing, ideal, acVoltsOf(project)) : []), [existing, ideal, project]);
+  const changes = useMemo(() => (existing ? changeList(existing, ideal, acVoltsOf(project), project.profile.units) : []), [existing, ideal, project]);
   if (!existing)
     return (
       <div className="empty">
@@ -270,7 +276,7 @@ function Changes() {
                 <li key={i}>
                   <div className="chg-title">{c.title}</div>
                   {c.detail && <div className="chg-detail">{c.detail}</div>}
-                  {c.rule && !c.detail?.includes(ruleInfo(c.rule).why) && <div className="chg-rule">{ruleInfo(c.rule).title}</div>}
+                  {c.rule && !c.detail?.includes(ruleInfo(c.rule, project.profile.units).why) && <div className="chg-rule">{ruleInfo(c.rule).title}</div>}
                 </li>
               ))}
             </ol>

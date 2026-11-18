@@ -8,6 +8,7 @@
 export type SystemVoltage = 12 | 24;
 export type Chemistry = 'flooded' | 'agm' | 'gel' | 'lifepo4';
 export type AcStandard = 'us120' | 'eu230';
+export type Units = 'imperial' | 'metric';
 export type Domain = 'dc' | 'ac';
 
 export interface Zone {
@@ -30,6 +31,8 @@ export interface BoatProfile {
   panelZone: string;
   /** Zone of the helm, where windlass, thruster and winch controls are. */
   helmZone: string;
+  /** How lengths and wire sizes are shown and entered: feet + AWG, or metres + mm². */
+  units: Units;
   zones: Zone[];
 }
 

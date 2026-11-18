@@ -305,3 +305,53 @@ test('the content-security policy from firebase.json is enforced here, and the a
   expect(errors.filter((e) => !e.includes('Executing inline script'))).toEqual([]);
   expect(errors.filter((e) => e.includes('Executing inline script'))).toHaveLength(1);
 });
+
+test('metric units: mm² and metres everywhere, same design underneath', async ({ page }) => {
+  const errors = await openFresh(page);
+  const labels = () => page.locator('.wlabel').allTextContents();
+  const before = await labels();
+  expect(before.some((l) => /^(\d+|\d\/0)$/.test(l))).toBe(true);
+  const gaugesBefore = (await page.evaluate(() => JSON.parse(localStorage.getItem('boatwire:v1')!).state.project.profile.zones.map((z: { x: number }) => z.x))) as number[];
+
+  await page.locator('.seg button', { hasText: 'Boat' }).click();
+  await page.locator('.boat .field', { hasText: 'Units' }).locator('select').selectOption('metric');
+  // diagram labels
+  await expect.poll(async () => (await labels()).every((l) => !/^(\d+|\d\/0)$/.test(l))).toBe(true);
+  expect((await labels()).some((l) => /mm²$/.test(l))).toBe(true);
+  // boat length and zone table are in metres, and the stored values (feet) have not moved
+  await expect(page.locator('.boat .field', { hasText: 'Length overall' }).locator('.unit')).toHaveText('m');
+  await expect(page.locator('table.zones thead')).toContainText('Aft (m)');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('boatwire:v1')!).state.project.profile.zones.map((z: { x: number }) => z.x))).toEqual(gaugesBefore);
+  // typing a metric distance stores the right number of feet
+  const bilge = page.locator('table.zones tr', { has: page.locator('input[value="Bilge"]') }).locator('input[type=number]').first();
+  await bilge.fill('6');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('boatwire:v1')!).state.project.profile.zones.find((z: { id: string }) => z.id === 'bilge').x)).toBeCloseTo(19.69, 1);
+
+  // reports
+  await page.getByRole('button', { name: 'Reports', exact: true }).click();
+  await page.locator('.report-tabs button', { hasText: 'Wire schedule' }).click();
+  const firstRow = page.locator('.report-body table.grid tbody tr').first().locator('td');
+  await expect(firstRow.nth(4)).toHaveText(/mm²$|^3G/);
+  await expect(firstRow.nth(5)).toHaveText(/^[\d.]+\s*m$/);
+  await expect(page.locator('.report-body')).not.toContainText(' ft');
+  await page.locator('.report-tabs button', { hasText: 'Bill of materials' }).click();
+  await expect(page.locator('.report-body')).toContainText('mm²');
+  await expect(page.locator('.report-body')).not.toContainText('AWG');
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  await expect(page.locator('table.cmp')).toContainText('Cable length (m)');
+  await expect(page.locator('table.cmp')).toContainText('mm²');
+
+  // existing boat: sizes are picked in mm² and lengths typed in metres
+  await blankDrawing(page, ['battery', 'fuse']);
+  await wire(page, [0, 'pos'], [1, 'in']);
+  const size = page.locator('.inspector .field', { hasText: 'Conductor size' }).locator('select');
+  expect(await size.locator('option').allTextContents()).toEqual(['—', '1 mm²', '1.5 mm²', '2.5 mm²', '4 mm²', '6 mm²', '10 mm²', '16 mm²', '25 mm²', '35 mm²', '50 mm²', '70 mm²', '95 mm²', '120 mm²']);
+  await size.selectOption({ label: '35 mm²' });
+  const len = page.locator('.inspector .field', { hasText: 'Run length' }).locator('input');
+  await len.fill('0.15');
+  const stored = (await storedProject(page)).existing.wires[0];
+  expect(stored.gauge).toBe('2');
+  expect(stored.lengthFt).toBeCloseTo(0.49, 2);
+  await expect(page.locator('.wlabel')).toHaveText(['35 mm²']);
+  expect(errors).toEqual([]);
+});

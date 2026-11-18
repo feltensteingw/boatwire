@@ -2,6 +2,7 @@ import { HelpLink } from './Help';
 import { useMemo } from 'react';
 import { generateIdeal } from '../engine/generate';
 import { designMetrics, type Metrics } from '../engine/reports';
+import { lenUnit, toLen, toWeight, weightUnit } from '../model/units';
 import type { Chemistry, Scenario, SystemVoltage } from '../model/types';
 import { acVoltsOf } from '../state/derived';
 import { useStore } from '../state/store';
@@ -23,13 +24,14 @@ export function Compare() {
   const setScenario = useStore((s) => s.setScenario);
   const setView = useStore((s) => s.setView);
   const acV = acVoltsOf(project);
+  const units = project.profile.units;
   const metrics = useMemo(
     () =>
       project.scenarios.map((s) => {
         const d = generateIdeal(project, s);
-        return { s, d, m: designMetrics(d, acV) };
+        return { s, d, m: designMetrics(d, acV, units) };
       }),
-    [project, acV],
+    [project, acV, units],
   );
   const allRoles = new Set(metrics.flatMap((x) => [...x.m.roles]));
   const differing = [...allRoles].filter((r) => !metrics.every((x) => x.m.roles.has(r))).sort();
@@ -90,8 +92,8 @@ export function Compare() {
             {row('Main fuse', (m) => m.mainFuse)}
             {row('Main battery cable', (m) => m.mainCable)}
             {row('Largest cable', (m) => m.largestCable)}
-            {row('Copper (lb, est.)', (m) => m.copperLb, 'min')}
-            {row('Cable length (ft)', (m) => m.cableFt, 'min')}
+            {row(`Copper (${weightUnit(units)}, est.)`, (m) => toWeight(m.copperLb, units), 'min')}
+            {row(`Cable length (${lenUnit(units)})`, (m) => Math.round(toLen(m.cableFt, units)), 'min')}
             {row('Components', (m) => m.components, 'min')}
             {row('Errors', (m) => m.errors, 'min')}
             {row('Warnings', (m) => m.warnings, 'min')}

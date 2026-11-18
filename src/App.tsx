@@ -22,6 +22,7 @@ import { DialogLayer, showMessage } from './ui/dialogs';
 import { useMenu } from './ui/useMenu';
 import { NewBoatWizard, useNewBoat } from './ui/NewBoat';
 import { isUntouched } from './model/examples';
+import { lenUnit } from './model/units';
 import { redo, undo, useHistory } from './state/history';
 import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
 import { parseProject } from './model/validate';
@@ -119,6 +120,7 @@ function Header() {
   const fileRef = useRef<HTMLInputElement>(null);
   const ideal = useIdeal();
   const existing = useExisting();
+  const units = project.profile.units;
   const fileMenu = useMenu();
   const { open: menu, setOpen: setMenu } = fileMenu;
   const diagramDesign = view === 'existing' && existing ? existing : ideal;
@@ -199,15 +201,15 @@ function Header() {
                 downloadText(
                   `${slug}-wires.csv`,
                   toCsv([
-                    ['Circuit', 'From', 'To', 'Colour', 'Size', 'Length ft', 'Amps', 'Protection', 'Vdrop %'],
-                    ...wireSchedule(diagramDesign).map((r) => [r.circuit, r.from, r.to, r.color, r.gauge, r.lengthFt, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2)]),
+                    ['Circuit', 'From', 'To', 'Colour', units === 'metric' ? 'Size mm²' : 'Size AWG', `Length ${lenUnit(units)}`, 'Amps', 'Protection', 'Vdrop %'],
+                    ...wireSchedule(diagramDesign, units).map((r) => [r.circuit, r.from, r.to, r.color, r.size, r.length, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2)]),
                   ]),
                 )
               }
             >
               Wire schedule (CSV)
             </button>
-            <button onClick={() => downloadText(`${slug}-bom.csv`, toCsv([['Category', 'Item', 'Spec', 'Qty', 'Unit'], ...billOfMaterials(diagramDesign).map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]))}>
+            <button onClick={() => downloadText(`${slug}-bom.csv`, toCsv([['Category', 'Item', 'Spec', 'Qty', 'Unit'], ...billOfMaterials(diagramDesign, units).map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]))}>
               Bill of materials (CSV)
             </button>
             <button onClick={() => window.print()}>Print current view</button>

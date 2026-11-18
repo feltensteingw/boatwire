@@ -3,6 +3,7 @@
 import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A } from '../model/catalog';
 import { growTerminal, makeNode } from '../model/nodeDefs';
 import { missingZones } from '../model/zones';
+import { fmtLen, fmtSize, type Units } from '../model/units';
 import { AC_STANDARDS, CONVERTER_EFFICIENCY, FUSE_CLASSES, GAUGES, STANDARD_BREAKERS_DC, VDROP } from '../model/standards';
 import type {
   Chemistry,
@@ -54,6 +55,8 @@ class Builder {
     public V: number,
     public acV: number,
     public us: boolean,
+    /** Units for the wording of notes (sizes and lengths). Calculations are the same either way. */
+    public units: Units = 'imperial',
   ) {}
 
   add(type: NodeType, id: string, label: string, opts: Parameters<typeof makeNode>[3] = {}): DNode {
@@ -106,7 +109,7 @@ class Builder {
         const runs = Math.max(2, Math.ceil((o.protect ?? o.amps) / big.ampacity105));
         w.cable = `${runs}× ${big.awg}`;
         w.vdropPct = Math.round((r.vdropPct / runs) * 100) / 100;
-        this.find('warning', 'conductor-sizing', `${a[0].label} → ${b[0].label} needs ${runs} parallel ${big.awg} AWG cables.`, 'Consider a higher system voltage or moving the equipment closer to the batteries.', [a[0].id, b[0].id]);
+        this.find('warning', 'conductor-sizing', `${a[0].label} → ${b[0].label} needs ${runs} parallel ${fmtSize(big.awg, this.units)} cables.`, 'Consider a higher system voltage or moving the equipment closer to the batteries.', [a[0].id, b[0].id]);
       }
     }
     if (domain === 'ac' && kind === 'ac') w.cable = w.cable ?? `${w.gauge}/3`;
@@ -158,7 +161,7 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   const { profile } = project;
   const V = scenarioVoltage(project, scenario);
   const acStd = AC_STANDARDS[profile.acStandard];
-  const b = new Builder(V, acStd.volts, profile.acStandard === 'us120');
+  const b = new Builder(V, acStd.volts, profile.acStandard === 'us120', profile.units);
   const eq = effectiveEquipment(project, scenario);
   const BZ = profile.batteryZone;
   const PZ = profile.panelZone;
@@ -199,7 +202,7 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     b.find(
       'warning',
       'missing-zone',
-      `${lost.equipment.slice(0, 4).join(', ')}${n > 4 ? ` and ${n - 4} more` : ''} ${n === 1 ? 'is' : 'are'} in a location that is not in the zone list, so the cable length to ${n === 1 ? 'it' : 'them'} is a ${MISSING_ZONE_RUN_FT} ft guess.`,
+      `${lost.equipment.slice(0, 4).join(', ')}${n > 4 ? ` and ${n - 4} more` : ''} ${n === 1 ? 'is' : 'are'} in a location that is not in the zone list, so the cable length to ${n === 1 ? 'it' : 'them'} is a ${fmtLen(MISSING_ZONE_RUN_FT, profile.units)} guess.`,
       'Open each item and choose its location, or add the zone back under Boat & zones.',
     );
   }
@@ -562,7 +565,7 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
     }
     if (!ded && GAUGES.findIndex((g) => g.awg === pw.gauge) >= GAUGES.findIndex((g) => g.awg === '2/0')) {
       const role = dedicatedRoleFor(l.e.kind);
-      b.find('info', 'voltage-choice', `${l.e.name}: a ${Math.round(len)} ft run at ${Math.round(l.amps)} A needs ${pw.gauge} AWG cable.`, role ? `A dedicated battery near the load would cut this substantially: add a Battery bank with the role "${DEDICATED_BANK_ROLES[role].label} (dedicated)". 24 V would also help.` : 'A dedicated battery near the load (charged by DC-DC), or 24 V, would cut this substantially.');
+      b.find('info', 'voltage-choice', `${l.e.name}: a ${fmtLen(Math.round(len), profile.units)} run at ${Math.round(l.amps)} A needs ${fmtSize(pw.gauge, profile.units)} cable.`, role ? `A dedicated battery near the load would cut this substantially: add a Battery bank with the role "${DEDICATED_BANK_ROLES[role].label} (dedicated)". 24 V would also help.` : 'A dedicated battery near the load (charged by DC-DC), or 24 V, would cut this substantially.');
     }
   }
 

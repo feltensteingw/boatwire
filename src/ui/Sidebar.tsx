@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { CATALOG, CATALOG_BY_KIND, CATEGORY_LABELS, DEDICATED_BANK_ROLES, dedicatedRoleFor, type Category } from '../model/catalog';
 import { AC_STANDARDS, STANDARDS_VERIFIED } from '../model/standards';
-import type { Equipment, EquipmentKind, SystemVoltage } from '../model/types';
+import type { Equipment, EquipmentKind, SystemVoltage, Units } from '../model/types';
+import { fmtLen, fromLen, lenUnit, toLen } from '../model/units';
 import { energyBudget } from '../engine/energy';
 import { activeScenario } from '../engine/scenario';
 import { uid } from '../model/examples';
@@ -239,6 +240,7 @@ function BoatPanel() {
   const project = useStore((s) => s.project);
   const profile = project.profile;
   const up = useStore((s) => s.updateProfile);
+  const units = profile.units;
   const removeZone = useStore((s) => s.removeZone);
   const [removing, setRemoving] = useState<string | null>(null);
   const zoneOpts = profile.zones.map((z) => ({ value: z.id, label: z.name }));
@@ -248,7 +250,17 @@ function BoatPanel() {
         <TextInput value={profile.name} onChange={(v) => up((p) => void (p.name = v))} />
       </Field>
       <Field label="Length overall" help="Boat length, for reference.">
-        <NumInput value={profile.lengthFt} unit="ft" onChange={(v) => up((p) => void (p.lengthFt = v))} />
+        <NumInput value={toLen(profile.lengthFt, units)} unit={lenUnit(units)} onChange={(v) => up((p) => void (p.lengthFt = fromLen(v, units)))} />
+      </Field>
+      <Field label="Units" help="How lengths and wire sizes are shown and entered. Metric shows the standard mm² cable to buy for each wire (the next size up from the AWG size it was worked out as) and lengths in metres. It does not change any result.">
+        <Select<Units>
+          value={units}
+          options={[
+            { value: 'imperial', label: 'Feet and AWG' },
+            { value: 'metric', label: 'Metres and mm²' },
+          ]}
+          onChange={(v) => up((p) => void (p.units = v))}
+        />
       </Field>
       <Field label="DC system voltage" help="The battery system voltage. 24 V halves the current, so cables are much smaller, which helps with big inverters, windlasses and thrusters. 12 V-only gear then needs a converter. Scenarios can override this to compare.">
         <Select<SystemVoltage> value={profile.systemVoltage} options={[{ value: 12, label: '12 V' }, { value: 24, label: '24 V' }]} onChange={(v) => up((p) => void (p.systemVoltage = v))} />
@@ -266,13 +278,13 @@ function BoatPanel() {
         <Select value={profile.helmZone} options={zoneOpts} onChange={(v) => up((p) => void (p.helmZone = v))} />
       </Field>
       <h4>Zones</h4>
-      <p className="hint">Cable lengths are estimated from where things are: distance aft of the bow, plus extra height or routing (the masthead is ~50 ft up). Runs add 20% for routing along the hull.</p>
+      <p className="hint">Cable lengths are estimated from where things are: distance aft of the bow, plus extra height or routing (the masthead is ~{fmtLen(50, units)} up). Runs add 20% for routing along the hull.</p>
       <table className="zones">
         <thead>
           <tr>
             <th>Zone</th>
-            <th data-tip="Distance aft of the bow, in feet.">Aft (ft)</th>
-            <th data-tip="Extra vertical or routing distance, in feet (e.g. ~50 ft up to a masthead).">Rise (ft)</th>
+            <th data-tip={`Distance aft of the bow, in ${units === 'metric' ? 'metres' : 'feet'}.`}>Aft ({lenUnit(units)})</th>
+            <th data-tip={`Extra vertical or routing distance, in ${units === 'metric' ? 'metres' : 'feet'} (e.g. ~${fmtLen(50, units)} up to a masthead).`}>Rise ({lenUnit(units)})</th>
             <th />
           </tr>
         </thead>
@@ -283,10 +295,10 @@ function BoatPanel() {
                 <input aria-label="Zone name" value={z.name} onChange={(e) => up((p) => void (p.zones[i].name = e.target.value))} />
               </td>
               <td>
-                <input type="number" aria-label={`${z.name}: distance aft of the bow, feet`} value={z.x} onChange={(e) => up((p) => void (p.zones[i].x = +e.target.value))} />
+                <input type="number" step="any" aria-label={`${z.name}: distance aft of the bow, ${lenUnit(units)}`} value={toLen(z.x, units)} onChange={(e) => up((p) => void (p.zones[i].x = fromLen(+e.target.value, units)))} />
               </td>
               <td>
-                <input type="number" aria-label={`${z.name}: rise, feet`} value={z.rise} onChange={(e) => up((p) => void (p.zones[i].rise = +e.target.value))} />
+                <input type="number" step="any" aria-label={`${z.name}: rise, ${lenUnit(units)}`} value={toLen(z.rise, units)} onChange={(e) => up((p) => void (p.zones[i].rise = fromLen(+e.target.value, units)))} />
               </td>
               <td>
                 <button

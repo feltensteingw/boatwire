@@ -21,7 +21,7 @@ import { joinTerminals } from '../engine/connect';
 import { estimateCurrents } from '../engine/audit';
 import { autoLayout, cachedLayout, manualLayout, viewShift, type Layout } from '../layout/layout';
 import type { Design, Finding } from '../model/types';
-import { severityByNode } from '../state/derived';
+import { severityByNode, useUnits } from '../state/derived';
 import { useStore } from '../state/store';
 import { SymbolNode, type SymbolFlowNode } from './symbols';
 import { UnderlayControls, UnderlayImage } from './Underlay';
@@ -125,6 +125,7 @@ function DiagramInner({ design, findings, mode }: Props) {
     if (shift.x || shift.y) setViewport({ x: vp.x - shift.x * vp.zoom, y: vp.y - shift.y * vp.zoom, zoom: vp.zoom });
   }
 
+  const units = useUnits();
   const severities = useMemo(() => severityByNode(findings), [findings]);
   const currents = useMemo(() => estimateCurrents(design), [design]);
 
@@ -167,14 +168,14 @@ function DiagramInner({ design, findings, mode }: Props) {
           target: le.target,
           sourceHandle: le.sourcePort,
           targetHandle: le.targetPort,
-          data: { wire: w, points: le.points, labels: layers.labels, amps: w.amps ?? currents.get(w.id), protection },
+          data: { wire: w, points: le.points, labels: layers.labels, amps: w.amps ?? currents.get(w.id), protection, units },
           selected: selection?.kind === 'wire' && selection.id === le.id,
           zIndex: w.kind === 'sig' ? 0 : 1,
         };
       }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, layers.labels, currents]);
+  }, [layout, layers.labels, currents, units]);
 
   // reflect external selection (e.g. clicking a finding)
   useEffect(() => {

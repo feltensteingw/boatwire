@@ -7,6 +7,7 @@ import type { Design, DNode, Finding, Wire } from '../model/types';
 import { audit, estimateCurrents } from './audit';
 import { gaugeIndex, gaugeSpec } from './calc';
 import { ruleInfo } from './rules';
+import { cableLabel, cableText, fmtLen, fmtSize, lenUnit, M_PER_FT, toLen, type Units } from '../model/units';
 
 // ------------------------------------------------------------ wire schedule
 
@@ -20,6 +21,9 @@ export interface WireRow {
   gauge: string;
   mm2: string;
   lengthFt: number;
+  /** Size and length as shown in the boat's units: "10" / "6 mm²", feet / metres. */
+  size: string;
+  length: number;
   amps?: number;
   protection: string;
   vdrop?: number;
@@ -41,7 +45,7 @@ export function wireColor(w: Wire, hasAc: boolean): string {
   }
 }
 
-export function wireSchedule(design: Design): WireRow[] {
+export function wireSchedule(design: Design, units: Units = 'imperial'): WireRow[] {
   const N = new Map(design.nodes.map((n) => [n.id, n]));
   const hasAc = design.nodes.some((n) => n.domain === 'ac');
   const est = estimateCurrents(design);
@@ -72,6 +76,8 @@ export function wireSchedule(design: Design): WireRow[] {
       gauge: w.cable ?? (w.kind === 'ac' && w.gauge ? `${w.gauge}/3` : w.gauge ?? '—'),
       mm2: g ? String(g.mm2) : '',
       lengthFt: w.lengthFt,
+      size: cableLabel(w, units) ?? '—',
+      length: toLen(w.lengthFt, units),
       amps: w.amps ?? est.get(w.id),
       protection,
       vdrop: w.vdropPct,
@@ -90,7 +96,7 @@ export interface BomRow {
   unit: string;
 }
 
-export function billOfMaterials(design: Design): BomRow[] {
+export function billOfMaterials(design: Design, units: Units = 'imperial'): BomRow[] {
   const rows = new Map<string, BomRow>();
   const add = (category: string, item: string, spec: string, qty: number, unit = 'ea') => {
     const k = `${category}|${item}|${spec}|${unit}`;
@@ -131,12 +137,16 @@ export function billOfMaterials(design: Design): BomRow[] {
   for (const w of design.wires) {
     if (!w.gauge) continue;
     const runs = w.cable?.match(/^(\d+)×/) ? Number(w.cable.split('×')[0]) : 1;
-    const len = Math.ceil(w.lengthFt * 1.1 * runs);
-    const label = w.kind === 'ac' ? `Marine AC cable ${w.gauge}/3` : `Marine tinned wire ${w.gauge} AWG`;
-    add('Cable', label, w.kind === 'ac' ? 'Type 3 boat cable' : wireColor(w, hasAc), len, 'ft');
-    if (gaugeIndex(w.gauge) >= gaugeIndex('8') && w.kind !== 'ac') add('Terminals', 'Tinned lug', `${w.gauge} AWG`, 2 * runs);
-    else if (w.kind !== 'ac') add('Terminals', 'Heat-shrink ring terminal', `${w.gauge} AWG`, 2);
+    // one run of this wire's size, whatever its parallel count: "4/0 AWG" or "120 mm²", "10/3" or "3G6"
+    const single = { gauge: w.gauge, kind: w.kind };
+    const len = w.lengthFt * 1.1 * runs;
+    const label = w.kind === 'ac' ? `Marine AC cable ${cableLabel(single, units)}` : `Marine tinned wire ${fmtSize(w.gauge, units)}`;
+    add('Cable', label, w.kind === 'ac' ? 'Type 3 boat cable' : wireColor(w, hasAc), len, lenUnit(units));
+    if (gaugeIndex(w.gauge) >= gaugeIndex('8') && w.kind !== 'ac') add('Terminals', 'Tinned lug', fmtSize(w.gauge, units), 2 * runs);
+    else if (w.kind !== 'ac') add('Terminals', 'Heat-shrink ring terminal', fmtSize(w.gauge, units), 2);
   }
+  // Cable was summed in feet; round each total up to whole feet or metres to buy.
+  for (const r of rows.values()) if (r.category === 'Cable') r.qty = Math.ceil(units === 'metric' ? r.qty * M_PER_FT : r.qty);
   return [...rows.values()].sort((a, b) => a.category.localeCompare(b.category) || a.item.localeCompare(b.item));
 }
 
@@ -158,7 +168,7 @@ export interface Metrics {
 
 const LB_PER_CM_FT = 3.03e-6; // copper weight
 
-export function designMetrics(design: Design, acVolts: number): Metrics {
+export function designMetrics(design: Design, acVolts: number, units: Units = 'imperial'): Metrics {
   const house = design.nodes.find((n) => n.id === 'house0-bat');
   const fuse = design.nodes.find((n) => n.id === 'house0-fuse');
   const mainWire = design.wires.find((w) => w.from.node === 'house0-bat');
@@ -174,14 +184,14 @@ export function designMetrics(design: Design, acVolts: number): Metrics {
     copper += (g?.cm ?? 0) * w.lengthFt * LB_PER_CM_FT * runs * cond;
     ft += w.lengthFt * runs;
   }
-  const f = audit(design, { acVolts });
+  const f = audit(design, { acVolts, units });
   const all = [...design.findings, ...f];
   return {
     volts: design.systemVoltage,
     houseBank: house?.sublabel ?? '—',
     mainFuse: fuse?.sublabel ?? '—',
-    mainCable: mainWire ? mainWire.cable ?? `${mainWire.gauge} AWG` : '—',
-    largestCable: largest >= 0 ? `${GAUGES[largest].awg} AWG` : '—',
+    mainCable: mainWire ? cableText(mainWire, units) : '—',
+    largestCable: largest >= 0 ? fmtSize(GAUGES[largest].awg, units) : '—',
     copperLb: Math.round(copper * 10) / 10,
     cableFt: Math.round(ft),
     components: design.nodes.filter((n) => !['load', 'ac-load', 'engine'].includes(n.type)).length,
@@ -206,15 +216,15 @@ const INFRA: DNode['type'][] = [
   'bus-pos', 'bus-neg', 'converter', 'bilge-switch', 'breaker',
 ];
 
-export function changeList(existing: Design, ideal: Design, acVolts: number): Change[] {
+export function changeList(existing: Design, ideal: Design, acVolts: number, units: Units = 'imperial'): Change[] {
   const changes: Change[] = [];
   // 1. Fix audit problems in the existing design
-  for (const f of audit(existing, { acVolts })) {
+  for (const f of audit(existing, { acVolts, units })) {
     if (f.severity === 'info') continue;
     changes.push({
       priority: f.severity === 'error' ? 'safety' : 'recommended',
       title: f.message,
-      detail: [f.fix, ruleInfo(f.rule).why].filter(Boolean).join(' — '),
+      detail: [f.fix, ruleInfo(f.rule, units).why].filter(Boolean).join(' — '),
       rule: f.rule,
     });
   }
@@ -273,15 +283,15 @@ export function changeList(existing: Design, ideal: Design, acVolts: number): Ch
     const ew = supply(existing, eNode);
     if (!iw || !ew || !iw.gauge) continue;
     if (!ew.gauge) {
-      changes.push({ priority: 'improvement', title: `${iNode.label}: record the wire size`, detail: `Ideal: ${iw.gauge} AWG.` });
+      changes.push({ priority: 'improvement', title: `${iNode.label}: record the wire size`, detail: `Ideal: ${fmtSize(iw.gauge, units)}.` });
     } else if (gaugeIndex(ew.gauge) < gaugeIndex(iw.gauge)) {
-      changes.push({ priority: 'recommended', title: `${iNode.label}: upsize wire ${ew.gauge} → ${iw.gauge} AWG`, detail: `At ~${Math.round(ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0)} A over ${iw.lengthFt} ft.`, rule: 'conductor-sizing' });
+      changes.push({ priority: 'recommended', title: `${iNode.label}: upsize wire ${fmtSize(ew.gauge, units)} → ${fmtSize(iw.gauge, units)}`, detail: `At ~${Math.round(ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0)} A over ${fmtLen(iw.lengthFt, units)}.`, rule: 'conductor-sizing' });
     }
   }
   const order = { safety: 0, recommended: 1, improvement: 2 };
   return changes.sort((a, b) => order[a.priority] - order[b.priority]);
 }
 
-export function allFindings(design: Design, acVolts: number): Finding[] {
-  return [...design.findings, ...audit(design, { acVolts })];
+export function allFindings(design: Design, acVolts: number, units: Units = 'imperial'): Finding[] {
+  return [...design.findings, ...audit(design, { acVolts, units })];
 }

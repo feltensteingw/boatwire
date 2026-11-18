@@ -5,7 +5,8 @@ import { ruleInfo } from '../engine/rules';
 import { growTerminal, NODE_DEFS } from '../model/nodeDefs';
 import { FUSE_CLASSES, GAUGES, INVERTER_EFFICIENCY, VDROP, type FuseClass } from '../model/standards';
 import type { Design, DNode, Finding, Wire } from '../model/types';
-import { acVoltsOf } from '../state/derived';
+import { acVoltsOf, useUnits } from '../state/derived';
+import { awgForMetric, cableLabel, cableText, fmtLen, fromLen, lenUnit, METRIC_SIZES, metricSize, toLen } from '../model/units';
 import { useStore } from '../state/store';
 import { EquipmentEditor } from './Sidebar';
 import { Field, NumInput, Select, TextInput, Toggle } from './fields';
@@ -77,13 +78,14 @@ function Legend() {
 }
 
 function Why({ notes }: { notes?: string[] }) {
+  const units = useUnits();
   if (!notes?.length) return null;
   const uniq = [...new Set(notes)];
   return (
     <div className="why">
       <h4>Why it's wired this way</h4>
       {uniq.map((id) => {
-        const r = ruleInfo(id);
+        const r = ruleInfo(id, units);
         return (
           <details key={id} open={uniq.length <= 2}>
             <summary>{r.title}</summary>
@@ -98,6 +100,7 @@ function Why({ notes }: { notes?: string[] }) {
 
 function NodeInspector({ node, design, findings, editable }: { node: DNode; design: Design; findings: Finding[]; editable: boolean }) {
   const project = useStore((s) => s.project);
+  const units = project.profile.units;
   const updateEquipment = useStore((s) => s.updateEquipment);
   const updateExisting = useStore((s) => s.updateExisting);
   const deleteSelection = useStore((s) => s.deleteSelection);
@@ -341,7 +344,7 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
               <button key={w.id} className="conn-row" onClick={() => select({ kind: 'wire', id: w.id, design: editable ? 'existing' : 'ideal' })}>
                 <i className={`lw ${w.kind}`} />
                 <span>{other?.label}</span>
-                <span className="mono">{w.cable ?? w.gauge ?? '?'}</span>
+                <span className="mono">{cableLabel(w, units) ?? '?'}</span>
               </button>
             );
           })}
@@ -356,6 +359,7 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
   const project = useStore((s) => s.project);
   const updateExisting = useStore((s) => s.updateExisting);
   const deleteSelection = useStore((s) => s.deleteSelection);
+  const units = useUnits();
   const N = new Map(design.nodes.map((n) => [n.id, n]));
   const a = N.get(wire.from.node);
   const b = N.get(wire.to.node);
@@ -390,16 +394,22 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
       )}
       {editable ? (
         <div className="eq-edit">
-          <Field label="Conductor size" help="Wire gauge as installed (AWG). Checked against the current it carries, the fuse protecting it, and voltage drop over its length.">
-            <Select value={wire.gauge} options={GAUGES.map((g) => ({ value: g.awg, label: fmtGauge(g.awg) }))} onChange={(v) => edit((w) => void (w.gauge = v))} />
-          </Field>
-          <Field label="Run length (one way)" help="Length of this wire in feet, one way. It starts as an estimate from where the two components are; replace it with the measured run. Voltage drop is calculated over the round trip (positive + negative).">
+          {units === 'metric' ? (
+            <Field label="Conductor size" help="Cross-section of the wire as installed, in mm². Checked against the current it carries, the fuse protecting it, and voltage drop over its length. The checks use the nearest AWG size with no more copper, so they never flatter the wire.">
+              <Select<number> value={wire.gauge ? metricSize(wire.gauge) : undefined} options={METRIC_SIZES.map((s) => ({ value: s, label: `${s} mm²` }))} onChange={(v) => edit((w) => void (w.gauge = awgForMetric(v)))} />
+            </Field>
+          ) : (
+            <Field label="Conductor size" help="Wire gauge as installed (AWG). Checked against the current it carries, the fuse protecting it, and voltage drop over its length.">
+              <Select value={wire.gauge} options={GAUGES.map((g) => ({ value: g.awg, label: fmtGauge(g.awg) }))} onChange={(v) => edit((w) => void (w.gauge = v))} />
+            </Field>
+          )}
+          <Field label="Run length (one way)" help={`Length of this wire in ${units === 'metric' ? 'metres' : 'feet'}, one way. It starts as an estimate from where the two components are; replace it with the measured run. Voltage drop is calculated over the round trip (positive + negative).`}>
             <NumInput
-              value={wire.lengthFt}
-              unit="ft"
+              value={toLen(wire.lengthFt, units)}
+              unit={lenUnit(units)}
               onChange={(v) =>
                 edit((w) => {
-                  w.lengthFt = v;
+                  w.lengthFt = fromLen(v, units);
                   delete w.lengthEstimated;
                 })
               }
@@ -430,12 +440,12 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
         <tbody>
           <tr>
             <th>Size</th>
-            <td>{wire.cable ? `${wire.cable} AWG (parallel)` : fmtGauge(wire.gauge)}</td>
+            <td>{units === 'metric' || wire.cable ? `${cableText(wire, units)}${/^\d+× /.test(wire.cable ?? '') ? ' (parallel)' : ''}` : fmtGauge(wire.gauge)}</td>
           </tr>
           <tr>
             <th>Length</th>
             <td>
-              {wire.lengthFt} ft one way {wire.lengthEstimated && <span className="hint">(estimated)</span>}
+              {fmtLen(wire.lengthFt, units)} one way {wire.lengthEstimated && <span className="hint">(estimated)</span>}
             </td>
           </tr>
           {amps !== undefined && (
@@ -462,8 +472,8 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
           )}
           {wire.gauge && (
             <tr>
-              <th>Metric</th>
-              <td>{gaugeSpec(wire.gauge)?.mm2} mm²</td>
+              <th>{units === 'metric' ? 'Sized as' : 'Metric'}</th>
+              <td>{units === 'metric' ? `${wire.gauge} AWG (${gaugeSpec(wire.gauge)?.mm2} mm²)` : `${gaugeSpec(wire.gauge)?.mm2} mm²`}</td>
             </tr>
           )}
         </tbody>

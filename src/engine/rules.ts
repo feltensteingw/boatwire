@@ -1,4 +1,5 @@
 import { BATTERY_FUSE_MAX_IN, ELCI_TRIP_MA, REFS, SHORE_MAIN_MAX_FT, VDROP } from '../model/standards';
+import { fmtLen, fmtShort, type Units } from '../model/units';
 
 export interface RuleInfo {
   title: string;
@@ -7,10 +8,11 @@ export interface RuleInfo {
 }
 
 /** Plain-English explanations attached to nodes, wires and findings. */
-export const RULES: Record<string, RuleInfo> = {
+function build(units: Units): Record<string, RuleInfo> {
+  return {
   'battery-fuse': {
     title: 'Fuse at the battery',
-    why: `Every positive conductor leaving a battery needs over-current protection within ${BATTERY_FUSE_MAX_IN} in of the terminal (longer only if sheathed). A short in an unfused battery cable can start a fire — batteries can deliver thousands of amps.`,
+    why: `Every positive conductor leaving a battery needs over-current protection within ${fmtShort(BATTERY_FUSE_MAX_IN, units)} of the terminal (longer only if sheathed). A short in an unfused battery cable can start a fire — batteries can deliver thousands of amps.`,
     ref: REFS.E11,
   },
   'class-t': {
@@ -123,7 +125,7 @@ export const RULES: Record<string, RuleInfo> = {
   },
   'shore-main': {
     title: 'Shore power main breaker + ELCI',
-    why: `The shore cable needs a main breaker within ${SHORE_MAIN_MAX_FT} ft of the inlet. Current standards require ELCI protection (${ELCI_TRIP_MA} mA) to trip on leakage that can electrocute swimmers near the boat.`,
+    why: `The shore cable needs a main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the inlet. Current standards require ELCI protection (${ELCI_TRIP_MA} mA) to trip on leakage that can electrocute swimmers near the boat.`,
     ref: REFS.E11,
   },
   'galvanic-isolator': {
@@ -198,8 +200,15 @@ export const RULES: Record<string, RuleInfo> = {
     why: 'The starter cable may be left unfused under ABYC, but a high-rated terminal fuse at the start battery is widely recommended. It is sized well above cranking current so it does not blow during a start.',
     ref: REFS.E11,
   },
-};
+  };
+}
 
-export function ruleInfo(id: string): RuleInfo {
-  return RULES[id] ?? { title: id, why: '' };
+const BUILT: Partial<Record<Units, Record<string, RuleInfo>>> = {};
+const rulesFor = (units: Units) => (BUILT[units] ??= build(units));
+
+/** The explanations in feet and inches. Use ruleInfo(id, units) to follow the boat's units. */
+export const RULES: Record<string, RuleInfo> = rulesFor('imperial');
+
+export function ruleInfo(id: string, units: Units = 'imperial'): RuleInfo {
+  return rulesFor(units)[id] ?? { title: id, why: '' };
 }

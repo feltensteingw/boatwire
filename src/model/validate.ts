@@ -85,6 +85,8 @@ export function parseProject(raw: unknown, opts: ParseOptions = {}): Parsed {
     panelZone: zoneOr(p.panelZone, blank.profile.panelZone),
     // Boats saved before the helm had its own setting used the cockpit.
     helmZone: zoneOr(p.helmZone, blank.profile.helmZone),
+    // Boats saved before there was a choice were all in feet and AWG.
+    units: p.units === 'metric' ? 'metric' : 'imperial',
     zones,
   };
 

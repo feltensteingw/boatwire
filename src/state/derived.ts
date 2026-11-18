@@ -3,7 +3,7 @@ import { audit } from '../engine/audit';
 import { generateIdeal } from '../engine/generate';
 import { activeScenario } from '../engine/scenario';
 import { AC_STANDARDS } from '../model/standards';
-import type { Design, Finding, Project } from '../model/types';
+import type { Design, Finding, Project, Units } from '../model/types';
 import { useStore } from './store';
 
 export function acVoltsOf(p: Project) {
@@ -29,7 +29,13 @@ export function useExisting(): Design | undefined {
 
 export function useFindings(design: Design | undefined): Finding[] {
   const acVolts = useStore((s) => acVoltsOf(s.project));
-  return useMemo(() => (design ? [...design.findings, ...audit(design, { acVolts })] : []), [design, acVolts]);
+  const units = useUnits();
+  return useMemo(() => (design ? [...design.findings, ...audit(design, { acVolts, units })] : []), [design, acVolts, units]);
+}
+
+/** Feet + AWG or metres + mm², as chosen for the open boat. */
+export function useUnits(): Units {
+  return useStore((s) => s.project.profile.units);
 }
 
 export function severityByNode(findings: Finding[]): Map<string, Finding['severity']> {

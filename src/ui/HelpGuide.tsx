@@ -155,6 +155,7 @@ const SECTIONS: Section[] = [
           <li>
             <b>Battery / main bus location</b> and <b>Main panel location</b> are the two hubs every circuit is measured from.
           </li>
+          <li><b>Units</b>: feet and AWG, or metres and mm². In metric, each wire shows the standard mm² cable to buy (the next size up from the AWG size it was worked out as), and lengths are in metres. Changing units never changes a result.</li>
         </ul>
         <h4>Zones</h4>
         <p>

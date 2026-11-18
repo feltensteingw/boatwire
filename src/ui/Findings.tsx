@@ -6,9 +6,10 @@ export function FindingItem({ f, design }: { f: Finding; design?: 'ideal' | 'exi
   const select = useStore((s) => s.select);
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
+  const units = useStore((s) => s.project.profile.units);
   const which = design ?? (view === 'existing' ? 'existing' : 'ideal');
   const target = f.nodes?.[0] ? { kind: 'node' as const, id: f.nodes[0] } : f.wires?.[0] ? { kind: 'wire' as const, id: f.wires[0] } : undefined;
-  const r = ruleInfo(f.rule);
+  const r = ruleInfo(f.rule, units);
   return (
     <div className={`finding f-${f.severity}`}>
       <div className="f-head">

@@ -5,6 +5,7 @@ import { BATTERY_FUSE_MAX_IN, BATTERY_FUSE_SHEATHED_MAX_IN, FUSE_CLASSES, LITHIU
 import type { Design, DNode, Finding, Severity, Wire } from '../model/types';
 import { ampacity, inverterDcAmps, isUnsized, vdropPct } from './calc';
 import { AC_SOURCE_TERMS, buildGraph, key, passThrough, positiveNets, SOURCE_TERMS, walk, type Graph, type Reach } from './graph';
+import { cableText, fmtLen, fmtShort, type Units } from '../model/units';
 import { joinTerminals } from './connect';
 
 const LEAD = new Set(['flooded', 'agm', 'gel']);
@@ -13,7 +14,8 @@ const LEAD = new Set(['flooded', 'agm', 'gel']);
 const guess = (w: Wire) => (w.lengthEstimated ? 'about ' : '');
 const guessed = (w: Wire) => (w.lengthEstimated ? ' (estimated from their locations; enter the measured length)' : '');
 
-export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[] {
+export function audit(design: Design, opts: { acVolts?: number; units?: Units } = {}): Finding[] {
+  const units = opts.units ?? 'imperial';
   const g = buildGraph(design);
   const V = design.systemVoltage;
   const acV = opts.acVolts ?? 120;
@@ -33,14 +35,14 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
       const n = g.node.get(o.node)!;
       const inches = w.lengthFt * 12;
       if (!NODE_DEFS[n.type].protective) {
-        add('error', 'battery-fuse', `${label(bat)}: positive cable to ${label(n)} has no fuse at the battery.`, `Add a fuse (MRBF terminal fuse, or Class T for lithium) within ${BATTERY_FUSE_MAX_IN} in of the battery positive.`, [bat.id, n.id], [w.id]);
+        add('error', 'battery-fuse', `${label(bat)}: positive cable to ${label(n)} has no fuse at the battery.`, `Add a fuse (MRBF terminal fuse, or Class T for lithium) within ${fmtShort(BATTERY_FUSE_MAX_IN, units)} of the battery positive.`, [bat.id, n.id], [w.id]);
       } else if (inches > BATTERY_FUSE_SHEATHED_MAX_IN) {
-        add('error', 'battery-fuse', `${label(bat)}: fuse is ${guess(w)}${Math.round(inches)} in from the battery${guessed(w)}.`, `Move it within ${BATTERY_FUSE_MAX_IN} in of the terminal.`, [bat.id, n.id], [w.id]);
+        add('error', 'battery-fuse', `${label(bat)}: fuse is ${guess(w)}${fmtShort(inches, units)} from the battery${guessed(w)}.`, `Move it within ${fmtShort(BATTERY_FUSE_MAX_IN, units)} of the terminal.`, [bat.id, n.id], [w.id]);
       } else if (inches > BATTERY_FUSE_MAX_IN) {
-        add('warning', 'battery-fuse', `${label(bat)}: fuse is ${guess(w)}${Math.round(inches)} in from the battery${guessed(w)} — allowed only if the cable is sheathed.`, `Move it within ${BATTERY_FUSE_MAX_IN} in, or sheath the cable.`, [bat.id, n.id], [w.id]);
+        add('warning', 'battery-fuse', `${label(bat)}: fuse is ${guess(w)}${fmtShort(inches, units)} from the battery${guessed(w)} — allowed only if the cable is sheathed.`, `Move it within ${fmtShort(BATTERY_FUSE_MAX_IN, units)}, or sheath the cable.`, [bat.id, n.id], [w.id]);
       } else if (w.lengthEstimated) {
         // A freshly drawn wire: nobody has measured it yet, so ask rather than pass or fail it.
-        add('info', 'battery-fuse', `${label(bat)}: how far is ${label(n)} from the battery? The cable length has not been entered.`, `Measure the cable from the battery positive to the fuse and enter it as the wire's length. It must be within ${BATTERY_FUSE_MAX_IN} in (${BATTERY_FUSE_SHEATHED_MAX_IN} in if sheathed).`, [bat.id, n.id], [w.id]);
+        add('info', 'battery-fuse', `${label(bat)}: how far is ${label(n)} from the battery? The cable length has not been entered.`, `Measure the cable from the battery positive to the fuse and enter it as the wire's length. It must be within ${fmtShort(BATTERY_FUSE_MAX_IN, units)} (${fmtShort(BATTERY_FUSE_SHEATHED_MAX_IN, units)} if sheathed).`, [bat.id, n.id], [w.id]);
       }
     }
   }
@@ -200,7 +202,7 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
     const ends = [w.from, w.to].map((e) => ({ e, n: g.node.get(e.node)! }));
     const names = `${ends[0].n?.label} → ${ends[1].n?.label}`;
     if (a !== undefined && a > amp) {
-      add('error', 'conductor-sizing', `${names}: ${w.gauge} AWG carries ~${Math.round(a)} A, above its ${Math.round(amp)} A ampacity.`, 'Use a larger conductor.', undefined, [w.id]);
+      add('error', 'conductor-sizing', `${names}: ${cableText(w, units)} carries ~${Math.round(a)} A, above its ${Math.round(amp)} A ampacity.`, 'Use a larger conductor.', undefined, [w.id]);
     }
     if (!w.notes?.includes('starter-exempt') && w.kind !== 'neg') {
       for (const { e, n } of ends) {
@@ -210,7 +212,7 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
         if (!isOut) continue;
         const rating = t?.rating ?? n.data.rating;
         if (typeof rating === 'number' && rating > amp * 1.0001) {
-          add('error', 'branch-protection', `${names}: protected by ${rating} A but ${w.gauge} AWG is only rated ${Math.round(amp)} A.`, `Use a smaller fuse/breaker or a larger wire.`, [n.id], [w.id]);
+          add('error', 'branch-protection', `${names}: protected by ${rating} A but ${cableText(w, units)} is only rated ${Math.round(amp)} A.`, `Use a smaller fuse/breaker or a larger wire.`, [n.id], [w.id]);
           break;
         }
       }
@@ -233,7 +235,7 @@ export function audit(design: Design, opts: { acVolts?: number } = {}): Finding[
       const o = g.node.get(w.from.node === inlet.id ? w.to.node : w.from.node);
       return o && (o.type === 'elci' || o.type === 'breaker') && w.lengthFt <= SHORE_MAIN_MAX_FT;
     });
-    if (ws.length && !ok) add('error', 'shore-main', 'No main breaker within 10 ft of the shore-power inlet.', 'Install a double-pole main breaker with ELCI protection close to the inlet.', [inlet.id]);
+    if (ws.length && !ok) add('error', 'shore-main', `No main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the shore-power inlet.`, 'Install a double-pole main breaker with ELCI protection close to the inlet.', [inlet.id]);
     const hasElci = ws.some((w) => g.node.get(w.from.node === inlet.id ? w.to.node : w.from.node)?.type === 'elci');
     if (ws.length && ok && !hasElci) add('warning', 'shore-main', 'The shore-power main breaker has no ELCI (earth-leakage) protection.', 'Use a main breaker with 30 mA ELCI.', [inlet.id]);
     const gws = g.at.get(key(inlet.id, 'g')) ?? [];

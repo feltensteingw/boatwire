@@ -3,13 +3,15 @@
 
 import { CATALOG_BY_KIND, DEFAULT_ZONES } from './catalog';
 import { blankProject, newEquipment } from './examples';
-import type { AcStandard, Chemistry, EquipmentKind, Project, SystemVoltage, Zone } from './types';
+import type { AcStandard, Chemistry, EquipmentKind, Project, SystemVoltage, Units, Zone } from './types';
 
 export interface BoatAnswers {
   name: string;
   lengthFt: number;
   systemVoltage: SystemVoltage;
   acStandard: AcStandard;
+  /** Left out, 230 V boats are metric and 120 V boats are in feet and AWG. */
+  units?: Units;
   houseChemistry: Chemistry;
   /** House bank capacity at the system voltage, amp-hours. */
   houseAh: number;
@@ -43,7 +45,7 @@ function bankUnits(ah: number, unitAh: number, volts: SystemVoltage): number {
 
 export function buildBoat(a: BoatAnswers): Project {
   const p = blankProject();
-  p.profile = { ...p.profile, name: a.name.trim() || 'My boat', lengthFt: a.lengthFt, systemVoltage: a.systemVoltage, acStandard: a.acStandard, zones: zonesFor(a.lengthFt) };
+  p.profile = { ...p.profile, name: a.name.trim() || 'My boat', lengthFt: a.lengthFt, systemVoltage: a.systemVoltage, acStandard: a.acStandard, units: a.units ?? (a.acStandard === 'eu230' ? 'metric' : 'imperial'), zones: zonesFor(a.lengthFt) };
 
   const eq = [newEquipment('battery-bank', { name: 'House bank', props: { role: 'house', chemistry: a.houseChemistry, unitVolts: 12, unitAh: 100, units: bankUnits(a.houseAh, 100, a.systemVoltage) } })];
   if (a.engine && a.startBattery) {
