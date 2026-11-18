@@ -16,8 +16,8 @@ import {
 } from '@xyflow/react';
 import { toPng, toSvg } from 'html-to-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { estimateCurrents } from '../engine/audit';
 import { joinTerminals } from '../engine/connect';
+import { estimateCurrents } from '../engine/audit';
 import { autoLayout, manualLayout, type Layout } from '../layout/layout';
 import type { Design, Finding } from '../model/types';
 import { severityByNode } from '../state/derived';
