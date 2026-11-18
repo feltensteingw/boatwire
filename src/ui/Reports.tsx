@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { energyBudget } from '../engine/energy';
-import { billOfMaterials, changeList, wireSchedule } from '../engine/reports';
-import { ruleInfo } from '../engine/rules';
+import { billOfMaterials, changeList, findingCounts, wireSchedule } from '../engine/reports';
+import { ruleInfo, STANDARDS_NOTICE } from '../engine/rules';
 import { activeScenario } from '../engine/scenario';
 import { acVoltsOf, useExisting, useFindings, useIdeal } from '../state/derived';
+import type { Design } from '../model/types';
 import { useStore, type ReportTab } from '../state/store';
+import { Diagram } from './Diagram';
 import { downloadText, toCsv } from './download';
 import { FindingsList } from './Findings';
 
@@ -14,6 +16,11 @@ const TABS: { id: ReportTab; label: string; tip: string }[] = [
   { id: 'wires', label: 'Wire schedule', tip: 'Every conductor: from, to, size, length, current, voltage drop and protection.' },
   { id: 'bom', label: 'Bill of materials', tip: 'Shopping list: cable by size and length, fuses, breakers, bus bars and other parts.' },
   { id: 'energy', label: 'Energy budget', tip: 'Daily consumption per item compared with house bank capacity and charging.' },
+  {
+    id: 'full',
+    label: 'Full report',
+    tip: 'Everything an electrician needs on one printable page: diagram, design check, upgrade plan, wire schedule, bill of materials and energy budget. Print, then choose “Save as PDF” to email it.',
+  },
 ];
 
 export function Reports() {
@@ -47,7 +54,9 @@ export function Reports() {
             </button>
           </div>
         )}
-        <button onClick={() => window.print()}>Print</button>
+        <button className={tab === 'full' ? 'primary' : ''} onClick={() => window.print()} data-tip={tab === 'full' ? 'Print the full report. Choose “Save as PDF” in the print dialog to make a PDF you can email.' : 'Print this report.'}>
+          {tab === 'full' ? 'Print / Save as PDF' : 'Print'}
+        </button>
       </div>
       <div className="report-body">
         {tab === 'findings' && <FindingsList findings={findings} design={design === ideal ? 'ideal' : 'existing'} />}
@@ -55,6 +64,7 @@ export function Reports() {
         {tab === 'wires' && <WireTable />}
         {tab === 'bom' && <Bom />}
         {tab === 'energy' && <Energy />}
+        {tab === 'full' && <FullReport />}
       </div>
     </div>
   );
@@ -284,6 +294,80 @@ function Changes() {
         );
       })}
       {changes.length === 0 && <p>Your existing system already matches the ideal design.</p>}
+    </div>
+  );
+}
+
+/** One printable document for a reviewer: every report for the chosen design, plus the diagram and the standards notice. */
+function FullReport() {
+  const project = useStore((s) => s.project);
+  const which = useStore((s) => s.reportDesign);
+  const ideal = useIdeal();
+  const existing = useExisting();
+  const isExisting = which === 'existing' && !!existing;
+  const design = isExisting ? existing : ideal;
+  const findings = useFindings(design);
+  const counts = findingCounts(findings);
+  const scen = activeScenario(project);
+  const [shot, setShot] = useState<{ id: Design; url: string } | null>(null);
+  const picture = shot?.id === design ? shot.url : undefined;
+  const p = project.profile;
+  const today = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  return (
+    <div className="full-report">
+      <header className="fr-head">
+        <h1>{p.name || 'Untitled boat'} — electrical system report</h1>
+        <div className="fr-meta">
+          <span>{isExisting ? 'Existing wiring (as drawn)' : `Ideal design · scenario “${scen?.name ?? 'base'}”`}</span>
+          <span>{design.systemVoltage} V DC</span>
+          <span>Prepared {today}</span>
+          <span>
+            BoatWire v{__APP_VERSION__} ({__APP_COMMIT__})
+          </span>
+        </div>
+        <p className="fr-summary">
+          Design check: <b>{counts.errors}</b> error{counts.errors === 1 ? '' : 's'}, <b>{counts.warnings}</b> warning{counts.warnings === 1 ? '' : 's'}, <b>{counts.notes}</b> note{counts.notes === 1 ? '' : 's'}.
+        </p>
+        <p className="fr-notice">
+          <b>For review by a qualified marine electrician.</b> {STANDARDS_NOTICE} Cable lengths are one-way estimates from zone distances, not measured runs.
+        </p>
+      </header>
+
+      <section className="fr-section fr-diagram">
+        <h2>Wiring diagram</h2>
+        {picture ? <img src={picture} alt="Wiring diagram" /> : <p className="hint">Drawing the diagram…</p>}
+        {/* Laid out off-screen, then turned into a picture that scales to the printed page. */}
+        <div className="fr-diagram-render" aria-hidden>
+          <Diagram key={isExisting ? 'existing' : 'ideal'} design={design} findings={findings} mode={isExisting ? 'manual' : 'auto'} readOnly onSnapshot={(url) => setShot({ id: design, url })} />
+        </div>
+      </section>
+
+      <section className="fr-section">
+        <h2>Design check</h2>
+        <FindingsList findings={findings} design={isExisting ? 'existing' : 'ideal'} expanded />
+      </section>
+
+      {existing && (
+        <section className="fr-section">
+          <h2>Upgrade plan (existing → ideal)</h2>
+          <Changes />
+        </section>
+      )}
+
+      <section className="fr-section">
+        <h2>Wire schedule</h2>
+        <WireTable />
+      </section>
+
+      <section className="fr-section">
+        <h2>Bill of materials</h2>
+        <Bom />
+      </section>
+
+      <section className="fr-section">
+        <h2>Energy budget</h2>
+        <Energy />
+      </section>
     </div>
   );
 }

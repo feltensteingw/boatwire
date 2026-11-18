@@ -15,7 +15,7 @@ import { stashUnreadable, useRecovery } from './recovery';
 import type { CloudBase } from '../cloud/sync';
 
 export type View = 'ideal' | 'existing' | 'compare' | 'reports';
-export type ReportTab = 'findings' | 'changes' | 'wires' | 'bom' | 'energy';
+export type ReportTab = 'findings' | 'changes' | 'wires' | 'bom' | 'energy' | 'full';
 export type Selection = { kind: 'node' | 'wire'; id: string; design: 'ideal' | 'existing' } | null;
 
 export const DEFAULT_LAYERS: LayerSettings = {

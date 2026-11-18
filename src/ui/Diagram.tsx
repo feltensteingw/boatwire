@@ -7,13 +7,13 @@ import {
   ReactFlow,
   ReactFlowProvider,
   getNodesBounds,
-  getViewportForBounds,
   useEdgesState,
   useNodesInitialized,
   useNodesState,
   useReactFlow,
   useStoreApi,
   type Connection,
+  type Node,
 } from '@xyflow/react';
 import { toPng, toSvg } from 'html-to-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,7 +26,7 @@ import { useStore } from '../state/store';
 import { SymbolNode, type SymbolFlowNode } from './symbols';
 import { UnderlayControls, UnderlayImage } from './Underlay';
 import { WireEdge, type WireFlowEdge } from './WireEdge';
-import { Panel, type Edge, type Node } from '@xyflow/react';
+import { Panel, type Edge } from '@xyflow/react';
 import { copyOf, freeSpot, GRID, type Clip } from '../engine/drawing';
 import { paletteNode } from '../engine/existing';
 import type { NodeType } from '../model/types';
@@ -47,6 +47,10 @@ interface Props {
   design: Design;
   findings: Finding[];
   mode: 'auto' | 'manual';
+  /** Static picture mode (printable report): no selection, dragging, wiring or controls. */
+  readOnly?: boolean;
+  /** With readOnly: called with a PNG of the whole diagram once it has been laid out. */
+  onSnapshot?: (pngDataUrl: string) => void;
 }
 
 export function Diagram(props: Props) {
@@ -57,7 +61,7 @@ export function Diagram(props: Props) {
   );
 }
 
-function DiagramInner({ design, findings, mode }: Props) {
+function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
   const layers = useStore((s) => s.layers);
   const nonce = useStore((s) => s.layoutNonce);
   const selection = useStore((s) => s.selection);
@@ -74,6 +78,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<SymbolFlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<WireFlowEdge>([]);
   const fitPending = useRef(true);
+  const containerRef = useRef<HTMLDivElement>(null);
   const which = mode === 'auto' ? 'ideal' : 'existing';
 
   const structural = `${layers.panelLoads}|${layers.fuses}|${layers.dc}|${layers.ac}|${layers.negatives}|${layers.signal}|${layers.grounding}`;
@@ -199,7 +204,7 @@ function DiagramInner({ design, findings, mode }: Props) {
         const on = selection?.kind === 'wire' && selection.id === e.id;
         // A selected wire can have either end dragged to another terminal. It is lifted above the
         // components so its end grips sit on top of the terminal dots.
-        const movable = on && mode === 'manual' && design.wires.some((w) => w.id === e.id);
+        const movable = on && mode === 'manual' && !readOnly && design.wires.some((w) => w.id === e.id);
         return { ...e, selected: selection ? on : e.selected, reconnectable: movable, zIndex: movable ? 2000 : e.data?.wire.kind === 'sig' ? 0 : 1 };
       }),
     );
@@ -234,6 +239,8 @@ function DiagramInner({ design, findings, mode }: Props) {
   }, [refusal]);
 
   // ------------------------------------------------------------ drawing tools (Existing boat)
+  /** The existing-boat drawing, shown for editing (not the read-only picture in the printable report). */
+  const editing = mode === 'manual' && !readOnly;
   const flowApi = useReactFlow();
   const removeFromExisting = useStore((s) => s.removeFromExisting);
   const nudgeExisting = useStore((s) => s.nudgeExisting);
@@ -249,19 +256,19 @@ function DiagramInner({ design, findings, mode }: Props) {
 
   // Tell the toolbar where the middle of this view is, so new components appear where the user is looking.
   useEffect(() => {
-    if (mode !== 'manual') return;
+    if (!editing) return;
     registerViewCentre(() => {
       const { width, height } = flow.getState();
       const vp = flowApi.getViewport();
       return { x: (width / 2 - vp.x) / vp.zoom - 70, y: (height / 2 - vp.y) / vp.zoom - 30 };
     });
     return () => registerViewCentre(null);
-  }, [mode, flow, flowApi]);
+  }, [editing, flow, flowApi]);
 
   /** Save where dragged components ended up: all of them in one step, so one undo puts them back. */
   const saveMoved = useCallback(
     (moved: Node[]) => {
-      if (mode !== 'manual' || !moved.length) return;
+      if (!editing || !moved.length) return;
       updateExisting((d) => {
         for (const m of moved) {
           const n = d.nodes.find((x) => x.id === m.id);
@@ -269,7 +276,7 @@ function DiagramInner({ design, findings, mode }: Props) {
         }
       });
     },
-    [mode, updateExisting],
+    [editing, updateExisting],
   );
 
   const removePicked = useCallback(() => removeFromExisting(pickedNodes, pickedWires), [removeFromExisting, pickedNodes, pickedWires]);
@@ -300,7 +307,7 @@ function DiagramInner({ design, findings, mode }: Props) {
   // Listening in the capture phase lets the arrow keys be handled here, once, before the canvas
   // library's own (unsaved) arrow-key move of a focused component.
   useEffect(() => {
-    if (mode !== 'manual') return;
+    if (!editing) return;
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) || el.isContentEditable || el.closest('.modal, [role="dialog"], [role="menu"]'))) return;
@@ -338,7 +345,7 @@ function DiagramInner({ design, findings, mode }: Props) {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [mode, design, pickedNodes, pickedWires, removePicked, duplicatePicked, addCopies, nudgeExisting, select, setNodes, setEdges]);
+  }, [editing, design, pickedNodes, pickedWires, removePicked, duplicatePicked, addCopies, nudgeExisting, select, setNodes, setEdges]);
 
   // A wire end dragged to another terminal.
   const onReconnect = useCallback(
@@ -365,14 +372,14 @@ function DiagramInner({ design, findings, mode }: Props) {
   const onDropPart = useCallback(
     (e: React.DragEvent) => {
       const type = e.dataTransfer.getData(PART_MIME) as NodeType;
-      if (!type || mode !== 'manual') return;
+      if (!type || !editing) return;
       e.preventDefault();
       const at = flowApi.screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const n = paletteNode(type, useStore.getState().project.profile.batteryZone);
       n.pos = freeSpot(design, { x: at.x - 60, y: at.y - 25 });
       addExistingNode(n);
     },
-    [mode, design, flowApi, addExistingNode],
+    [editing, design, flowApi, addExistingNode],
   );
 
   const onConnect = useCallback(
@@ -391,8 +398,31 @@ function DiagramInner({ design, findings, mode }: Props) {
     [connectExisting, design],
   );
 
+  // Read-only picture: once nodes are measured and edges drawn, render the whole diagram to a PNG.
+  const { getNodes } = useReactFlow();
+  useEffect(() => {
+    if (!readOnly || !onSnapshot || !initialized || !nodes.length || !layout) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const el = containerRef.current?.querySelector('.react-flow__viewport') as HTMLElement | null;
+      if (!el || cancelled) return;
+      try {
+        const url = await renderDiagram(el, getNodes(), 'png');
+        if (!cancelled && url) onSnapshot(url);
+      } catch (e) {
+        console.error('diagram snapshot failed', e);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly, initialized, nodes, edges, layout]);
+
+  const interactive = !readOnly;
   return (
-    <div className="diagram">
+    <div className="diagram" ref={containerRef}>
       {busy && <div className="busy">Laying out…</div>}
       <ReactFlow
         nodes={nodes}
@@ -401,32 +431,38 @@ function DiagramInner({ design, findings, mode }: Props) {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeClick={(e, n) => {
-          // Shift / Ctrl / Cmd-click adds to what is selected; the canvas keeps track of the group.
-          if (mode === 'manual' && (e.shiftKey || e.metaKey || e.ctrlKey)) select(null);
-          else select({ kind: 'node', id: n.id, design: which });
-        }}
-        onEdgeClick={(_, e) => select({ kind: 'wire', id: e.id, design: which })}
-        onPaneClick={() => select(null)}
+        onNodeClick={
+          interactive
+            ? (e, n) => {
+                // Shift / Ctrl / Cmd-click adds to what is selected; the canvas keeps track of the group.
+                if (editing && (e.shiftKey || e.metaKey || e.ctrlKey)) select(null);
+                else select({ kind: 'node', id: n.id, design: which });
+              }
+            : undefined
+        }
+        onEdgeClick={interactive ? (_, e) => select({ kind: 'wire', id: e.id, design: which }) : undefined}
+        onPaneClick={interactive ? () => select(null) : undefined}
         onNodeDragStop={(_, _n, moved) => saveMoved(moved)}
         onSelectionDragStop={(_, moved) => saveMoved(moved)}
         onSelectionChange={({ nodes: ns, edges: es }) => {
           // several things selected: the details panel shows one item at a time, so it steps aside
-          if (ns.length + es.length > 1 && useStore.getState().selection) select(null);
+          if (editing && ns.length + es.length > 1 && useStore.getState().selection) select(null);
         }}
         multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
-        selectionOnDrag={mode === 'manual' && boxMode}
-        panOnDrag={!(mode === 'manual' && boxMode)}
+        selectionOnDrag={editing && boxMode}
+        panOnDrag={!(editing && boxMode)}
         onConnect={onConnect}
         connectionMode={ConnectionMode.Loose}
-        nodesConnectable={mode === 'manual'}
+        nodesConnectable={mode === 'manual' && interactive}
+        nodesDraggable={interactive}
+        elementsSelectable={interactive}
         deleteKeyCode={null}
         minZoom={0.1}
         maxZoom={2.5}
         snapToGrid={mode === 'manual'}
         snapGrid={[10, 10]}
         proOptions={{ hideAttribution: true }}
-        onReconnect={mode === 'manual' ? onReconnect : undefined}
+        onReconnect={editing ? onReconnect : undefined}
         edgesReconnectable={false}
         reconnectRadius={14}
         onDrop={onDropPart}
@@ -436,11 +472,11 @@ function DiagramInner({ design, findings, mode }: Props) {
         connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2 }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--grid)" />
-        <Controls showInteractive={false} />
-        <MiniMap pannable zoomable nodeColor={(n) => ((n as SymbolFlowNode).data.laid.node.domain === 'ac' ? 'var(--w-ac)' : 'var(--mini)')} />
+        {interactive && <Controls showInteractive={false} />}
+        {interactive && <MiniMap pannable zoomable nodeColor={(n) => ((n as SymbolFlowNode).data.laid.node.domain === 'ac' ? 'var(--w-ac)' : 'var(--mini)')} />}
         {underlay && <UnderlayImage u={underlay} />}
-        {mode === 'manual' && <UnderlayControls u={underlay} />}
-        {mode === 'manual' && (
+        {editing && <UnderlayControls u={underlay} />}
+        {editing && (
           <Panel position="top-left" className="draw-tools">
             <button
               className={boxMode ? 'on' : ''}
@@ -465,7 +501,7 @@ function DiagramInner({ design, findings, mode }: Props) {
             )}
           </Panel>
         )}
-        <ExportBridge />
+        {interactive && <ExportBridge />}
       </ReactFlow>
       {refusal && (
         <div className="refusal" role="alert">
@@ -484,23 +520,9 @@ function ExportBridge() {
   const { getNodes } = useReactFlow();
   useEffect(() => {
     (window as unknown as { boatwireExport?: (fmt: 'png' | 'svg') => Promise<void> }).boatwireExport = async (fmt) => {
-      const nodes = getNodes();
-      if (!nodes.length) return;
-      const bounds = getNodesBounds(nodes);
-      const pad = 40;
-      const width = Math.ceil(bounds.width + pad * 2);
-      const height = Math.ceil(bounds.height + pad * 2);
-      const vp = getViewportForBounds(bounds, width, height, 0.1, 2, pad);
       const el = document.querySelector('.react-flow__viewport') as HTMLElement;
-      const bg = getComputedStyle(document.body).getPropertyValue('--canvas').trim() || '#fff';
-      const opts = {
-        backgroundColor: bg,
-        width,
-        height,
-        pixelRatio: 2,
-        style: { width: `${width}px`, height: `${height}px`, transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` },
-      };
-      const url = fmt === 'png' ? await toPng(el, opts) : await toSvg(el, opts);
+      const url = await renderDiagram(el, getNodes(), fmt);
+      if (!url) return;
       const a = document.createElement('a');
       a.href = url;
       a.download = `wiring-diagram.${fmt}`;
@@ -508,4 +530,25 @@ function ExportBridge() {
     };
   }, [getNodes]);
   return null;
+}
+
+/** Render a React Flow viewport, framed around all its nodes, to a PNG or SVG data URL. */
+async function renderDiagram(el: HTMLElement, nodes: Node[], fmt: 'png' | 'svg'): Promise<string | undefined> {
+  if (!nodes.length) return undefined;
+  const bounds = getNodesBounds(nodes);
+  const pad = 40;
+  const width = Math.ceil(bounds.width + pad * 2);
+  const height = Math.ceil(bounds.height + pad * 2);
+  // The frame is the diagram plus a fixed margin, so draw it 1:1, shifted into the frame.
+  // (getViewportForBounds takes padding as a fraction, so passing pixels shrank the drawing to a speck.)
+  const vp = { x: pad - bounds.x, y: pad - bounds.y, zoom: 1 };
+  const bg = getComputedStyle(document.body).getPropertyValue('--canvas').trim() || '#fff';
+  const opts = {
+    backgroundColor: bg,
+    width,
+    height,
+    pixelRatio: 2,
+    style: { width: `${width}px`, height: `${height}px`, transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` },
+  };
+  return fmt === 'png' ? toPng(el, opts) : toSvg(el, opts);
 }
