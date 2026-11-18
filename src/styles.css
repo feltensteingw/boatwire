@@ -764,6 +764,36 @@ table.zones td:nth-child(3) {
   padding: 4px 12px;
   box-shadow: var(--shadow);
 }
+/* ---- a drawn wire that was refused (Existing boat) ---- */
+.refusal {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: min(560px, calc(100% - 32px));
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--err);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.refusal b {
+  color: var(--err);
+  white-space: nowrap;
+}
+@media print {
+  .refusal {
+    display: none;
+  }
+}
 .react-flow__controls button {
   background: var(--panel);
   border-color: var(--border);
@@ -1956,37 +1986,6 @@ table.cmp td.best {
 }
 @media print {
   .underlay-panel {
-    display: none;
-  }
-}
-
-/* ---- a drawn wire that was refused (Existing boat) ---- */
-.refusal {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 6;
-  max-width: min(560px, calc(100% - 32px));
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px 8px 12px;
-  border: 1px solid var(--err);
-  border-left-width: 4px;
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 12.5px;
-  line-height: 1.4;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
-}
-.refusal b {
-  color: var(--err);
-  white-space: nowrap;
-}
-@media print {
-  .refusal {
     display: none;
   }
 }
