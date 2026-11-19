@@ -1,6 +1,7 @@
 // Engine: the starter circuit, the alternator, and how its charge is shared between the start
 // battery and the house bank (charging relay, battery isolator, or DC-DC charger for lithium).
 
+import { DCDC_INPUT_FACTOR, START_DCDC_SIZES } from '../../model/standards';
 import type { Chemistry, DNode, Equipment } from '../../model/types';
 import { fuseClassFor, nextStandard, protectionFor } from '../calc';
 import { num } from '../energy';
@@ -10,6 +11,8 @@ import type { Plan } from './plan';
 
 /** The charge profile a DC-DC charger is set to, named for the battery it charges. */
 const PROFILE: Record<Chemistry, string> = { flooded: 'flooded', agm: 'AGM', gel: 'gel', lifepo4: 'lithium' };
+/** The profile for a chemistry, or nothing for one BoatWire does not know (from a hand-edited file, say). */
+const profileOf = (chem: string | undefined) => (chem && Object.hasOwn(PROFILE, chem) ? PROFILE[chem as Chemistry] : undefined);
 
 /** The engine as drawn, for the alternator wiring that hangs off it. */
 interface EngineInfo {
@@ -116,7 +119,12 @@ function buildAlternator(b: Builder, p: Plan, core: Core, e: EngineInfo) {
 
   // A relay or isolator the owner chose but the design cannot use: say what it uses instead.
   const [lithium, other] = lfp ? ['the lithium house bank', 'the start battery'] : ['the lithium start battery', 'the house bank'];
-  const instead = toStart || !lfp ? 'The design uses a DC-DC charger instead.' : 'The design uses an external regulator and alternator protection instead.';
+  const instead =
+    toStart || !lfp
+      ? 'The design uses a DC-DC charger instead.'
+      : startBus
+        ? 'Instead, the design charges the start battery from the house bank through a DC-DC charger, and the alternator charges the lithium house bank through an external regulator and an alternator protection device.'
+        : 'The design uses an external regulator and alternator protection instead.';
   if (wantsRunRelay && needsDcdc) {
     b.find('info', 'charge-relay', `Charge splitting is set to an engine-run charging relay, but a relay would parallel ${lithium} with ${other} while the engine runs.`, instead);
   } else if (wantsRunRelay && !startBus) {
@@ -244,19 +252,21 @@ function alternatorRegulation(b: Builder, p: Plan, core: Core, a: Alt) {
 function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus: DNode) {
   const { V, BZ } = p;
   const { posBus, negBus } = core;
-  const { altA, wantsRunRelay, engineNode, crankLen, needsDcdc, startChem } = a;
+  const { engine, altA, wantsRunRelay, engineNode, crankLen, needsDcdc, startChem } = a;
 
   if (needsDcdc) {
     // A start battery needs little charge. Take the larger charger only if the alternator covers what it draws.
-    const sizes = V === 12 ? [10, 18] : [12];
-    const fits = sizes.filter((s) => s * 1.15 <= altA);
+    const sizes = START_DCDC_SIZES[V];
+    const fits = sizes.filter((s) => s * DCDC_INPUT_FACTOR <= altA);
     const dcA = fits.length ? fits[fits.length - 1] : sizes[0];
     if (!fits.length) {
-      b.find('info', 'dcdc', `The alternator makes about ${Math.round(altA)} A, less than the ${Math.round(dcA * 1.15)} A the start battery's DC-DC charger draws at full output, so the house bank makes up the difference while the engine runs.`, 'If the charger lets you set its current limit, set it below the alternator\'s output.');
+      // (The owner enters the alternator's rating at 12 V; altA is its output at the system voltage.)
+      const entered = V === 12 ? '' : ` at ${V} V (the ${num(engine, 'alternatorAmps')} A entered is at 12 V)`;
+      b.find('info', 'dcdc', `The alternator makes about ${Math.round(altA)} A${entered}, less than the ${Math.round(dcA * DCDC_INPUT_FACTOR)} A the start battery's DC-DC charger draws at full output, so the house bank makes up the difference while the engine runs.`, 'If the charger lets you set its current limit, set it below the alternator\'s output.');
     }
-    const profile = PROFILE[startChem ?? 'agm'];
-    const dcdc = b.add('dcdc', 'start-dcdc', 'DC-DC charger (house → start)', { zone: BZ, sublabel: `${dcA} A ${profile} profile`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}, ${profile} profile` }, notes: ['dcdc'] });
-    const r = protectionFor(dcA * 1.15);
+    const profile = profileOf(startChem);
+    const dcdc = b.add('dcdc', 'start-dcdc', 'DC-DC charger (house → start)', { zone: BZ, sublabel: `${dcA} A${profile ? ` ${profile} profile` : ''}`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}${profile ? `, ${profile} profile` : ''}` }, notes: ['dcdc'] });
+    const r = protectionFor(dcA * DCDC_INPUT_FACTOR);
     const f1 = b.add('fuse', 'start-dcdc-in', 'DC-DC input fuse', { zone: BZ, col: 5, sublabel: fuseLabel(r, 'ATC'), data: { rating: r, fuseClass: fuseClassFor(r, {}) }, notes: ['charging-source-fuse'] });
     const f2 = b.add('fuse', 'start-dcdc-out', 'DC-DC output fuse', { zone: startBus.zone, sublabel: fuseLabel(r, 'ATC'), data: { rating: r, fuseClass: fuseClassFor(r, {}) }, notes: ['charging-source-fuse'] });
     b.wire('pos', [posBus, b.stud(posBus)], [f1, 'in'], { amps: dcA, protect: r, len: 0.5 });

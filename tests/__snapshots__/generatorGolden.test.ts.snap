@@ -1625,7 +1625,7 @@ exports[`more generated designs are unchanged (fingerprint only) > lithium house
 
 exports[`more generated designs are unchanged (fingerprint only) > lithium house with a lead-acid windlass bank 1`] = `"65 components, 98 wires, 1 findings, 578af0cea0f38734"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house with an isolator chosen and an external regulator 1`] = `"59 components, 89 wires, 2 findings, d1b1f694947a3167"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house with an isolator chosen and an external regulator 1`] = `"59 components, 89 wires, 2 findings, 2e9ad909ea19e414"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > lithium house with the charging relay chosen 1`] = `"57 components, 86 wires, 2 findings, bfda19d77a0fd59c"`;
 

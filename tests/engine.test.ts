@@ -310,11 +310,29 @@ describe('start battery and house bank of different chemistries', () => {
     expect(splitNote(d)!.message).toContain('the lithium house bank');
   });
 
+  it('lithium house bank charged by the alternator: the note for a relay or isolator choice names the DC-DC charger to the start battery', () => {
+    const both = 'Instead, the design charges the start battery from the house bank through a DC-DC charger, and the alternator charges the lithium house bank through an external regulator and an alternator protection device.';
+    for (const chargeSplit of ['acr', 'relay-run', 'isolator-fet'])
+      for (const [start, regulator] of [['agm', 'external'], ['lifepo4', 'external'], ['lifepo4', 'internal']]) {
+        const d = generateIdeal(boat('lifepo4', start, { chargeSplit, regulator }));
+        const what = `${chargeSplit}, ${start} start, ${regulator}`;
+        expect(d.nodes.some((n) => n.id === 'start-dcdc'), what).toBe(true);
+        expect(splitNote(d)?.fix, what).toBe(both);
+      }
+  });
+
   it('lithium house, lead-acid start battery: the DC-DC charger to the start battery names its lead-acid profile', () => {
     const p = boat('lifepo4', 'agm', { regulator: 'external' });
     expect(generateIdeal(p).nodes.find((n) => n.id === 'start-dcdc')!.sublabel).toBe('18 A AGM profile');
     const q = boat('lifepo4', 'flooded', { regulator: 'external' });
     expect(generateIdeal(q).nodes.find((n) => n.id === 'start-dcdc')!.data.part).toBe('DC-DC charger 12/12-18, flooded profile');
+  });
+
+  it('a start battery chemistry BoatWire does not know (a hand-edited file) gives the DC-DC charger no profile, not "undefined"', () => {
+    const d = generateIdeal(boat('lifepo4', 'LiFePO4', { regulator: 'external' }));
+    const dcdc = d.nodes.find((n) => n.id === 'start-dcdc')!;
+    expect(dcdc.sublabel).toBe('18 A');
+    expect(dcdc.data.part).toBe('DC-DC charger 12/12-18');
   });
 
   it('the DC-DC charger for the start battery draws no more than the alternator makes', () => {
@@ -329,6 +347,12 @@ describe('start battery and house bank of different chemistries', () => {
     expect(size(12, 11)).toBe('10 A + note'); // the smallest draws 11.5 A
     expect(size(24, 90)).toBe('12 A'); // 45 A at 24 V
     expect(size(24, 20)).toBe('12 A + note'); // 10 A at 24 V
+  });
+
+  it('on 24 V the note about a small alternator also gives the rating as the owner entered it (at 12 V)', () => {
+    const note = (V: 12 | 24, alternatorAmps: number) => generateIdeal(boat('agm', 'lifepo4', { alternatorAmps }), { id: 'x', name: 'x', systemVoltage: V }).findings.find((f) => f.rule === 'dcdc')!.message;
+    expect(note(24, 20)).toMatch(/^The alternator makes about 10 A at 24 V \(the 20 A entered is at 12 V\), less than the 14 A /);
+    expect(note(12, 11)).toMatch(/^The alternator makes about 11 A, less than the 12 A /);
   });
 
   it('both batteries lithium, stock regulator: the alternator is not wired to the start battery, and the design asks for an external regulator', () => {
