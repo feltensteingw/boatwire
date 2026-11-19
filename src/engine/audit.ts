@@ -134,13 +134,14 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
   }
 
   // 6. Alternator on a lithium net needs protection
-  for (const alt of design.nodes.filter((n) => n.type === 'alternator')) {
+  const alternators = design.nodes.filter((n) => n.type === 'alternator');
+  for (const alt of alternators) {
     const lfp = walk(g, { node: alt.id, term: 'b' }, ['pos']).some((r) => r.node.type === 'battery' && r.node.data.chemistry === 'lifepo4');
     if (!lfp) continue;
     const hasApd = (g.at.get(key(alt.id, 'b')) ?? []).some((w) => g.node.get(w.from.node === alt.id ? w.to.node : w.from.node)?.type === 'apd');
-    const hasReg = (g.at.get(key(alt.id, 'field')) ?? []).some((w) => g.node.get(w.from.node === alt.id ? w.to.node : w.from.node)?.type === 'regulator');
-    if (!hasApd || !hasReg) {
-      add('error', 'alternator-lfp', 'The alternator charges a lithium bank directly without an external regulator and alternator protection device.', 'Charge lithium through a DC-DC charger from a lead-acid start battery, or fit an external regulator plus APD.', [alt.id]);
+    if (!hasApd || !hasRegulator(g, alt)) {
+      // (with two alternators, say which one)
+      add('error', 'alternator-lfp', `${alternators.length > 1 ? `${label(alt)}: ` : ''}The alternator charges a lithium bank directly without an external regulator and alternator protection device.`, 'Charge lithium through a DC-DC charger from a lead-acid start battery, or fit an external regulator plus APD.', [alt.id]);
     }
   }
 
@@ -156,8 +157,11 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
       add('warning', 'isolator', `${label(iso)} feeds a lithium bank. It gives every bank the alternator's voltage, so lithium can't get its own charge profile, and a BMS disconnect can still spike the alternator.`, 'Charge lithium through a DC-DC charger instead.', [iso.id]);
     }
     if (iso.data.isolatorType === 'diode') {
-      const hasReg = design.nodes.some((n) => n.type === 'regulator');
-      if (!hasReg && !diodeCompensated(g, iso)) add('warning', 'isolator', `${label(iso)} is a diode isolator: its ~0.7 V drop leaves the batteries undercharged with a stock regulator.`, 'Wire the isolator\'s "E" terminal to the alternator excitation terminal, move the alternator sense lead to the battery side of the isolator, or use a FET (zero-drop) isolator or an ACR.', [iso.id]);
+      // Only the regulators of the alternators wired to this isolator count. When none is wired to it
+      // (a drawing in progress), any regulator in the drawing does.
+      const feeding = walk(g, { node: iso.id, term: 'in' }, ['pos']).filter((r) => r.node.type === 'alternator').map((r) => r.node);
+      const hasReg = feeding.length ? feeding.some((a) => hasRegulator(g, a)) : design.nodes.some((n) => n.type === 'regulator');
+      if (!hasReg && !diodeCompensated(g, iso, feeding)) add('warning', 'isolator', `${label(iso)} is a diode isolator: its ~0.7 V drop leaves the batteries undercharged with a stock regulator.`, 'Wire the isolator\'s "E" terminal to the alternator excitation terminal, move the alternator sense lead to the battery side of the isolator, or use a FET (zero-drop) isolator or an ACR.', [iso.id]);
     }
   }
 
@@ -280,15 +284,22 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
   return out;
 }
 
+/** Is an external regulator wired to the alternator's field terminal? */
+function hasRegulator(g: Graph, alt: DNode): boolean {
+  return (g.at.get(key(alt.id, 'field')) ?? []).some((w) => g.node.get(w.from.node === alt.id ? w.to.node : w.from.node)?.type === 'regulator');
+}
+
 /**
  * Does something make a stock regulator see battery voltage despite a diode isolator's drop?
- * Either the isolator's excitation ("E") terminal is wired, an alternator's remote-sense lead is wired
- * (it can only usefully go to the battery side), or the user recorded the compensation on the isolator.
+ * Either the isolator's excitation ("E") terminal is wired, the remote-sense lead of an alternator
+ * feeding it is wired (it can only usefully go to the battery side), or the user recorded the
+ * compensation on the isolator. With no alternator wired to the isolator, any alternator's sense lead counts.
  */
-function diodeCompensated(g: Graph, iso: DNode): boolean {
+function diodeCompensated(g: Graph, iso: DNode, feeding: DNode[]): boolean {
   if (iso.data.compensation === 'excite' || iso.data.compensation === 'sense') return true;
   if ((g.at.get(key(iso.id, 'exc')) ?? []).length > 0) return true;
-  return g.design.nodes.some((n) => n.type === 'alternator' && (g.at.get(key(n.id, 'sense')) ?? []).length > 0);
+  const alternators = feeding.length ? feeding : g.design.nodes.filter((n) => n.type === 'alternator');
+  return alternators.some((n) => (g.at.get(key(n.id, 'sense')) ?? []).length > 0);
 }
 
 function walkGround(g: Graph, inletId: string): boolean {
