@@ -133,12 +133,12 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'shore-main': {
     title: 'Shore power main breaker + ELCI',
-    why: `The shore cable needs a main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the inlet. Current standards require ELCI protection (${ELCI_TRIP_MA} mA) to trip on leakage that can electrocute swimmers near the boat.`,
+    why: `The shore cable needs a main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the inlet. With two inlets, each has its own, rated for that inlet. Current standards require ELCI protection (${ELCI_TRIP_MA} mA) to trip on leakage that can electrocute swimmers near the boat.`,
     ref: REFS.E11,
   },
   'galvanic-isolator': {
     title: 'Galvanic isolator',
-    why: 'Shore-power ground connects your boat to every other boat on the dock. A galvanic isolator blocks the small DC currents that would eat your zincs and underwater metals, while still passing fault current.',
+    why: 'Shore-power ground connects your boat to every other boat on the dock. A galvanic isolator blocks the small DC currents that would eat your zincs and underwater metals, while still passing fault current. With two inlets, each has its own isolator in its green conductor.',
     ref: REFS.A28,
   },
   'ac-dc-bond': {
@@ -148,7 +148,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'source-selector': {
     title: 'AC source selection',
-    why: 'Shore, generator and inverter must never be connected to the same AC circuit at once. A break-before-make selector or transfer switch guarantees only one source feeds the panel.',
+    why: 'Shore, generator and inverter must never be connected to the same AC circuit at once. A break-before-make selector or transfer switch guarantees only one source feeds the panel. Two shore inlets are two sources: the selector lets only one of them in at a time.',
     ref: REFS.E11,
   },
   'charger-not-on-inverter': {
@@ -169,7 +169,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'not-drawn': {
     title: 'Equipment left out of the design',
-    why: 'The ideal design is built around one propulsion engine, one inverter or inverter/charger, one shore power inlet, one AC generator, one engine start battery and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',
+    why: 'The ideal design is built around one propulsion engine, one inverter or inverter/charger, up to two shore power inlets, one AC generator, one engine start battery and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',
   },
   'beyond-sizes': {
     title: 'Bigger than the largest part',

@@ -1,7 +1,7 @@
 // What the boat has and what it draws: the facts every part of the generator works from.
 // Nothing here adds to the design; see reportPlanProblems for the findings these facts lead to.
 
-import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A } from '../../model/catalog';
+import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A, MAX_SHORE_INLETS } from '../../model/catalog';
 import { AC_STANDARDS } from '../../model/standards';
 import type { BoatProfile, Chemistry, DNode, Equipment, Project, Scenario, SystemVoltage } from '../../model/types';
 import { fmtLen } from '../../model/units';
@@ -164,23 +164,23 @@ export function reportPlanProblems(b: Builder, p: Plan) {
     b.find('warning', 'missing-zone', `The ${lost.roles.join(' and the ')} ${lost.roles.length === 1 ? 'is' : 'are'} not in the zone list, so cable lengths measured from there are guesses.`, 'Choose the location again under Boat & zones.');
   }
 
-  // The design has one of each of these. Every extra is reported, never left out silently.
-  const drawnOnce: [Equipment[], string][] = [
-    [kinds('engine'), 'engine'],
-    [kinds('inverter-charger'), 'inverter/charger'],
+  // The design draws at most this many of each. Every extra is reported, never left out silently.
+  const drawnAtMost: [list: Equipment[], max: number, what: string][] = [
+    [kinds('engine'), 1, 'one engine per boat'],
+    [kinds('inverter-charger'), 1, 'one inverter/charger per boat'],
     // a separate inverter is not drawn when there is an inverter/charger
-    [[...kinds('inverter-charger').slice(0, 1), ...kinds('inverter')], 'inverter'],
-    [kinds('shore-power'), 'shore power inlet'],
-    [kinds('generator'), 'AC generator'],
-    [banks.filter((e) => e.props.role === 'start'), 'engine start battery'],
-    ...Object.entries(DEDICATED_BANK_ROLES).map(([r, def]): [Equipment[], string] => [banks.filter((e) => e.props.role === r), `${def.label.toLowerCase()} battery`]),
+    [[...kinds('inverter-charger').slice(0, 1), ...kinds('inverter')], 1, 'one inverter per boat'],
+    [kinds('shore-power'), MAX_SHORE_INLETS, 'up to two shore power inlets per boat'],
+    [kinds('generator'), 1, 'one AC generator per boat'],
+    [banks.filter((e) => e.props.role === 'start'), 1, 'one engine start battery per boat'],
+    ...Object.entries(DEDICATED_BANK_ROLES).map(([r, def]): [Equipment[], number, string] => [banks.filter((e) => e.props.role === r), 1, `one ${def.label.toLowerCase()} battery per boat`]),
   ];
-  for (const [list, what] of drawnOnce) {
-    for (const e of list.slice(1)) {
+  for (const [list, max, what] of drawnAtMost) {
+    for (const e of list.slice(max)) {
       b.find(
         'warning',
         'not-drawn',
-        `${e.name} is not in this design. BoatWire draws one ${what} per boat and used ${list[0].name}.`,
+        `${e.name} is not in this design. BoatWire draws ${what} and used ${list.slice(0, max).map((x) => x.name).join(' and ')}.`,
         'Its wiring, fuses and cables are missing from the diagram, wire schedule and bill of materials. Work those out separately, or remove it from the equipment list.',
       );
     }

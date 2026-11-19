@@ -91,6 +91,20 @@ export const SAMPLE_BOATS: SampleBoat[] = [
     p.profile.acStandard = 'eu230';
     p.profile.units = 'metric';
   }),
+
+  boat('two shore inlets (30 A and 50 A), inverter/charger', (p) => {
+    p.equipment.push(newEquipment('shore-power', { name: 'Bow shore inlet 50 A', zone: 'bow', props: { amps: 50 } }));
+  }),
+
+  boat('two shore inlets and a generator, separate inverter and charger', (p) => {
+    without(p, (e) => e.kind !== 'inverter-charger');
+    p.equipment.push(
+      newEquipment('shore-power', { name: 'Second shore inlet 30 A', zone: 'vberth', props: { amps: 30 } }),
+      newEquipment('inverter', { name: 'Inverter', props: { watts: 1500 } }),
+      newEquipment('battery-charger', { name: 'Battery charger', props: { amps: 40 } }),
+      newEquipment('generator', {}),
+    );
+  }),
 ];
 
 /** More boats, locked by a fingerprint of the whole design rather than line by line. */
@@ -136,6 +150,14 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
     p.equipment.push(newEquipment('inverter', {}), newEquipment('battery-charger', {}), newEquipment('air-conditioner', {}));
   }),
   boat('no AC at all', (p) => without(p, (e) => !['shore-power', 'inverter-charger', 'ac-outlets', 'microwave', 'water-heater'].includes(e.kind))),
+  boat('two 230 V shore inlets (16 A and 32 A), metric', (p) => {
+    p.profile.acStandard = 'eu230';
+    p.profile.units = 'metric';
+    const aft = the(p, 'shore-power');
+    aft.name = 'Shore power 16 A';
+    aft.props.amps = 16;
+    p.equipment.push(newEquipment('shore-power', { name: 'Bow shore inlet 32 A', zone: 'bow', props: { amps: 32 } }));
+  }),
 
   // --- batteries
   boat('two house banks of different chemistry', (p) => {

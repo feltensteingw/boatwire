@@ -229,20 +229,23 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
   }
 
   // 9. AC: shore main, galvanic isolator, AC/DC bond, single source, charger feed
-  for (const inlet of design.nodes.filter((n) => n.type === 'shore-inlet')) {
+  const inlets = design.nodes.filter((n) => n.type === 'shore-inlet');
+  for (const inlet of inlets) {
+    // With two inlets, say which one.
+    const which = inlets.length > 1 ? `${label(inlet)}: ` : '';
     const ws = g.at.get(key(inlet.id, 'l')) ?? [];
     const ok = ws.some((w) => {
       const o = g.node.get(w.from.node === inlet.id ? w.to.node : w.from.node);
       return o && (o.type === 'elci' || o.type === 'breaker') && w.lengthFt <= SHORE_MAIN_MAX_FT;
     });
-    if (ws.length && !ok) add('error', 'shore-main', `No main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the shore-power inlet.`, 'Install a double-pole main breaker with ELCI protection close to the inlet.', [inlet.id]);
+    if (ws.length && !ok) add('error', 'shore-main', `${which}No main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the shore-power inlet.`, 'Install a double-pole main breaker with ELCI protection close to the inlet.', [inlet.id]);
     const hasElci = ws.some((w) => g.node.get(w.from.node === inlet.id ? w.to.node : w.from.node)?.type === 'elci');
-    if (ws.length && ok && !hasElci) add('warning', 'shore-main', 'The shore-power main breaker has no ELCI (earth-leakage) protection.', 'Use a main breaker with 30 mA ELCI.', [inlet.id]);
+    if (ws.length && ok && !hasElci) add('warning', 'shore-main', `${which}The shore-power main breaker has no ELCI (earth-leakage) protection.`, 'Use a main breaker with 30 mA ELCI.', [inlet.id]);
     const gws = g.at.get(key(inlet.id, 'g')) ?? [];
     const hasGi = gws.some((w) => g.node.get(w.from.node === inlet.id ? w.to.node : w.from.node)?.type === 'galvanic-isolator');
-    if (!hasGi) add('warning', 'galvanic-isolator', 'Shore-power ground has no galvanic isolator.', 'Install a galvanic isolator (or isolation transformer) in the green ground conductor at the inlet.', [inlet.id]);
+    if (!hasGi) add('warning', 'galvanic-isolator', `${which}Shore-power ground has no galvanic isolator.`, 'Install a galvanic isolator (or isolation transformer) in the green ground conductor at the inlet.', [inlet.id]);
     if (!walkGround(g, inlet.id)) {
-      add('error', 'ac-dc-bond', 'AC grounding conductor is not connected to the DC negative / engine ground.', 'Bond the AC grounding bus to the main DC negative bus.', [inlet.id]);
+      add('error', 'ac-dc-bond', `${which}AC grounding conductor is not connected to the DC negative / engine ground.`, 'Bond the AC grounding bus to the main DC negative bus.', [inlet.id]);
     }
   }
   for (const p of design.nodes.filter((n) => n.type === 'ac-panel')) {

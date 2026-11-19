@@ -168,7 +168,7 @@ const SECTIONS: Section[] = [
   {
     id: 'ideal',
     title: 'The ideal design',
-    keywords: 'generated automatic why wired inspector click component wire ratings part largest size too big beyond current',
+    keywords: 'generated automatic why wired inspector click component wire ratings part largest size too big beyond current shore inlet second two selector',
     body: (
       <>
         <p>
@@ -186,6 +186,9 @@ const SECTIONS: Section[] = [
           <li>Charging: alternator, solar, wind, hydro and shore charger, each fused at the battery end, plus the right way to share charge between banks.</li>
           <li>The AC side: inlet, main breaker with ELCI, galvanic isolator, source selector, AC panel, and the AC ground bonded to DC negative.</li>
         </ul>
+        <p>
+          <b>Two shore inlets.</b> List each inlet in the equipment list with its own rating, for example a 30 A inlet aft and a 50 A one at the bow. Each gets its own main breaker with ELCI and its own galvanic isolator, with its cable sized for that inlet. A source selector (Off / Shore 1 / Shore 2, plus Generator when there is one) lets one of them at a time feed the AC panel. A third inlet is listed in the Design check as not drawn.
+        </p>
         <p>
           <b>Click anything</b> on the diagram. The panel on the right shows its rating, the suggested part, its connections and a plain-English <b>Why it's wired this way</b>. Click a wire to see its size, length, current and voltage drop, and how the size was chosen.
         </p>

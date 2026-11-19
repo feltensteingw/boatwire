@@ -29,16 +29,28 @@ describe('equipment the generator cannot draw is reported, not dropped silently'
     expect(f[0].message).toBe(`Port engine is not in this design. BoatWire draws one engine per boat and used ${first.name}.`);
   });
 
-  it('reports each extra of every single-instance kind', () => {
+  it('reports each extra of every kind it draws a set number of', () => {
     const p = exampleProject();
     add(p, 'engine', 'Port engine');
     add(p, 'shore-power', 'Second shore inlet');
+    add(p, 'shore-power', 'Third shore inlet');
     add(p, 'generator', 'Genset A');
     add(p, 'generator', 'Genset B');
     add(p, 'inverter-charger', 'Spare inverter/charger');
     add(p, 'battery-bank', 'Second start battery', { role: 'start' });
     const names = notDrawn(generateIdeal(p)).map((f) => f.message.split(' is not in this design')[0]);
-    expect(names.sort()).toEqual(['Genset B', 'Port engine', 'Second shore inlet', 'Second start battery', 'Spare inverter/charger'].sort());
+    expect(names.sort()).toEqual(['Genset B', 'Port engine', 'Third shore inlet', 'Second start battery', 'Spare inverter/charger'].sort());
+  });
+
+  it('draws a second shore inlet, and reports a third naming the two that were used', () => {
+    const p = exampleProject();
+    const first = p.equipment.find((e) => e.kind === 'shore-power')!;
+    add(p, 'shore-power', 'Bow shore inlet');
+    expect(notDrawn(generateIdeal(p))).toHaveLength(0);
+    add(p, 'shore-power', 'Stern shore inlet');
+    const d = generateIdeal(p);
+    expect(d.nodes.filter((n) => n.type === 'shore-inlet')).toHaveLength(2);
+    expect(notDrawn(d).map((f) => f.message)).toEqual([`Stern shore inlet is not in this design. BoatWire draws up to two shore power inlets per boat and used ${first.name} and Bow shore inlet.`]);
   });
 
   it('reports a plain inverter that is ignored because there is an inverter/charger', () => {

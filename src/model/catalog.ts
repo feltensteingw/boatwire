@@ -303,7 +303,7 @@ const PROP_HELP: Record<string, string> = {
   'inverter-charger.watts': 'Continuous AC output rating. Sets the size of the DC cable and fuse feeding it, which can be very large.',
   'inverter.watts': 'Continuous AC output rating. Sets the size of the DC cable and fuse feeding it, which can be very large.',
   chargeAmps: 'Maximum DC charging current when the unit runs on shore power or the generator.',
-  'shore-power.amps': 'Rating of the shore inlet and cord: 30 A or 50 A in North America, 16 A or 32 A in Europe.',
+  'shore-power.amps': 'Rating of the shore inlet and cord: 30 A or 50 A in North America, 16 A or 32 A in Europe. With two inlets, list each one with its own rating.',
   'generator.watts': 'Continuous rated output of the AC generator.',
   // loads
   'dc-load.watts': 'How much power the item draws while running (from its label or manual). Watts ÷ volts = amps.',
@@ -348,6 +348,9 @@ export function dedicatedRoleFor(kind: EquipmentKind): string | undefined {
 
 /** Heavy DC loads that are fed directly from the main bus rather than the panel. */
 export const HEAVY_DC_THRESHOLD_A = 30;
+
+/** Shore power inlets the ideal design draws. Any more are reported as not drawn. */
+export const MAX_SHORE_INLETS = 2;
 
 export const DEFAULT_ZONES: Zone[] = [
   { id: 'bow', name: 'Bow / anchor locker', x: 0, rise: 2 },
