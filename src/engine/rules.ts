@@ -9,7 +9,7 @@ export interface RuleInfo {
 
 /** Shown wherever a design is presented as advice (Boat & zones tab, printed report) while STANDARDS_VERIFIED is false. */
 export const STANDARDS_NOTICE =
-  'Wire tables and limits are seeded from widely published ABYC-derived values and have not been checked against the current ABYC E-11 text. Have a qualified marine electrician review any design before installation.';
+  "Wire tables and limits were checked against Blue Sea Systems' published tables (2023 catalog) on 19 November 2026. Those tables summarise ABYC E-11; they are not the ABYC standard itself, and a few values used here, such as AC cable ratings and fuse interrupt ratings, are not in them. Have a qualified marine electrician review any design before installation.";
 
 /** Plain-English explanations attached to nodes, wires and findings. */
 function build(units: Units): Record<string, RuleInfo> {

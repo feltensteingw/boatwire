@@ -1667,7 +1667,7 @@ exports[`more generated designs are unchanged (fingerprint only) > template: Coa
 
 exports[`more generated designs are unchanged (fingerprint only) > template: Day sailer / weekender 1`] = `"23 components, 31 wires, 0 findings, e61dfe00edcb208d"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > template: Large cruiser, 24 V 1`] = `"74 components, 111 wires, 5 findings, 597f2089aba74bbb"`;
+exports[`more generated designs are unchanged (fingerprint only) > template: Large cruiser, 24 V 1`] = `"74 components, 111 wires, 5 findings, 6bd6fa5e82e34b38"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > template: Offshore cruiser, lithium and solar 1`] = `"60 components, 93 wires, 5 findings, 6d00206133f24e1d"`;
 

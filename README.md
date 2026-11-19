@@ -5,10 +5,11 @@ You list the equipment aboard. BoatWire generates the **ideal wiring diagram**, 
 every fuse, switch, bus and cable sized. It explains each decision and audits
 hand-drawn diagrams of existing boats.
 
-> **Safety notice:** wire tables and limits are seeded from widely published,
-> ABYC-derived values (see `src/model/standards.ts`). They have **not** been checked
-> against the current paid ABYC E-11 text. Have a qualified marine electrician
-> review any design before installing it.
+> **Safety notice:** wire tables and limits were checked against Blue Sea Systems'
+> published tables (2023 catalog) on 19 November 2026 (see `src/model/standards.ts`).
+> Those tables summarise ABYC E-11; they are **not** the standard itself, and some
+> values used here are not in them. Have a qualified marine electrician review any
+> design before installing it.
 
 ## Run
 
@@ -107,14 +108,17 @@ src/ui/         React + React Flow canvas, symbols, inspector, reports
 - `tests/auditRules.test.ts` has, for every design-check rule, one small drawing that breaks it and
   one that does not. It fails if a rule is added to `audit.ts` without a case.
 - `tests/idealPassesAudit.test.ts` checks that every generated design passes the design check.
+- `tests/standards.test.ts` checks the wire tables against the Blue Sea Systems figures they were
+  checked against.
 
 **Download size:** the page loads only the app, React and React Flow up front (about 170 KB gzipped).
 The layout engine, Firebase, PDF import, the help guide, Compare and Reports load on first use.
 `scripts/check-bundle-size.mjs` (run by `npm run build`, so also in CI) fails the build if the
 up-front download grows past its budget, so new heavy code should be loaded with a dynamic `import()`.
 
-All standards numbers live in `src/model/standards.ts`. If you hold the ABYC standard,
-replace the values there; nothing else hard-codes them.
+All standards numbers live in `src/model/standards.ts`. Each table there names the source it was
+checked against (or says that none was found). If you hold the ABYC standard, replace the values
+there; nothing else hard-codes them.
 
 ## Known limitations (v0.1)
 

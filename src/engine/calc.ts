@@ -1,5 +1,6 @@
 import {
   AC_CABLE_AMPACITY,
+  AC_ENGINE_SPACE_DERATE,
   ENGINE_SPACE_DERATE,
   FUSE_CLASSES,
   INVERTER_EFFICIENCY,
@@ -28,8 +29,8 @@ export function gaugeIndex(awg: string): number {
 export function ampacity(awg: string, inEngineSpace = false, acCable = false): number {
   const g = gaugeSpec(awg);
   if (!g) return 0;
-  const base = acCable ? (AC_CABLE_AMPACITY[awg] ?? 0) : g.ampacity105;
-  return base * (inEngineSpace ? ENGINE_SPACE_DERATE : 1);
+  if (acCable) return (AC_CABLE_AMPACITY[awg] ?? 0) * (inEngineSpace ? AC_ENGINE_SPACE_DERATE : 1);
+  return g.ampacity105 * (inEngineSpace ? ENGINE_SPACE_DERATE : 1);
 }
 
 /**

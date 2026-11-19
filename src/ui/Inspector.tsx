@@ -3,7 +3,7 @@ import { estimateCurrents } from '../engine/audit';
 import { ampacity, fmtGauge, gaugeSpec, vdropPct } from '../engine/calc';
 import { ruleInfo } from '../engine/rules';
 import { growTerminal, NODE_DEFS } from '../model/nodeDefs';
-import { FUSE_CLASSES, GAUGES, INVERTER_EFFICIENCY, VDROP, type FuseClass } from '../model/standards';
+import { AC_ENGINE_SPACE_DERATE, ENGINE_SPACE_DERATE, FUSE_CLASSES, GAUGES, INVERTER_EFFICIENCY, VDROP, type FuseClass } from '../model/standards';
 import type { Design, DNode, Finding, Wire } from '../model/types';
 import { acVoltsOf, useUnits } from '../state/derived';
 import { awgForMetric, cableLabel, cableText, fmtLen, fromLen, lenUnit, METRIC_SIZES, metricSize, toLen } from '../model/units';
@@ -464,7 +464,12 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
               }
             />
           </Field>
-          <Toggle checked={!!wire.inEngineSpace} label="Runs through engine space" tip="Engine rooms are hot, so the wire's current rating is reduced (derated) to about 82%." onChange={(v) => edit((w) => void (w.inEngineSpace = v))} />
+          <Toggle
+            checked={!!wire.inEngineSpace}
+            label="Runs through engine space"
+            tip={`Engine rooms are hot, so the wire's current rating is reduced (derated) to ${Math.round((wire.kind === 'ac' ? AC_ENGINE_SPACE_DERATE : ENGINE_SPACE_DERATE) * 100)}%.`}
+            onChange={(v) => edit((w) => void (w.inEngineSpace = v))}
+          />
         </div>
       ) : null}
       <table className="kv">
