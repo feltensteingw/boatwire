@@ -223,7 +223,9 @@ export function reportBank(b: Builder, p: Plan, e: Equipment, s: BankSummary, no
     c.why === 'capacity'
       ? [`to make ${s.ah} Ah at ${V} V`, 'This scenario sets the house bank capacity.']
       : c.why === 'energy'
-        ? ['to store the same energy', `Lithium batteries are taken as ${s.unitV} V each.`]
+        ? ['to store the same energy', '']
         : [`for ${V} V`, `${s.unitV} V batteries make ${V} V in strings of ${s.series}.`];
-  b.find('info', 'series-parallel', `${e.name}: ${assumed} assumed ${reason}; your list has ${listed}.`, `${why} If you make this change, list ${batteries(s.units)}${sameV ? '' : ` of ${s.unitV} V`}.`, [node.id]);
+  const volts = c.batteryVolts === 'lithium' ? `Lithium batteries are taken as ${s.unitV} V each.` : c.batteryVolts === 'too-high' ? `${wasV} V batteries can't make a ${V} V bank.` : '';
+  const fix = [volts, why, `If you make this change, list ${batteries(s.units)}${sameV ? '' : ` of ${s.unitV} V`}.`].filter(Boolean).join(' ');
+  b.find('info', 'series-parallel', `${e.name}: ${assumed} assumed ${reason}; your list has ${listed}.`, fix, [node.id]);
 }

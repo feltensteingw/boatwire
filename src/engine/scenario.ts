@@ -17,16 +17,21 @@ export interface BankChange {
    * scenario's house capacity, or (when the battery voltage changes) the energy the listed bank stores.
    */
   why: 'voltage' | 'capacity' | 'energy';
+  /**
+   * Why the voltage of each battery changed, when it did: lithium is taken as 12 V batteries, and
+   * batteries of a higher voltage than the scenario's (24 V ones in a 12 V what-if) as batteries of its voltage.
+   */
+  batteryVolts?: 'lithium' | 'too-high';
 }
 
 /**
  * The bank as this scenario has it, or undefined when the scenario leaves it as listed.
  *
  * A scenario changes a bank only when it really changes something about it: the system voltage
- * (every bank), or the house bank's chemistry or capacity. The bank is then kept buildable at the
- * scenario's voltage: a single 12 V start battery becomes two in series in a 24 V what-if. At the
- * boat's own voltage nothing is rounded: a bank that cannot be built is drawn as listed, and the
- * design says so.
+ * (every bank), or the house bank's chemistry or capacity. A bank it changes is kept buildable at
+ * the scenario's voltage: a single 12 V start battery becomes two in series in a 24 V what-if, and
+ * two 24 V batteries become four 12 V ones in a 12 V what-if. At the boat's own voltage nothing is
+ * rounded: a bank that cannot be built is drawn as listed, and the design says so.
  */
 function assumeBank(project: Project, scenario: Scenario, V: SystemVoltage, e: Equipment): BankChange | undefined {
   const house = (e.props.role ?? 'house') === 'house';
@@ -41,10 +46,16 @@ function assumeBank(project: Project, scenario: Scenario, V: SystemVoltage, e: E
   if (!changes) return undefined;
 
   const props = { ...e.props };
-  if (chem) {
-    props.chemistry = chem;
+  let batteryVolts: BankChange['batteryVolts'];
+  if (chem) props.chemistry = chem;
+  if (chem === 'lifepo4') {
     // (lithium is taken as 12 V batteries)
-    if (chem === 'lifepo4') props.unitVolts = 12;
+    props.unitVolts = 12;
+    if (listedUnitV !== 12) batteryVolts = 'lithium';
+  } else if (listedUnitV > V) {
+    // Batteries of a higher voltage than the scenario's cannot make it at all.
+    props.unitVolts = V;
+    batteryVolts = 'too-high';
   }
   const unitV = Number(props.unitVolts) || 12;
   const series = Math.max(1, Math.round(V / unitV));
@@ -53,14 +64,15 @@ function assumeBank(project: Project, scenario: Scenario, V: SystemVoltage, e: E
     props.units = Math.max(series, Math.ceil(cap / unitAh) * series);
     why = 'capacity';
   } else if (unitV !== listedUnitV) {
-    // Keep the energy the bank stores: four 6 V 225 Ah batteries become two 12 V 225 Ah.
+    // Keep the energy the bank stores, in whole strings: four 6 V 225 Ah batteries become two
+    // 12 V 225 Ah.
     props.units = Math.max(1, Math.ceil((listedUnits * listedUnitV) / V)) * series;
     why = 'energy';
   } else {
     props.units = Math.ceil(listedUnits / series) * series;
     why = 'voltage';
   }
-  return { listed: e, assumed: { ...e, props }, why };
+  return { listed: e, assumed: { ...e, props }, why, ...(batteryVolts && { batteryVolts }) };
 }
 
 /** The battery banks a scenario changes. None for a scenario that changes nothing about the boat. */

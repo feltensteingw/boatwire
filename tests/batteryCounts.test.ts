@@ -83,7 +83,7 @@ describe("at the boat's own voltage, a bank that cannot make it is drawn as list
   });
 });
 
-describe('a what-if scenario keeps every bank buildable, and says what it assumed', () => {
+describe('a what-if scenario keeps the banks it changes buildable, and says what it assumed', () => {
   const p = boat(12, 3);
   const v24: Scenario = { id: 'v24', name: '24 V', systemVoltage: 24 };
 
@@ -105,6 +105,27 @@ describe('a what-if scenario keeps every bank buildable, and says what it assume
     const d = generateIdeal(p, v24);
     expect(d.findings.filter((f) => f.severity === 'error')).toEqual([]);
     expect(p.equipment.filter((e) => e.kind === 'battery-bank').map((e) => e.props.units)).toEqual([3, 1, 1]);
+  });
+
+  it('in a 12 V what-if, 24 V batteries are taken as 12 V ones storing the same energy, with a note', () => {
+    const q = exampleProject();
+    q.profile.systemVoltage = 24;
+    Object.assign(bank(q, 'house').props, { unitVolts: 24, units: 2 });
+    Object.assign(bank(q, 'start').props, { unitVolts: 24, units: 1 });
+    const v12: Scenario = { id: 'v12', name: '12 V', systemVoltage: 12 };
+    const d = generateIdeal(q, v12);
+    const house = node(d, bank(q, 'house'));
+    const start = node(d, bank(q, 'start'));
+    expect(house.sublabel).toBe('4× 12 V 100 Ah AGM · 1S4P = 12 V 400 Ah');
+    expect(start.sublabel).toBe('2× 12 V 90 Ah AGM · 1S2P = 12 V 180 Ah');
+    expect(about(d, house.id)).toEqual(['info: House bank: 4× 12 V 100 Ah assumed to store the same energy; your list has 2× 24 V 100 Ah.']);
+    expect(about(d, start.id)).toEqual(['info: Start battery: 2× 12 V 90 Ah assumed to store the same energy; your list has 1× 24 V 90 Ah.']);
+    expect(d.findings.find((f) => f.nodes?.includes(start.id))!.fix).toBe("24 V batteries can't make a 12 V bank. If you make this change, list 2 batteries of 12 V.");
+    expect(d.findings.filter((f) => f.severity === 'error')).toEqual([]);
+    expect(energyBudget(q, v12).houseAh).toBe(400);
+    // the same energy of the same chemistry costs the same as specified
+    const batteries = (x: Design) => designCost(x).byCategory.find((c) => c.category === 'Batteries')!.cost;
+    expect(batteries(d)).toBeCloseTo(batteries(generateIdeal(q)), 6);
   });
 
   it('a bank that already fits is not changed and gets no note', () => {
@@ -140,24 +161,28 @@ describe('a what-if scenario keeps every bank buildable, and says what it assume
 });
 
 describe('every difference between the equipment list and the drawing is stated', () => {
-  /** Boats with banks of 1 to 3 batteries, at 12 and 24 V, as specified and in what-ifs. */
+  /** Boats with banks of 1 to 3 batteries of 6, 12 or 24 V, at 12 and 24 V, as specified and in what-ifs. */
   function* cases(): Generator<[string, Project, Scenario | undefined]> {
     for (const b of [...SAMPLE_BOATS, ...FINGERPRINT_BOATS]) yield [b.name, b.project, b.scenario];
     const whatIfs: (Scenario | undefined)[] = [undefined, { id: 'a', name: 'As specified' }, { id: '24', name: '24 V', systemVoltage: 24 }, { id: '12', name: '12 V', systemVoltage: 12 }, { id: 'l', name: 'Lithium', houseChemistry: 'lifepo4' }, { id: 'c', name: '300 Ah', houseCapacityAh: 300 }];
     for (const volts of [12, 24] as const)
-      for (const units of [1, 2, 3])
-        for (const s of whatIfs) {
-          const p = boat(volts, units);
-          bank(p, 'start').props.units = units;
-          bank(p, 'windlass').props.units = 4 - units;
-          yield [`${volts} V, ${units}/${units}/${4 - units} batteries, ${s?.name ?? 'no scenario'}`, p, s];
-        }
+      for (const unitVolts of [6, 12, 24])
+        for (const units of [1, 2, 3])
+          for (const s of whatIfs) {
+            const p = boat(volts, units);
+            bank(p, 'start').props.units = units;
+            bank(p, 'windlass').props.units = 4 - units;
+            for (const e of p.equipment) if (e.kind === 'battery-bank') e.props.unitVolts = unitVolts;
+            yield [`${volts} V, ${units}/${units}/${4 - units} batteries of ${unitVolts} V, ${s?.name ?? 'no scenario'}`, p, s];
+          }
   }
 
-  it('no bank reads 0 Ah, and a bank drawn unlike the list, or that cannot be built, has a finding of its own', () => {
+  it('no bank reads 0 Ah, a bank drawn unlike the list or that cannot be built has a finding of its own, and a what-if never leaves a bank it changes unbuildable', () => {
     const problems: string[] = [];
     for (const [name, p, s] of cases()) {
       const d = generateIdeal(p, s);
+      const changed = new Set(bankChanges(p, s).map((c) => c.listed.id));
+      const voltageWhatIf = s?.systemVoltage !== undefined && s.systemVoltage !== p.profile.systemVoltage;
       for (const n of d.nodes.filter((x) => x.type === 'battery')) {
         const e = p.equipment.find((x) => x.id === n.equipmentId)!;
         const drawnAsListed = n.sublabel!.startsWith(`${e.props.units}× ${e.props.unitVolts} V `);
@@ -165,6 +190,8 @@ describe('every difference between the equipment list and the drawing is stated'
         if (/\b0 Ah/.test(n.sublabel!) || !(Number(n.data.ah) > 0)) problems.push(`${name}: ${n.label} drawn as ${n.sublabel}`);
         if (!drawnAsListed && !about(d, n.id).some((f) => f.startsWith('info:'))) problems.push(`${name}: ${n.label} changed silently (${n.sublabel})`);
         if (cannot && !about(d, n.id).some((f) => f.startsWith('error:'))) problems.push(`${name}: ${n.label} cannot be built, with no error`);
+        if (cannot && (changed.has(e.id) || voltageWhatIf)) problems.push(`${name}: ${n.label} changed by the what-if but cannot be built (${n.sublabel})`);
+        if (changed.has(e.id) && Number(n.data.ah) * d.systemVoltage < Number(e.props.units) * Number(e.props.unitVolts) * Number(e.props.unitAh) && !s?.houseCapacityAh) problems.push(`${name}: ${n.label} stores less than listed (${n.sublabel})`);
       }
     }
     expect(problems).toEqual([]);
