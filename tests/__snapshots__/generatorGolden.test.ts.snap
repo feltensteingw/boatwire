@@ -1637,10 +1637,10 @@ pvbrk-solar <breaker> "PV disconnect" · [20 A DC breaker] · @battery · rating
 mppt-solar <mppt> "MPPT controller" · [100/30] · @battery · eq:solar · rating=30 amps=28.25 · part "MPPT 30 A" · notes mppt · terms pvpos,pvneg,bat,batneg,atc
 pvfuse-solar <fuse> "MPPT output fuse" · [40 A MIDI] · @battery · rating=40 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 ac-gnd <ac-ground-bus> "AC grounding bus" · @nav · notes ac-dc-bond · terms s1,s2,s3,s4,s5,s6,s7
-shore-inlet <shore-inlet> "Shore power 30 A" · [30 A 120 V] · @cockpit · eq:shore-power · amps=30 volts=120 · terms l,g
+shore-inlet <shore-inlet> "Shore power 30 A" · [Shore 1 · 30 A 120 V] · @cockpit · eq:shore-power · amps=30 volts=120 · terms l,g
 shore-elci <elci> "Shore 1 main breaker + ELCI" · [30 A · 30 mA ELCI] · @cockpit · rating=30 · part "30 A double-pole main breaker with ELCI" · notes shore-main · terms in,out
 galv-iso <galvanic-isolator> "Galvanic isolator 1" · @cockpit · rating=30 · part "Galvanic isolator, 30 A, fail-safe" · notes galvanic-isolator · terms a,b
-shore-inlet-2 <shore-inlet> "Bow shore inlet 50 A" · [50 A 120 V] · @bow · eq:shore-power-2 · amps=50 volts=120 · terms l,g
+shore-inlet-2 <shore-inlet> "Bow shore inlet 50 A" · [Shore 2 · 50 A 120 V] · @bow · eq:shore-power-2 · amps=50 volts=120 · terms l,g
 shore-elci-2 <elci> "Shore 2 main breaker + ELCI" · [50 A · 30 mA ELCI] · @bow · rating=50 · part "50 A double-pole main breaker with ELCI" · notes shore-main · terms in,out
 galv-iso-2 <galvanic-isolator> "Galvanic isolator 2" · @bow · rating=50 · part "Galvanic isolator, 50 A, fail-safe" · notes galvanic-isolator · terms a,b
 ac-selector <selector> "AC source selector" · [Off / Shore 1 / Shore 2 (break-before-make)] · @nav · rating=50 · notes source-selector · terms in1,in2,out
@@ -1745,7 +1745,7 @@ w89 gnd ac-water-heater.g → ac-gnd.s7 · 6 · 8.8 ft · 0 A · equipment groun
 g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
 `;
 
-exports[`generated designs are unchanged > two shore inlets (30 A and 50 A), inverter/charger > fingerprint 1`] = `"f7c35bb5b347a9df"`;
+exports[`generated designs are unchanged > two shore inlets (30 A and 50 A), inverter/charger > fingerprint 1`] = `"574877e868c2321d"`;
 
 exports[`generated designs are unchanged > two shore inlets and a generator, separate inverter and charger > design 1`] = `
 "Ideal (ideal), 12 V: 67 components, 100 wires, 1 findings
@@ -1797,10 +1797,10 @@ pvbrk-solar <breaker> "PV disconnect" · [20 A DC breaker] · @battery · rating
 mppt-solar <mppt> "MPPT controller" · [100/30] · @battery · eq:solar · rating=30 amps=28.25 · part "MPPT 30 A" · notes mppt · terms pvpos,pvneg,bat,batneg,atc
 pvfuse-solar <fuse> "MPPT output fuse" · [40 A MIDI] · @battery · rating=40 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 ac-gnd <ac-ground-bus> "AC grounding bus" · @nav · notes ac-dc-bond · terms s1,s2,s3,s4,s5,s6,s7,s8,s9
-shore-inlet <shore-inlet> "Shore power 30 A" · [30 A 120 V] · @cockpit · eq:shore-power · amps=30 volts=120 · terms l,g
+shore-inlet <shore-inlet> "Shore power 30 A" · [Shore 1 · 30 A 120 V] · @cockpit · eq:shore-power · amps=30 volts=120 · terms l,g
 shore-elci <elci> "Shore 1 main breaker + ELCI" · [30 A · 30 mA ELCI] · @cockpit · rating=30 · part "30 A double-pole main breaker with ELCI" · notes shore-main · terms in,out
 galv-iso <galvanic-isolator> "Galvanic isolator 1" · @cockpit · rating=30 · part "Galvanic isolator, 30 A, fail-safe" · notes galvanic-isolator · terms a,b
-shore-inlet-2 <shore-inlet> "Second shore inlet 30 A" · [30 A 120 V] · @vberth · eq:shore-power-2 · amps=30 volts=120 · terms l,g
+shore-inlet-2 <shore-inlet> "Second shore inlet 30 A" · [Shore 2 · 30 A 120 V] · @vberth · eq:shore-power-2 · amps=30 volts=120 · terms l,g
 shore-elci-2 <elci> "Shore 2 main breaker + ELCI" · [30 A · 30 mA ELCI] · @vberth · rating=30 · part "30 A double-pole main breaker with ELCI" · notes shore-main · terms in,out
 galv-iso-2 <galvanic-isolator> "Galvanic isolator 2" · @vberth · rating=30 · part "Galvanic isolator, 30 A, fail-safe" · notes galvanic-isolator · terms a,b
 genset <generator> "AC generator" · [3500 W] · @engine · eq:generator · watts=3500 amps=29.17 · terms l,g
@@ -1922,7 +1922,7 @@ w100 pos chgfuse2-battery-charger.out → start-bus.s4 · 16 · 0.5 ft · 10 A �
 g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
 `;
 
-exports[`generated designs are unchanged > two shore inlets and a generator, separate inverter and charger > fingerprint 1`] = `"544687efddcdab73"`;
+exports[`generated designs are unchanged > two shore inlets and a generator, separate inverter and charger > fingerprint 1`] = `"4ec5d66bbdaa5f7b"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > FET battery isolator 1`] = `"56 components, 83 wires, 1 findings, 4076b5e4612110d3"`;
 
@@ -2012,8 +2012,8 @@ exports[`more generated designs are unchanged (fingerprint only) > three 12 V ba
 
 exports[`more generated designs are unchanged (fingerprint only) > thruster and winch on their own banks 1`] = `"81 components, 118 wires, 1 findings, f92e991f1907ec43"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > two 230 V shore inlets (16 A and 32 A), metric 1`] = `"61 components, 89 wires, 1 findings, cfa3865b7c1fae75"`;
+exports[`more generated designs are unchanged (fingerprint only) > two 230 V shore inlets (16 A and 32 A), metric 1`] = `"61 components, 89 wires, 1 findings, d0ec8a5f93b0b5ca"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > two house banks of different chemistry 1`] = `"59 components, 87 wires, 1 findings, 42891e4662eccf7f"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"63 components, 92 wires, 3 findings, 492f1b1a62551ec6"`;
+exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"63 components, 92 wires, 3 findings, 7af59fe5b04cacbf"`;

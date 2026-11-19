@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { audit } from '../src/engine/audit';
 import { designCost } from '../src/engine/cost';
@@ -7,7 +9,8 @@ import { existingFromEquipment, existingFromIdeal } from '../src/engine/existing
 import { generateIdeal } from '../src/engine/generate';
 import { billOfMaterials, changeList, designMetrics } from '../src/engine/reports';
 import { exampleProject, newEquipment } from '../src/model/examples';
-import type { Design, Project } from '../src/model/types';
+import type { Design, DNode, Project } from '../src/model/types';
+import { Icon } from '../src/ui/symbols';
 
 // A boat with two shore inlets. Each inlet has its own main breaker with ELCI and its own galvanic
 // isolator, sized for that inlet; one source selector lets one of them at a time feed the AC side.
@@ -27,6 +30,8 @@ const node = (d: Design, id: string) => {
 const into = (d: Design, id: string, term: string) => d.wires.find((w) => w.to.node === id && w.to.term === term);
 const errors = (d: Design, p: Project) => audit(d, { acVolts: acVolts(p), units: p.profile.units }).filter((f) => f.severity === 'error');
 const inletCable = (d: Design, sfx = '') => into(d, `shore-elci${sfx}`, 'in')!.gauge;
+/** Contacts drawn in a part's diagram symbol. */
+const contacts = (n: DNode) => renderToStaticMarkup(createElement(Icon, { n })).split('<circle').length - 1;
 
 describe('two shore inlets', () => {
   it('draws both, each with its own main breaker and galvanic isolator, and no "not in this design"', () => {
@@ -42,6 +47,8 @@ describe('two shore inlets', () => {
     expect(node(d, 'galv-iso-2').label).toBe('Galvanic isolator 2');
     // the isolator sits in its own inlet's green conductor
     expect(into(d, 'galv-iso-2', 'a')!.from).toEqual({ node: 'shore-inlet-2', term: 'g' });
+    // each inlet says which selector position it is
+    expect([node(d, 'shore-inlet').sublabel, node(d, 'shore-inlet-2').sublabel]).toEqual(['Shore 1 · 30 A 120 V', 'Shore 2 · 50 A 120 V']);
   });
 
   it("sizes each inlet's breaker, isolator, cable and green conductor for that inlet alone", () => {
@@ -78,8 +85,8 @@ describe('two shore inlets', () => {
       return p;
     };
     const d = generateIdeal(twoInlets(32, metric(16)));
-    expect(node(d, 'shore-inlet').sublabel).toBe('16 A 230 V');
-    expect(node(d, 'shore-inlet-2').sublabel).toBe('32 A 230 V');
+    expect(node(d, 'shore-inlet').sublabel).toBe('Shore 1 · 16 A 230 V');
+    expect(node(d, 'shore-inlet-2').sublabel).toBe('Shore 2 · 32 A 230 V');
     expect([node(d, 'shore-elci').data.rating, node(d, 'shore-elci-2').data.rating]).toEqual([16, 32]);
     expect(inletCable(d)).toBe(inletCable(generateIdeal(metric(16))));
     expect(inletCable(d, '-2')).toBe(inletCable(generateIdeal(metric(32))));
@@ -111,6 +118,8 @@ describe('two shore inlets', () => {
     expect(sel.data.rating).toBe(node(d, 'gen-brk').data.rating); // a 40 A generator breaker beats two 30 A inlets
     expect(into(d, 'ats', 'in1')!.from).toEqual({ node: 'ac-selector', term: 'out' });
     expect(errors(d, p)).toEqual([]);
+    // its symbol shows a contact for each of the three inputs, plus the output
+    expect(contacts(sel)).toBe(4);
   });
 
   it('keeps the one-inlet selector as it was', () => {
@@ -118,6 +127,8 @@ describe('two shore inlets', () => {
     const sel = node(d, 'ac-selector');
     expect(sel.sublabel).toBe('Off / Shore / Generator (break-before-make)');
     expect(sel.terminals.map((t) => [t.id, t.label])).toEqual([['in1', 'Shore'], ['in2', 'Gen'], ['out', undefined]]);
+    expect(contacts(sel)).toBe(3);
+    expect(node(d, 'shore-inlet').sublabel).toBe('30 A 120 V');
     expect(node(d, 'shore-elci').label).toBe('Shore main breaker + ELCI');
     expect(node(d, 'galv-iso').label).toBe('Galvanic isolator');
   });
@@ -148,6 +159,25 @@ describe('two shore inlets downstream', () => {
       'Shore-power ground has no galvanic isolator.',
       'AC grounding conductor is not connected to the DC negative / engine ground.',
     ]);
+    // two inlets with the same name are told apart by their order
+    const sameName = twoInlets();
+    for (const e of sameName.equipment) if (e.kind === 'shore-power') e.name = 'Shore power inlet';
+    expect(stripIsolator(sameName, 'galv-iso-2')).toEqual([
+      'Shore power inlet 2: Shore-power ground has no galvanic isolator.',
+      'Shore power inlet 2: AC grounding conductor is not connected to the DC negative / engine ground.',
+    ]);
+  });
+
+  it('report a missing AC/DC bond once, since the inlets share one grounding bus', () => {
+    const p = twoInlets();
+    const d = existingFromIdeal(generateIdeal(p), {});
+    const bond = d.wires.find((w) => w.notes?.includes('ac-dc-bond'))!;
+    removeItems(d, [], [bond.id]);
+    const f = audit(d, { acVolts: acVolts(p), units: p.profile.units }).filter((x) => x.rule === 'ac-dc-bond');
+    expect(f.map((x) => [x.message, x.nodes])).toEqual([['AC grounding conductor is not connected to the DC negative / engine ground.', ['shore-inlet', 'shore-inlet-2']]]);
+    // and the upgrade plan lists it once
+    const plan = changeList(d, generateIdeal(p), acVolts(p)).filter((c) => c.rule === 'ac-dc-bond');
+    expect(plan).toHaveLength(1);
   });
 
   it('are an error when both are wired to a panel without the selector', () => {

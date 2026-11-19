@@ -48,7 +48,8 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     const sfx = i ? `-${i + 1}` : '';
     const tag = shores.length > 1 ? ` ${i + 1}` : '';
     const A = num(shore, 'amps', 30);
-    const inlet = b.add('shore-inlet', `shore-inlet${sfx}`, shore.name, { zone: shore.zone, equipmentId: shore.id, sublabel: `${A} A ${acV} V`, data: { amps: A, volts: acV } });
+    // with two, the sublabel names the selector position it feeds ("Shore 2 · 50 A 120 V")
+    const inlet = b.add('shore-inlet', `shore-inlet${sfx}`, shore.name, { zone: shore.zone, equipmentId: shore.id, sublabel: `${tag ? `Shore${tag} · ` : ''}${A} A ${acV} V`, data: { amps: A, volts: acV } });
     const elci = b.add('elci', `shore-elci${sfx}`, `Shore${tag} main breaker + ELCI`, { zone: shore.zone, sublabel: `${A} A · 30 mA ELCI`, data: { rating: A, part: `${A} A double-pole main breaker with ELCI` }, notes: ['shore-main'] });
     const gi = b.add('galvanic-isolator', `galv-iso${sfx}`, `Galvanic isolator${tag}`, { zone: shore.zone, data: { rating: A, part: `Galvanic isolator, ${A} A, fail-safe` }, notes: ['galvanic-isolator'] });
     const w = b.wire('ac', [inlet, 'l'], [elci, 'in'], { amps: A, protect: A, len: 3, notes: ['shore-main'] });

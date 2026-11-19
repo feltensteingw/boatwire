@@ -230,9 +230,11 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
 
   // 9. AC: shore main, galvanic isolator, AC/DC bond, single source, charger feed
   const inlets = design.nodes.filter((n) => n.type === 'shore-inlet');
-  for (const inlet of inlets) {
-    // With two inlets, say which one.
-    const which = inlets.length > 1 ? `${label(inlet)}: ` : '';
+  // With two inlets, say which one; inlets that share a name are told apart by their order.
+  const inletName = (inlet: DNode, i: number) => (inlets.filter((x) => label(x) === label(inlet)).length > 1 ? `${label(inlet)} ${i + 1}` : label(inlet));
+  const unbonded: { inlet: DNode; which: string }[] = [];
+  inlets.forEach((inlet, i) => {
+    const which = inlets.length > 1 ? `${inletName(inlet, i)}: ` : '';
     const ws = g.at.get(key(inlet.id, 'l')) ?? [];
     const ok = ws.some((w) => {
       const o = g.node.get(w.from.node === inlet.id ? w.to.node : w.from.node);
@@ -244,10 +246,14 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
     const gws = g.at.get(key(inlet.id, 'g')) ?? [];
     const hasGi = gws.some((w) => g.node.get(w.from.node === inlet.id ? w.to.node : w.from.node)?.type === 'galvanic-isolator');
     if (!hasGi) add('warning', 'galvanic-isolator', `${which}Shore-power ground has no galvanic isolator.`, 'Install a galvanic isolator (or isolation transformer) in the green ground conductor at the inlet.', [inlet.id]);
-    if (!walkGround(g, inlet.id)) {
-      add('error', 'ac-dc-bond', `${which}AC grounding conductor is not connected to the DC negative / engine ground.`, 'Bond the AC grounding bus to the main DC negative bus.', [inlet.id]);
-    }
-  }
+    if (!walkGround(g, inlet.id)) unbonded.push({ inlet, which });
+  });
+  // The inlets normally share one AC grounding bus, so when none of them reaches DC negative that is
+  // one missing bond, reported once. Each inlet is named only when some are bonded and others are not.
+  const bondMsg = 'AC grounding conductor is not connected to the DC negative / engine ground.';
+  const bondFix = 'Bond the AC grounding bus to the main DC negative bus.';
+  if (unbonded.length && unbonded.length === inlets.length) add('error', 'ac-dc-bond', bondMsg, bondFix, inlets.map((n) => n.id));
+  else for (const { inlet, which } of unbonded) add('error', 'ac-dc-bond', `${which}${bondMsg}`, bondFix, [inlet.id]);
   for (const p of design.nodes.filter((n) => n.type === 'ac-panel')) {
     const reach = walk(g, { node: p.id, term: 'in' }, ['ac']).filter((r) => AC_SOURCE_TERMS[r.node.type]?.includes(r.term));
     const kinds = new Set(reach.map((r) => r.node.id));

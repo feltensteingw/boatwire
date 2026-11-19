@@ -133,7 +133,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'shore-main': {
     title: 'Shore power main breaker + ELCI',
-    why: `The shore cable needs a main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the inlet. With two inlets, each has its own, rated for that inlet. Current standards require ELCI protection (${ELCI_TRIP_MA} mA) to trip on leakage that can electrocute swimmers near the boat.`,
+    why: `The shore cable needs a main breaker within ${fmtLen(SHORE_MAIN_MAX_FT, units)} of the inlet. With two inlets, each has its own main breaker, rated for that inlet. Current standards require ELCI protection (${ELCI_TRIP_MA} mA) to trip on leakage that can electrocute swimmers near the boat.`,
     ref: REFS.E11,
   },
   'galvanic-isolator': {

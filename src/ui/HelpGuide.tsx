@@ -187,7 +187,7 @@ const SECTIONS: Section[] = [
           <li>The AC side: inlet, main breaker with ELCI, galvanic isolator, source selector, AC panel, and the AC ground bonded to DC negative.</li>
         </ul>
         <p>
-          <b>Two shore inlets.</b> List each inlet in the equipment list with its own rating, for example a 30 A inlet aft and a 50 A one at the bow. Each gets its own main breaker with ELCI and its own galvanic isolator, with its cable sized for that inlet. A source selector (Off / Shore 1 / Shore 2, plus Generator when there is one) lets one of them at a time feed the AC panel. A third inlet is listed in the Design check as not drawn.
+          <b>Two shore inlets.</b> List each inlet in the equipment list with its own rating, for example a 30 A inlet aft and a 50 A one at the bow. Each gets its own main breaker with ELCI and its own galvanic isolator, with its cable sized for that inlet. A source selector (Off / Shore 1 / Shore 2, plus Generator when there is one) lets one of them at a time feed the AC panel, so two 30 A inlets still give 30 A, not 60 A. Shore 1 is the first inlet in your equipment list and Shore 2 the second; each inlet's label on the diagram says which it is. A third inlet is listed in the Design check as not drawn. The source selector you can add to a drawing of your existing boat has two inputs; for two inlets and a generator, use <b>Start from the ideal design</b>, whose selector has three.
         </p>
         <p>
           <b>Click anything</b> on the diagram. The panel on the right shows its rating, the suggested part, its connections and a plain-English <b>Why it's wired this way</b>. Click a wire to see its size, length, current and voltage drop, and how the size was chosen.
