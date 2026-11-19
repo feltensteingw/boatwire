@@ -7,7 +7,7 @@ import { fuseClassFor } from '../calc';
 import { num } from '../energy';
 import { bankSummary, fuseLabel, type Builder, type WOpts } from './builder';
 import type { Core } from './houseBank';
-import type { Plan } from './plan';
+import { reportBank, type Plan } from './plan';
 
 /** Start battery fuse sizes: terminal (MRBF) fuses, whose largest is 300 A. */
 const START_FUSE_SIZES = [100, 150, 200, 250, 300];
@@ -79,6 +79,7 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBus?: DNode
     const s = bankSummary(startBank, V);
     startChem = s.chem;
     const sbat = b.add('battery', 'start-bat', startBank.name, { zone: startBank.zone || BZ, equipmentId: startBank.id, sublabel: s.text, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['house-start-split'] });
+    reportBank(b, p, startBank, s, sbat);
     const sfWanted = Math.ceil((starterA * 2) / 50) * 50;
     // the larger fuse families that come in that size
     const sfKinds = (['Class T', 'ANL'] as const).filter((c) => FUSE_CLASSES[c].max >= sfWanted).join(' or ');

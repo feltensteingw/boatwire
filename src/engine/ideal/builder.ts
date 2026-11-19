@@ -172,7 +172,13 @@ export class Builder {
   }
 }
 
-/** How a bank's batteries are arranged to reach the system voltage, and what that adds up to. */
+/**
+ * How a bank's batteries are arranged to reach the system voltage, and what that adds up to.
+ *
+ * A bank that cannot make the system voltage is still drawn as listed: its label says so, and its
+ * amp-hours are what the listed batteries store (as the energy budget counts them), so it is priced
+ * as listed and never shows as 0 Ah.
+ */
 export function bankSummary(e: Equipment, V: number) {
   const unitV = num(e, 'unitVolts', 12);
   const units = num(e, 'units', 1);
@@ -180,6 +186,8 @@ export function bankSummary(e: Equipment, V: number) {
   const series = Math.max(1, Math.round(V / unitV));
   const parallel = Math.floor(units / series);
   const chem = (e.props.chemistry as Chemistry) ?? 'agm';
+  const valid = unitV <= V && units % series === 0 && parallel > 0;
+  const batteries = `${units}× ${unitV} V ${unitAh} Ah ${CHEM_LABEL[chem]}`;
   return {
     unitV,
     units,
@@ -187,11 +195,13 @@ export function bankSummary(e: Equipment, V: number) {
     series,
     parallel,
     chem,
-    ah: parallel * unitAh,
-    valid: unitV <= V && units % series === 0 && parallel > 0,
-    text: `${units}× ${unitV} V ${unitAh} Ah ${CHEM_LABEL[chem]} · ${series}S${parallel}P = ${V} V ${parallel * unitAh} Ah`,
+    ah: valid ? parallel * unitAh : (units * unitAh) / series,
+    valid,
+    text: valid ? `${batteries} · ${series}S${parallel}P = ${V} V ${parallel * unitAh} Ah` : `${batteries} · cannot make ${V} V`,
   };
 }
+
+export type BankSummary = ReturnType<typeof bankSummary>;
 
 export function fuseLabel(rating: number, cls: string) {
   return `${rating} A ${cls}`;

@@ -3,13 +3,13 @@
 
 import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A } from '../../model/catalog';
 import { AC_STANDARDS } from '../../model/standards';
-import type { BoatProfile, Chemistry, Equipment, Project, Scenario, SystemVoltage } from '../../model/types';
+import type { BoatProfile, Chemistry, DNode, Equipment, Project, Scenario, SystemVoltage } from '../../model/types';
 import { fmtLen } from '../../model/units';
 import { missingZones } from '../../model/zones';
 import { inverterDcAmps, MISSING_ZONE_RUN_FT, runLength } from '../calc';
 import { num } from '../energy';
-import { effectiveEquipment, scenarioVoltage } from '../scenario';
-import type { Builder } from './builder';
+import { bankChanges, effectiveEquipment, scenarioVoltage, type BankChange } from '../scenario';
+import type { BankSummary, Builder } from './builder';
 
 /** A DC appliance and how it will be fed. `ded` = role of the dedicated bank that powers it (if the boat has one). */
 export interface LoadInfo {
@@ -34,6 +34,8 @@ export interface Plan {
   acStd: (typeof AC_STANDARDS)[keyof typeof AC_STANDARDS];
   /** Equipment as this scenario has it. */
   eq: Equipment[];
+  /** Battery banks this scenario changes from the equipment list, by equipment id. */
+  bankChanges: Map<string, BankChange>;
   /** Zones of the batteries, the panel and the helm. */
   BZ: string;
   PZ: string;
@@ -81,6 +83,7 @@ export function makePlan(project: Project, scenario?: Scenario): Plan {
   const V = scenarioVoltage(project, scenario);
   const acStd = AC_STANDARDS[profile.acStandard];
   const eq = effectiveEquipment(project, scenario);
+  const changed = new Map(bankChanges(project, scenario).map((c) => [c.listed.id, c]));
   const BZ = profile.batteryZone;
   const PZ = profile.panelZone;
   const HZ = profile.helmZone;
@@ -139,7 +142,7 @@ export function makePlan(project: Project, scenario?: Scenario): Plan {
   // Inverter at full output plus typical loads, with half the largest motor load (they rarely coincide).
   const mainAmps = Math.max(invDcAmps + continuous + 0.5 * maxHeavyFromHouse, maxHeavyFromHouse + continuous, chargeTotal);
 
-  return { project, scenario, profile, V, acStd, eq, BZ, PZ, HZ, run, scale, kinds, banks, house, startBank, dedBanks, engine, houseChem, lfp, extBms, dcLoads, panelLoads, v12Loads, heavyLoads, dedLoads, aoLoads, acLoads, ic, inv, chargers, solars, winds, invWatts, invDcAmps, mainAmps };
+  return { project, scenario, profile, V, acStd, eq, bankChanges: changed, BZ, PZ, HZ, run, scale, kinds, banks, house, startBank, dedBanks, engine, houseChem, lfp, extBms, dcLoads, panelLoads, v12Loads, heavyLoads, dedLoads, aoLoads, acLoads, ic, inv, chargers, solars, winds, invWatts, invDcAmps, mainAmps };
 }
 
 /** Things about the boat as a whole that the user should know before reading the design. */
@@ -190,4 +193,45 @@ export function reportPlanProblems(b: Builder, p: Plan) {
   if (V === 12 && invWatts >= 2500) {
     b.find('warning', 'voltage-choice', `A ${invWatts} W inverter draws about ${Math.round(invDcAmps)} A from a 12 V bank. At 24 V it would be about ${Math.round(invDcAmps / 2)} A, with much smaller cables.`, 'Compare a 24 V scenario.');
   }
+}
+
+const batteries = (n: number) => `${n} ${n === 1 ? 'battery' : 'batteries'}`;
+
+/**
+ * Say how a battery bank as drawn differs from the equipment list: an error when its batteries
+ * cannot make the system voltage, and a design note when a what-if scenario changed them.
+ */
+export function reportBank(b: Builder, p: Plan, e: Equipment, s: BankSummary, node: DNode) {
+  const { V } = p;
+  if (s.units < 1) {
+    b.find('error', 'series-parallel', `${e.name}: no batteries listed.`, 'Set the number of batteries in the equipment list.', [node.id]);
+    return;
+  }
+  if (!s.valid) {
+    if (s.unitV > V) {
+      b.find('error', 'series-parallel', `${e.name}: ${s.unitV} V batteries can't make a ${V} V bank.`, `Use ${V} V batteries, or smaller ones in series.`, [node.id]);
+    } else {
+      b.find('error', 'series-parallel', `${e.name}: ${s.units}× ${s.unitV} V ${s.units === 1 ? 'battery' : 'batteries'} can't make a ${V} V bank (need a multiple of ${s.series}).`, `Use ${batteries(Math.max(s.series, Math.ceil(s.units / s.series) * s.series))} or a different battery voltage.`, [node.id]);
+    }
+  }
+
+  const c = p.bankChanges.get(e.id);
+  if (!c) return;
+  const was = num(c.listed, 'units', 1);
+  const wasV = num(c.listed, 'unitVolts', 12);
+  if (was === s.units && wasV === s.unitV) return;
+  const sameV = wasV === s.unitV;
+  const assumed = sameV ? batteries(s.units) : `${s.units}× ${s.unitV} V ${s.unitAh} Ah`;
+  const listed = sameV ? `${was}` : `${was}× ${wasV} V ${s.unitAh} Ah`;
+  // Whole strings can store more than the list does (three 6 V batteries become two 12 V ones), never less.
+  const more = s.units * s.unitV > was * wasV;
+  const [reason, why] =
+    c.why === 'capacity'
+      ? [`to make ${s.ah} Ah at ${V} V`, 'This scenario sets the house bank capacity.']
+      : c.why === 'energy'
+        ? [`to store ${more ? 'at least ' : ''}the same energy`, '']
+        : [`for ${V} V`, `${s.unitV} V batteries make ${V} V in strings of ${s.series}.`];
+  const volts = c.batteryVolts === 'lithium' ? `Lithium batteries are taken as ${s.unitV} V each.` : c.batteryVolts === 'too-high' ? `${wasV} V batteries can't make a ${V} V bank.` : '';
+  const fix = [volts, why, `If you make this change, list ${batteries(s.units)}${sameV ? '' : ` of ${s.unitV} V`}.`].filter(Boolean).join(' ');
+  b.find('info', 'series-parallel', `${e.name}: ${assumed} assumed ${reason}; your list has ${listed}.`, fix, [node.id]);
 }

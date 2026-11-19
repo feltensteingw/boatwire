@@ -9,7 +9,7 @@ import { fuseClassFor, runLength } from '../calc';
 import { bankSummary, fuseLabel, SWITCH_SIZES, type Builder, type WOpts } from './builder';
 import { loadNode } from './distribution';
 import type { Core } from './houseBank';
-import type { Plan } from './plan';
+import { reportBank, type Plan } from './plan';
 
 /** The buses of a dedicated bank, which its loads connect to. */
 export interface DedicatedBank {
@@ -48,6 +48,7 @@ function dedicatedBank(b: Builder, p: Plan, core: Core, e: Equipment, role: stri
   // At least the fuse, and at least the current when no fuse is big enough for it.
   const swRating = b.rating(Math.max(rating, loadAmps), SWITCH_SIZES, { what: `${label} battery switch`, fix: MOTOR_FIX(b), nodes: [`${key}-switch`] });
   const bat = b.add('battery', `${key}-bat`, e.name, { zone: e.zone, sublabel: s.text, equipmentId: e.id, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['dedicated-bank'] });
+  reportBank(b, p, e, s, bat);
   const bus = b.add('bus-pos', `${key}-bus`, `${label} positive bus`, { zone: e.zone });
   const nbus = b.add('bus-neg', `${key}-nbus`, `${label} negative bus`, { zone: e.zone });
   const fuse = b.add('fuse', `${key}-fuse`, `${label} battery fuse`, { zone: e.zone, sublabel: fuseLabel(rating, cls), data: { rating, fuseClass: cls }, notes: ['battery-fuse'] });
