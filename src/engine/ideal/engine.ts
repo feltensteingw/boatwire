@@ -1,12 +1,15 @@
 // Engine: the starter circuit, the alternator, and how its charge is shared between the start
 // battery and the house bank (charging relay, battery isolator, or DC-DC charger for lithium).
 
-import type { DNode, Equipment } from '../../model/types';
+import type { Chemistry, DNode, Equipment } from '../../model/types';
 import { fuseClassFor, nextStandard, protectionFor } from '../calc';
 import { num } from '../energy';
 import { bankSummary, fuseLabel, type Builder, type WOpts } from './builder';
 import type { Core } from './houseBank';
 import type { Plan } from './plan';
+
+/** The charge profile a DC-DC charger is set to, named for the battery it charges. */
+const PROFILE: Record<Chemistry, string> = { flooded: 'flooded', agm: 'AGM', gel: 'gel', lifepo4: 'lithium' };
 
 /** The engine as drawn, for the alternator wiring that hangs off it. */
 interface EngineInfo {
@@ -14,6 +17,8 @@ interface EngineInfo {
   engineNode: DNode;
   /** Positive bus of the start battery, if the boat has one. */
   startBus?: DNode;
+  /** Chemistry of the start battery, if the boat has one. */
+  startChem?: Chemistry;
   /** Alternator output at the system voltage. */
   altA: number;
   /** An external (smart) regulator is fitted. */
@@ -34,6 +39,11 @@ interface Alt extends EngineInfo {
   /** The charge-splitting arrangement the user chose for the engine. */
   split: string;
   wantsRunRelay: boolean;
+  /**
+   * One of the two batteries is lithium, so they are kept apart by a DC-DC charger: a relay or
+   * isolator would parallel lithium with lead-acid, or give lithium the alternator's charge voltage.
+   */
+  needsDcdc: boolean;
 }
 
 /** Engine, starter circuit and alternator charging. Returns the start battery's bus, if there is one. */
@@ -55,8 +65,10 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBus?: DNode
     notes: ['starter-exempt', 'common-negative'],
   });
   const crankLen = run(BZ, EZ);
+  let startChem: Chemistry | undefined;
   if (startBank) {
     const s = bankSummary(startBank, V);
+    startChem = s.chem;
     const sbat = b.add('battery', 'start-bat', startBank.name, { zone: startBank.zone || BZ, equipmentId: startBank.id, sublabel: s.text, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['house-start-split'] });
     const sfRating = nextStandard(starterA * 2, [100, 150, 200, 250, 300]);
     const sfClass = fuseClassFor(sfRating, { atBattery: true, lithium: s.chem === 'lifepo4' });
@@ -81,35 +93,44 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBus?: DNode
   const engNegGauge = b.wires.filter((w) => w.to.node === 'engine' || w.from.node === 'engine').map((w) => w.gauge)[0];
   b.wire('neg', [engineNode, 'neg'], [negBus, b.stud(negBus)], { amps: Math.max(altA, starterA), len: crankLen, gauge: engNegGauge, engine: true, notes: ['common-negative'] });
 
-  if (altA > 0) buildAlternator(b, p, core, { engine, engineNode, startBus, altA, extReg, EZ, crankLen });
+  if (altA > 0) buildAlternator(b, p, core, { engine, engineNode, startBus, startChem, altA, extReg, EZ, crankLen });
   return { startBus };
 }
 
 function buildAlternator(b: Builder, p: Plan, core: Core, e: EngineInfo) {
   const { BZ, run, lfp } = p;
-  const { engine, startBus, altA, extReg, EZ } = e;
+  const { engine, startBus, startChem, altA, extReg, EZ } = e;
 
   const alt = b.add('alternator', 'alternator', 'Alternator', { zone: EZ, sublabel: `${Math.round(altA)} A${extReg ? ' · ext. reg.' : ''}`, data: { amps: altA, part: `${num(engine, 'alternatorAmps')} A alternator` } });
   const altFuseR = protectionFor(altA);
   const altFuseCls = fuseClassFor(altFuseR, { lithium: lfp, mainFeeder: true });
   const altLen = run(EZ, BZ);
   const split = String(engine.props.chargeSplit ?? 'auto');
+  const needsDcdc = lfp || startChem === 'lifepo4';
+  // Lithium house, stock regulator: the alternator charges the lead-acid start battery instead.
+  const toStart = lfp && !extReg && !!startBus;
   const wantsIso = split === 'isolator-fet' || split === 'isolator-diode';
-  const useIso = wantsIso && !lfp && !!startBus;
+  const useIso = wantsIso && !needsDcdc && !!startBus;
   const wantsRunRelay = split === 'relay-run';
-  if (wantsRunRelay && lfp) {
-    b.find('info', 'charge-relay', 'Charge splitting is set to an engine-run charging relay, but a relay would parallel the lithium house bank with the start battery while the engine runs.', lfp && !extReg && startBus ? 'The design uses a DC-DC charger instead.' : 'The design uses an external regulator and alternator protection instead.');
+
+  // A relay or isolator the owner chose but the design cannot use: say what it uses instead.
+  const [lithium, other] = lfp ? ['the lithium house bank', 'the start battery'] : ['the lithium start battery', 'the house bank'];
+  const instead = toStart || !lfp ? 'The design uses a DC-DC charger instead.' : 'The design uses an external regulator and alternator protection instead.';
+  if (wantsRunRelay && needsDcdc) {
+    b.find('info', 'charge-relay', `Charge splitting is set to an engine-run charging relay, but a relay would parallel ${lithium} with ${other} while the engine runs.`, instead);
   } else if (wantsRunRelay && !startBus) {
     b.find('info', 'charge-relay', 'Charge splitting is set to a charging relay, but there is only one battery bank, so no relay is needed.');
+  } else if (split === 'acr' && needsDcdc && startBus) {
+    b.find('info', 'acr', `Charge splitting is set to an ACR, but an ACR would parallel ${lithium} with ${other} whenever either is being charged.`, instead);
   }
-  if (wantsIso && lfp) {
-    b.find('info', 'isolator', 'Charge splitting is set to a battery isolator, but an isolator cannot give the lithium house bank its own charge profile or protect the alternator from a BMS disconnect.', lfp && !extReg && startBus ? 'The design uses a DC-DC charger instead.' : 'The design uses an external regulator and alternator protection instead.');
+  if (wantsIso && needsDcdc) {
+    b.find('info', 'isolator', `Charge splitting is set to a battery isolator, but an isolator cannot give ${lithium} its own charge profile or protect the alternator from a BMS disconnect.`, instead);
   } else if (wantsIso && !startBus) {
     b.find('info', 'isolator', 'Charge splitting is set to a battery isolator, but there is only one battery bank, so no isolator is needed.');
   }
 
-  const a: Alt = { ...e, alt, altFuseR, altFuseCls, altLen, split, wantsRunRelay };
-  if (lfp && !extReg && startBus) {
+  const a: Alt = { ...e, alt, altFuseR, altFuseCls, altLen, split, wantsRunRelay, needsDcdc };
+  if (toStart && startBus) {
     alternatorToStartBattery(b, p, core, a, startBus);
     return;
   }
@@ -214,15 +235,25 @@ function alternatorRegulation(b: Builder, p: Plan, core: Core, a: Alt) {
   }
 }
 
-/** Keeps the start battery charged from the house side: a DC-DC charger for a lithium house, otherwise a charging relay. */
+/**
+ * Keeps the start battery charged from the house side: a DC-DC charger set to the start battery's
+ * profile when either battery is lithium, otherwise a charging relay.
+ */
 function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus: DNode) {
-  const { V, BZ, lfp } = p;
+  const { V, BZ } = p;
   const { posBus, negBus } = core;
-  const { altA, wantsRunRelay, engineNode, crankLen } = a;
+  const { altA, wantsRunRelay, engineNode, crankLen, needsDcdc, startChem } = a;
 
-  if (lfp) {
-    const dcA = V === 12 ? 18 : 12;
-    const dcdc = b.add('dcdc', 'start-dcdc', 'DC-DC charger (house → start)', { zone: BZ, sublabel: `${dcA} A`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}` }, notes: ['dcdc'] });
+  if (needsDcdc) {
+    // A start battery needs little charge. Take the larger charger only if the alternator covers what it draws.
+    const sizes = V === 12 ? [10, 18] : [12];
+    const fits = sizes.filter((s) => s * 1.15 <= altA);
+    const dcA = fits.length ? fits[fits.length - 1] : sizes[0];
+    if (!fits.length) {
+      b.find('info', 'dcdc', `The alternator makes about ${Math.round(altA)} A, less than the ${Math.round(dcA * 1.15)} A the start battery's DC-DC charger draws at full output, so the house bank makes up the difference while the engine runs.`, 'If the charger lets you set its current limit, set it below the alternator\'s output.');
+    }
+    const profile = PROFILE[startChem ?? 'agm'];
+    const dcdc = b.add('dcdc', 'start-dcdc', 'DC-DC charger (house → start)', { zone: BZ, sublabel: `${dcA} A ${profile} profile`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}, ${profile} profile` }, notes: ['dcdc'] });
     const r = protectionFor(dcA * 1.15);
     const f1 = b.add('fuse', 'start-dcdc-in', 'DC-DC input fuse', { zone: BZ, col: 5, sublabel: fuseLabel(r, 'ATC'), data: { rating: r, fuseClass: fuseClassFor(r, {}) }, notes: ['charging-source-fuse'] });
     const f2 = b.add('fuse', 'start-dcdc-out', 'DC-DC output fuse', { zone: startBus.zone, sublabel: fuseLabel(r, 'ATC'), data: { rating: r, fuseClass: fuseClassFor(r, {}) }, notes: ['charging-source-fuse'] });

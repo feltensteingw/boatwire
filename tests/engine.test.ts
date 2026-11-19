@@ -260,6 +260,92 @@ describe('battery isolators', () => {
   });
 });
 
+describe('start battery and house bank of different chemistries', () => {
+  const boat = (house: string, start: string, engine: Record<string, unknown> = {}) => {
+    const p = exampleProject();
+    p.equipment.find((e) => e.props.role === 'house')!.props.chemistry = house;
+    p.equipment.find((e) => e.props.role === 'start')!.props.chemistry = start;
+    Object.assign(p.equipment.find((e) => e.kind === 'engine')!.props, engine);
+    return p;
+  };
+  const relayOrIsolator = (d: Design) => d.nodes.filter((n) => n.type === 'acr' || n.type === 'isolator').map((n) => n.id);
+  const wired = (d: Design, from: string, to: string) => d.wires.some((w) => w.from.node === from && w.to.node === to);
+  const splitNote = (d: Design) => d.findings.find((f) => f.severity === 'info' && f.message.startsWith('Charge splitting is set to'));
+
+  it('lithium start battery, lead-acid house: the alternator charges the house bank and a DC-DC charger with a lithium profile charges the start battery', () => {
+    const p = boat('agm', 'lifepo4');
+    const d = generateIdeal(p);
+    expect(relayOrIsolator(d)).toEqual([]);
+    expect(wired(d, 'alt-fuse', 'pos-bus')).toBe(true);
+    expect(wired(d, 'pos-bus', 'start-dcdc-in')).toBe(true);
+    expect(wired(d, 'start-dcdc-out', 'start-bus')).toBe(true);
+    const dcdc = d.nodes.find((n) => n.id === 'start-dcdc')!;
+    expect(dcdc.sublabel).toBe('18 A lithium profile');
+    expect(dcdc.data.part).toBe('DC-DC charger 12/12-18, lithium profile');
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+    // the advice to keep the start battery lead-acid stays, and automatic needs no note
+    expect(d.findings.some((f) => f.rule === 'alternator-lfp' && f.severity === 'warning')).toBe(true);
+    expect(splitNote(d)).toBeUndefined();
+  });
+
+  for (const split of ['acr', 'relay-run', 'isolator-fet', 'isolator-diode']) {
+    for (const regulator of ['internal', 'external']) {
+      it(`lithium start battery: "${split}" with the ${regulator} regulator becomes a DC-DC charger, with a note`, () => {
+        const p = boat('agm', 'lifepo4', { chargeSplit: split, regulator });
+        const d = generateIdeal(p);
+        expect(relayOrIsolator(d)).toEqual([]);
+        expect(d.nodes.find((n) => n.id === 'start-dcdc')!.sublabel).toBe('18 A lithium profile');
+        expect(splitNote(d)!.message).toContain('the lithium start battery');
+        expect(splitNote(d)!.fix).toBe('The design uses a DC-DC charger instead.');
+        expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+      });
+    }
+  }
+
+  it('lithium house bank: choosing an ACR is noted like the other relay and isolator choices', () => {
+    const p = boat('lifepo4', 'agm', { chargeSplit: 'acr' });
+    const d = generateIdeal(p);
+    expect(relayOrIsolator(d)).toEqual([]);
+    expect(splitNote(d)).toMatchObject({ rule: 'acr', fix: 'The design uses a DC-DC charger instead.' });
+    expect(splitNote(d)!.message).toContain('the lithium house bank');
+  });
+
+  it('lithium house, lead-acid start battery: the DC-DC charger to the start battery names its lead-acid profile', () => {
+    const p = boat('lifepo4', 'agm', { regulator: 'external' });
+    expect(generateIdeal(p).nodes.find((n) => n.id === 'start-dcdc')!.sublabel).toBe('18 A AGM profile');
+    const q = boat('lifepo4', 'flooded', { regulator: 'external' });
+    expect(generateIdeal(q).nodes.find((n) => n.id === 'start-dcdc')!.data.part).toBe('DC-DC charger 12/12-18, flooded profile');
+  });
+
+  it('the DC-DC charger for the start battery draws no more than the alternator makes', () => {
+    const size = (V: 12 | 24, alternatorAmps: number) => {
+      const d = generateIdeal(boat('agm', 'lifepo4', { alternatorAmps }), { id: 'x', name: 'x', systemVoltage: V });
+      const note = d.findings.find((f) => f.rule === 'dcdc');
+      return `${d.nodes.find((n) => n.id === 'start-dcdc')!.data.rating} A${note ? ' + note' : ''}`;
+    };
+    expect(size(12, 90)).toBe('18 A');
+    expect(size(12, 21)).toBe('18 A'); // draws 20.7 A
+    expect(size(12, 20)).toBe('10 A');
+    expect(size(12, 11)).toBe('10 A + note'); // the smallest draws 11.5 A
+    expect(size(24, 90)).toBe('12 A'); // 45 A at 24 V
+    expect(size(24, 20)).toBe('12 A + note'); // 10 A at 24 V
+  });
+
+  it('no design joins lithium and lead-acid through a relay or isolator, and every one passes its own check', () => {
+    for (const [house, start] of [['agm', 'lifepo4'], ['lifepo4', 'agm']])
+      for (const chargeSplit of ['auto', 'acr', 'relay-run', 'isolator-fet', 'isolator-diode'])
+        for (const regulator of ['internal', 'external'])
+          for (const V of [12, 24] as const) {
+            const p = boat(house, start, { chargeSplit, regulator });
+            const d = generateIdeal(p, { id: 'x', name: 'x', systemVoltage: V });
+            const what = `${house} house, ${start} start, ${chargeSplit}, ${regulator}, ${V} V`;
+            expect(relayOrIsolator(d), what).toEqual([]);
+            expect(d.findings.filter((f) => f.severity === 'error'), what).toEqual([]);
+            expect(errorsOf(d, p).map((e) => e.message), what).toEqual([]);
+          }
+  });
+});
+
 describe('dedicated batteries for high-draw equipment', () => {
   const withBank = (role: string, zone: string, extra: string[] = []) => {
     const p = exampleProject();

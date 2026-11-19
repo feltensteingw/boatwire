@@ -272,7 +272,7 @@ const SECTIONS: Section[] = [
         </p>
         <table className="g-table">
           <tbody>
-            <tr><td><b>Automatic</b> (recommended)</td><td>Picks an ACR for lead-acid and a DC-DC charger for lithium.</td></tr>
+            <tr><td><b>Automatic</b> (recommended)</td><td>Picks an ACR when both batteries are lead-acid, and a DC-DC charger when either is lithium.</td></tr>
             <tr><td><b>ACR / voltage-sensitive relay</b></td><td>Joins the banks whenever either is being charged (by any source), and separates them when voltage falls. Simple and cheap.</td></tr>
             <tr><td><b>Charging relay (engine-run / D+)</b></td><td>Joins the banks only while the engine runs (the alternator's D+ signal). Predictable, but solar or shore charging won't reach the start battery through it.</td></tr>
             <tr><td><b>FET isolator</b></td><td>Electronic one-way valves: one alternator feeds both banks, which are never connected to each other. Almost no voltage loss.</td></tr>
@@ -282,8 +282,8 @@ const SECTIONS: Section[] = [
         <h4>Lithium (LiFePO4)</h4>
         <p>
           Lithium needs its own charge profile and must never be paralleled with lead-acid. If its BMS disconnects while the alternator is charging, the voltage spike can destroy the alternator. So for a lithium house bank, BoatWire either charges the lead-acid start battery
-          from the alternator and feeds the house bank through a <b>DC-DC charger</b>, or, with an <b>external regulator</b>, charges lithium directly with an <b>alternator protection device</b>. Relay and isolator options are ignored for lithium, with a note explaining
-          why.
+          from the alternator and feeds the house bank through a <b>DC-DC charger</b>, or, with an <b>external regulator</b>, charges lithium directly with an <b>alternator protection device</b>. A lithium start battery with a lead-acid house bank works the other
+          way round: the alternator charges the house bank, and a DC-DC charger set to a lithium profile keeps the start battery charged. Whenever either battery is lithium, relay and isolator options are ignored, with a note explaining why.
         </p>
       </>
     ),

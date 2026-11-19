@@ -355,7 +355,7 @@ alternator <alternator> "Alternator" · [45 A · ext. reg.] · @engine · amps=4
 alt-fuse <fuse> "Alternator output fuse" · [60 A MIDI] · @battery · rating=60 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 alt-reg <regulator> "Smart alternator regulator" · [Lithium profile, belt/temperature limiting] · @engine · part "External regulator (e.g. Wakespeed WS500 / Balmar MC-618)" · notes alternator-lfp · terms field,sense,atc
 alt-apd <apd> "Alternator protection device" · @engine · part "Alternator protection device (APD)" · notes alternator-lfp · terms b,neg
-start-dcdc <dcdc> "DC-DC charger (house → start)" · [12 A] · @battery · rating=12 · part "DC-DC charger 24/24-12" · notes dcdc · terms in,inneg,out,outneg,run
+start-dcdc <dcdc> "DC-DC charger (house → start)" · [12 A AGM profile] · @battery · rating=12 · part "DC-DC charger 24/24-12, AGM profile" · notes dcdc · terms in,inneg,out,outneg,run
 start-dcdc-in <fuse> "DC-DC input fuse" · [20 A ATC] · @battery · rating=20 fuseClass=ATC · notes charging-source-fuse · terms in,out
 start-dcdc-out <fuse> "DC-DC output fuse" · [20 A ATC] · @battery · rating=20 fuseClass=ATC · notes charging-source-fuse · terms in,out
 pv-solar <solar-panel> "Solar arch (2 × 200 W)" · [400 W · Vmp 36 V] · @arch · eq:solar · watts=400 amps=11.11 · terms pos,neg
@@ -480,7 +480,7 @@ g1 warning bank-sizing: House bank is 200 Ah; daily use is ~92 Ah, which suggest
 g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel."
 `;
 
-exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"e1dc8830bdbf9a0d"`;
+exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"610efc7f9af44259"`;
 
 exports[`generated designs are unchanged > 230 V shore power, metric units > design 1`] = `
 "Ideal (ideal), 12 V: 57 components, 84 wires, 1 findings
@@ -1619,7 +1619,9 @@ exports[`more generated designs are unchanged (fingerprint only) > isolator chos
 
 exports[`more generated designs are unchanged (fingerprint only) > lead-acid with an external regulator 1`] = `"58 components, 86 wires, 1 findings, 583f6e66c20a8a5a"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house with an isolator chosen and an external regulator 1`] = `"59 components, 89 wires, 2 findings, cdcb31302700be80"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house with a lead-acid windlass bank 1`] = `"65 components, 98 wires, 1 findings, 578af0cea0f38734"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > lithium house with an isolator chosen and an external regulator 1`] = `"59 components, 89 wires, 2 findings, d1b1f694947a3167"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > lithium house with the charging relay chosen 1`] = `"57 components, 86 wires, 2 findings, bfda19d77a0fd59c"`;
 
@@ -1627,7 +1629,13 @@ exports[`more generated designs are unchanged (fingerprint only) > lithium house
 
 exports[`more generated designs are unchanged (fingerprint only) > lithium house, no start battery, stock regulator (an error the design reports) 1`] = `"53 components, 80 wires, 3 findings, e660ca02aebf6ee8"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery 1`] = `"57 components, 84 wires, 2 findings, a3e1ae33a72cd6cf"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery 1`] = `"57 components, 85 wires, 2 findings, 513296cc6cd30e14"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an ACR chosen, 24 V 1`] = `"62 components, 91 wires, 4 findings, 14d305c72303d46c"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an isolator chosen 1`] = `"57 components, 85 wires, 3 findings, 52aa2411077b5c12"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with the charging relay chosen and an external regulator 1`] = `"58 components, 87 wires, 3 findings, 5807edf64b4468cb"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > no AC at all 1`] = `"46 components, 67 wires, 1 findings, c1f47eacb8813b74"`;
 

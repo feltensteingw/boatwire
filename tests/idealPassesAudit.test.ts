@@ -12,11 +12,6 @@ import { acVoltsOf, FINGERPRINT_BOATS, SAMPLE_BOATS } from './sampleBoats';
  * fails the test until its entry is removed from this list.
  */
 const KNOWN_GAPS: Record<string, { rules: string[]; task: string }> = {
-  // A lead-acid house bank and a lithium start battery are joined by a charging relay.
-  'lithium start battery': {
-    rules: ['alternator-lfp', 'no-mixed-chemistry'],
-    task: 'Lithium start battery with a lead-acid house bank: the ideal design joins them with a charging relay',
-  },
   // About 915 A is drawn through an 800 A fuse and two 4/0 cables, with no finding from the generator.
   'a very large inverter on 12 V (parallel cables, beyond fuse sizes)': {
     rules: ['conductor-sizing'],

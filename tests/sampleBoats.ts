@@ -148,6 +148,10 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   boat('lithium start battery', (p) => {
     the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
   }),
+  boat('lithium house with a lead-acid windlass bank', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    p.equipment.push(newEquipment('battery-bank', { name: 'Bow battery', zone: 'bow', props: { role: 'windlass', chemistry: 'agm', unitVolts: 12, unitAh: 100, units: 1 } }));
+  }),
   boat('a dedicated winch bank with no winch aboard', (p) => {
     p.equipment.push(newEquipment('battery-bank', { name: 'Winch battery', zone: 'cockpit', props: { role: 'winch', chemistry: 'lifepo4', unitVolts: 12, unitAh: 100, units: 1 } }));
   }),
@@ -171,6 +175,19 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   boat('lithium house with an isolator chosen and an external regulator', (p) => {
     the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
     Object.assign(the(p, 'engine').props, { chargeSplit: 'isolator-fet', regulator: 'external' });
+  }),
+  boat('lithium start battery with an isolator chosen', (p) => {
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.chargeSplit = 'isolator-fet';
+  }),
+  boat('lithium start battery with the charging relay chosen and an external regulator', (p) => {
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    Object.assign(the(p, 'engine').props, { chargeSplit: 'relay-run', regulator: 'external' });
+  }),
+  boat('lithium start battery with an ACR chosen, 24 V', (p) => {
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.chargeSplit = 'acr';
+    return { id: 'v24', name: '24 V', systemVoltage: 24 };
   }),
   boat('charging relay chosen with only one battery bank', (p) => {
     the(p, 'engine').props.chargeSplit = 'relay-run';
