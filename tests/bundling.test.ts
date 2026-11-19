@@ -3,6 +3,7 @@ import { audit } from '../src/engine/audit';
 import { ampacity } from '../src/engine/calc';
 import { paletteNode } from '../src/engine/existing';
 import { generateIdeal } from '../src/engine/generate';
+import { changeList } from '../src/engine/reports';
 import { AMPACITY_105_BUNDLED, GAUGES } from '../src/model/standards';
 import type { Design, Wire } from '../src/model/types';
 import { parseProject } from '../src/model/validate';
@@ -143,6 +144,45 @@ describe('the design check of a bundled wire', () => {
     d.nodes[1].data.rating = 125;
     d.nodes[2].data.amps = 90;
     expect(about(d)).toEqual([]);
+  });
+});
+
+describe('the upgrade plan for a bundled wire', () => {
+  /** The ideal: 12 AWG on its own. The existing drawing: the same circuit with `o` on its wire. */
+  const plan = (o: Partial<Wire>, fuse = 30) => {
+    const ideal = circuit();
+    const existing = circuit(o);
+    for (const d of [ideal, existing]) {
+      d.nodes[1].data.rating = fuse;
+      d.nodes[2].equipmentId = 'pump';
+    }
+    if (fuse > 30) ideal.wires[1].gauge = '4/0';
+    const lines = changeList(existing, ideal, 120).filter((c) => c.title.includes('upsize'));
+    return { existing, lines: lines.map((c) => [c.title, c.detail, c.parts]) };
+  };
+
+  it('a wire on its own is upsized to the ideal size, as before', () => {
+    expect(plan({ gauge: '14' }).lines).toEqual([['DC load: upsize wire 14 AWG → 12 AWG', 'At ~28 A over 1 ft.', [['cable:12', 2]]]]);
+  });
+
+  it('a bundled wire is upsized to the size its bundle needs, and the check then passes', () => {
+    // 12 AWG with three others is rated 27 A, below the 30 A fuse; 10 AWG is rated 36 A.
+    const { existing, lines } = plan({ gauge: '14', bundledWith: 3 });
+    expect(lines).toEqual([['DC load: upsize wire 14 AWG → 10 AWG', 'At ~28 A over 1 ft, bundled with 3 other wires.', [['cable:10', 2]]]]);
+    existing.wires[1].gauge = '10';
+    expect(about(existing)).toEqual([]);
+  });
+
+  it('a bundled wire already at the ideal size is upsized when its bundle needs more', () => {
+    expect(plan({ bundledWith: 3 }).lines.map((l) => l[0])).toEqual(['DC load: upsize wire 12 AWG → 10 AWG']);
+    expect(plan({ bundledWith: 1 }).lines).toEqual([]);
+  });
+
+  it('no upsize line when no size is enough in that bundle; the check says what to do', () => {
+    // 4/0 with 30 others is rated 178 A, below a 300 A fuse.
+    const { existing, lines } = plan({ gauge: '2/0', bundledWith: 30 }, 300);
+    expect(lines).toEqual([]);
+    expect(about(existing)).toEqual([expect.stringContaining('protected by 300 A but 2/0 AWG (bundled with 30 other wires) is only rated 132 A')]);
   });
 });
 
