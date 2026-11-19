@@ -508,7 +508,7 @@ const SECTIONS: Section[] = [
       <>
         <p className="hint caution">
           BoatWire is a design aid, not a substitute for a qualified marine electrician. Its wire tables and limits were checked against Blue Sea Systems' published tables (2023 catalog) on 19 November 2026. Those tables are a published summary, <b>not</b> the ABYC E-11
-          standard itself, and some values used here, such as AC cable ratings and fuse interrupt ratings, are not in them. Have any design reviewed before you install it, especially AC wiring and lithium systems.
+          standard itself, and some values used here, such as AC cable ratings and the interrupt ratings of fuse types, are not in them. Have any design reviewed before you install it, especially AC wiring and lithium systems.
         </p>
         <ul>
           <li>Cable lengths are estimates from your zones. Measure real runs before buying cable.</li>

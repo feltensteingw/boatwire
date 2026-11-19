@@ -10,13 +10,19 @@
 //
 // Corrected from that check: the engine-space factor for DC wire (0.82 →
 // 0.85) and the condition on the 72 in battery-fuse distance. Added: the
-// 40 in battery-fuse distance and the bundling table.
+// 40 in battery-fuse distance and the bundling table. Derated DC ratings
+// are rounded to whole amps, as Blue Sea prints them (see ampacity()).
 //
 // Not checked, because Blue Sea does not publish them in the pages read:
-// AC cable ampacity, the minimum wire sizes, fuse interrupt ratings, the
-// voltage-drop constant (taken from Ancor and BEP instead), and circular
-// mils for 18 to 1 AWG. Values that one check matched but another did not
-// confirm were left as they were.
+// AC cable ampacity, the minimum wire sizes, the interrupt rating of each
+// fuse type (FUSE_CLASSES), the voltage-drop constant (taken from Ancor and
+// BEP instead), and circular mils for 18 to 1 AWG. Values that one check
+// matched but another did not confirm were left as they were.
+//
+// Published but not used: p.164's table of the interrupt rating a DC main
+// or branch fuse needs, by the cold-cranking amps of the batteries behind
+// it. BoatWire checks interrupt ratings only for fuses on a lithium battery
+// (LITHIUM_FUSE_MIN_AIC).
 //
 // A published summary is not the ABYC standard itself, so STANDARDS_VERIFIED
 // stays false and the app keeps its safety notice. Replace values here if
@@ -104,7 +110,9 @@ export const BUNDLE_FACTORS: readonly { from: number; factor: number }[] = [
  *
  * Not published by Blue Sea Systems (no AC cable table in its 2023 Catalog, p.165 checked
  * 2026-11-19). Every value is below Blue Sea's nearest figures, the "up to three conductors in a
- * sheath" set on p.164 (e.g. 30 A against 42 A for 10 AWG), so it errs on the safe side.
+ * sheath" set on p.164 (e.g. 30 A against 42 A for 10 AWG), and at or below its figures for 7 to
+ * 24 bundled conductors (VI-B × 0.714, in whole amps); only bundles of 25 or more are rated lower.
+ * So it errs on the safe side.
  */
 export const AC_CABLE_AMPACITY: Record<string, number> = {
   '14': 15,
@@ -126,8 +134,9 @@ export const MIN_GAUGE_AC = '14';
 /**
  * Ampacity multiplier for 105 °C DC conductors routed through engine spaces (50 °C ambient).
  * Blue Sea Systems prints no factor, but its inside-engine-space column is 0.85 × the outside
- * column on every row: 2023 Catalog p.164, https://www.delzer.com/oneasg/bss_cat/164/ (a
- * distributor's copy of the catalog), read 2026-11-19. Ancor Catalog 2024 p.64 states 0.85,
+ * column, rounded to whole amps, on every AWG row (not on every metric row: 1.5 mm² is 29/24):
+ * 2023 Catalog p.164, https://www.delzer.com/oneasg/bss_cat/164/ (a distributor's copy of the
+ * catalog), read 2026-11-19. Ancor Catalog 2024 p.64 states 0.85,
  * https://docs.navico.com/view/362211770/64/. The 0.82 used before is Blue Sea's 90 °C figure.
  */
 export const ENGINE_SPACE_DERATE = 0.85;
@@ -158,9 +167,13 @@ export const VDROP = {
 /** Minimum conductor size outside panels/harnesses. Not published by Blue Sea Systems; not checked. */
 export const MIN_GAUGE = '16';
 
-// Battery fuse distances. Source: Blue Sea Systems 2023 Catalog p.164, "DC Main and Branch Circuit
-// Protection", https://www.delzer.com/oneasg/bss_cat/164/ (a distributor's copy of the catalog),
-// read 2026-11-19.
+// Battery fuse distances. Source for the three distances: Blue Sea Systems 2023 Catalog p.164,
+// "DC Main Circuit Protection and Branch Circuit Protection", https://www.delzer.com/oneasg/bss_cat/164/
+// (a distributor's copy of the catalog), read 2026-11-19. It measures them from the "power source"
+// and gives 72 in for a conductor "connected directly to the battery and housed in a sheath or
+// enclosure". The wording on the point of connection to the DC system, and on a sheath for the
+// whole length, is ABYC E-11 as quoted by Blue Sea's article 99 on bluesea.com, seen only in
+// search-engine excerpts and not opened.
 
 /** Over-current device must sit within this many inches of the battery or of the point where the conductor connects to the DC system. */
 export const BATTERY_FUSE_MAX_IN = 7;
@@ -184,7 +197,11 @@ export const STANDARD_FUSES = [
 export const STANDARD_BREAKERS_DC = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 100, 120, 150];
 export const STANDARD_BREAKERS_AC = [10, 15, 20, 25, 30, 40, 50];
 
-/** Fuse families with practical max rating and interrupt capacity (AIC, amps @ DC). Not published by Blue Sea Systems; not checked. */
+/**
+ * Fuse families with practical max rating and interrupt capacity (AIC, amps @ DC). Not published by
+ * Blue Sea Systems, which gives the interrupt rating a circuit needs (p.164), not what each fuse
+ * type has; not checked.
+ */
 export const FUSE_CLASSES = {
   ATC: { max: 30, aic: 1000, desc: 'Blade fuse (ATC/ATO) in fuse block' },
   MIDI: { max: 200, aic: 2000, desc: 'MIDI/AMI bolt-down fuse' },
@@ -196,8 +213,10 @@ export type FuseClass = keyof typeof FUSE_CLASSES;
 
 /**
  * Smallest interrupt rating (AIC, amps) accepted for a fuse connected straight to a lithium
- * battery. Only Class T meets it. The same policy the ideal design follows. BoatWire's own
- * policy, not a published value; not checked.
+ * battery. Only Class T meets it. The same policy the ideal design follows. Matches the top DC
+ * main tier on Blue Sea Systems 2023 Catalog p.164 (above 2,200 CCA: 20,000 AIC at 125 V DC, or
+ * the battery's short-circuit rating), as above; applying it to every lithium bank is BoatWire's
+ * own policy.
  */
 export const LITHIUM_FUSE_MIN_AIC = 20000;
 

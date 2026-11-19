@@ -56,6 +56,13 @@ describe('wire tables against Blue Sea Systems p.164', () => {
     expect(ampacity('2', true, true)).toBeCloseTo(AC_CABLE_AMPACITY['2'] * 0.82, 5);
   });
 
+  it('AC cable figures (not published by Blue Sea) are at or below its ratings for 7 to 24 bundled conductors', () => {
+    for (const [awg, amps] of Object.entries(AC_CABLE_AMPACITY)) {
+      expect(amps, awg).toBeLessThanOrEqual(ampacity(awg, false, false, 6));
+      expect(amps, awg).toBeGreaterThan(ampacity(awg, false, false, 24));
+    }
+  });
+
   it('voltage-drop limits and battery fuse distances are the published ones', () => {
     expect(VDROP).toEqual({ critical: 3, nonCritical: 10 });
     expect([BATTERY_FUSE_MAX_IN, SHEATHED_NOT_AT_BATTERY_FUSE_MAX_IN, BATTERY_FUSE_SHEATHED_MAX_IN]).toEqual([7, 40, 72]);
