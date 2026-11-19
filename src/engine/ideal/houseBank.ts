@@ -31,13 +31,22 @@ export function buildHouseBank(b: Builder, p: Plan): Core {
   const { project, scenario, V, BZ, lfp, extBms, house, mainAmps } = p;
 
   const mainFuse = nextStandard(mainAmps * 1.25, MAIN_FUSE_SIZES);
-  if (mainFuse === undefined) {
-    // The largest fuse is drawn so the diagram is complete; the switch and buses are then too small as well.
-    b.find('error', 'beyond-sizes', `Main DC current (~${Math.round(mainAmps)} A) is beyond practical fuse and switch sizes.`, 'Raise the system voltage or split loads across banks.', house.map((_, i) => `house${i}-fuse`));
-  }
   const mainFuseRating = mainFuse ?? MAIN_FUSE_SIZES[MAIN_FUSE_SIZES.length - 1];
   const mainFuseClass = fuseClassFor(mainFuseRating, { atBattery: true, lithium: lfp });
+  // (sized from the main fuse, so the main fuse error below covers it too)
   const switchRating = b.rating(mainFuseRating, SWITCH_SIZES, { what: 'House battery switch', nodes: ['house-switch'] });
+  if (mainFuse === undefined) {
+    // The largest fuse is drawn so the diagram is complete. The switch, buses and BMS contactor are
+    // rated from it, so the finding points at them too.
+    const shown = mainAmps > mainFuseRating ? `The ${mainFuseRating} A fuse, switch and buses shown are too small for that current.` : `The ${mainFuseRating} A fuse shown leaves too little margin.`;
+    b.find(
+      'error',
+      'beyond-sizes',
+      `Main DC current (~${Math.round(mainAmps)} A) is beyond practical fuse and switch sizes. ${shown}`,
+      'Raise the system voltage or split loads across banks.',
+      [...house.map((_, i) => `house${i}-fuse`), 'house-switch', 'pos-bus', 'neg-bus', ...(extBms ? ['house-contactor'] : [])],
+    );
+  }
   const houseSwitch = b.add('switch', 'house-switch', 'House battery switch', {
     zone: BZ,
     data: { rating: switchRating, part: `Battery switch, ${switchRating} A continuous` },

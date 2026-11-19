@@ -1,6 +1,7 @@
 // Engine: the starter circuit, the alternator, and how its charge is shared between the start
 // battery and the house bank (charging relay, battery isolator, or DC-DC charger for lithium).
 
+import { FUSE_CLASSES } from '../../model/standards';
 import type { DNode, Equipment } from '../../model/types';
 import { fuseClassFor } from '../calc';
 import { num } from '../energy';
@@ -64,10 +65,13 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBus?: DNode
   if (startBank) {
     const s = bankSummary(startBank, V);
     const sbat = b.add('battery', 'start-bat', startBank.name, { zone: startBank.zone || BZ, equipmentId: startBank.id, sublabel: s.text, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['house-start-split'] });
+    const sfWanted = Math.ceil((starterA * 2) / 50) * 50;
+    // the larger fuse families that come in that size
+    const sfKinds = (['Class T', 'ANL'] as const).filter((c) => FUSE_CLASSES[c].max >= sfWanted).join(' or ');
     const sfRating = b.rating(starterA * 2, START_FUSE_SIZES, {
       what: 'Start battery fuse',
       carries: starterA,
-      fix: `Fit a larger start fuse (Class T or ANL, about ${Math.ceil((starterA * 2) / 50) * 50} A) or the size the engine maker recommends, and check the starter current entered.`,
+      fix: `Fit a larger start fuse (${sfKinds ? `${sfKinds}, ` : ''}about ${sfWanted} A) or the size the engine maker recommends, and check the starter current entered.`,
       nodes: ['start-fuse'],
     });
     const sfClass = fuseClassFor(sfRating, { atBattery: true, lithium: s.chem === 'lifepo4' });
@@ -250,7 +254,8 @@ function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus:
     b.pair([[dcdc, 'out'], [f2, 'in']], [[dcdc, 'outneg'], [negBus, b.stud(negBus)]], { amps: dcA, protect: r, len: 2, protectedBy: f2.id });
     b.wire('pos', [f2, 'out'], [startBus, b.stud(startBus)], { amps: dcA, protect: r, len: 0.5 });
   } else {
-    const acrR = altA > 100 ? 500 : 120;
+    // The relay carries the alternator's charge on to the house bank.
+    const acrR = altA > 100 ? b.rating(altA, [500], { what: wantsRunRelay ? 'Charging relay' : 'Automatic charging relay', fix: ALT_FIX, nodes: ['acr'] }) : 120;
     const acr = wantsRunRelay
       ? b.add('acr', 'acr', 'Charging relay (engine-run)', {
           zone: BZ,
@@ -264,11 +269,11 @@ function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus:
       acr.terminals.push({ id: 'trig', pol: 'sig', side: 'N', label: 'D+' });
       b.wire('sig', [engineNode, 'run'], [acr, 'trig'], { amps: 0, len: crankLen });
     }
-    const fr = b.protection(Math.min(altA, acrR), { what: `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (each side)`, fix: ALT_FIX, nodes: ['acr-fuse-house', 'acr-fuse-start'] }, 'feeder-fuse');
+    const fr = b.protection(altA, { what: `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (each side)`, fix: ALT_FIX, nodes: ['acr-fuse-house', 'acr-fuse-start'] }, 'feeder-fuse');
     const cls = fuseClassFor(fr, { mainFeeder: true });
     const fa = b.add('fuse', 'acr-fuse-house', `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (house side)`, { zone: BZ, col: 5, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });
     const fb = b.add('fuse', 'acr-fuse-start', `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (start side)`, { zone: startBus.zone, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });
-    const o = { amps: Math.min(altA, acrR), protect: fr, len: 1.5 };
+    const o = { amps: altA, protect: fr, len: 1.5 };
     b.wire('pos', [posBus, b.stud(posBus)], [fa, 'in'], { ...o, len: 0.5 });
     b.wire('pos', [fa, 'out'], [acr, 'a'], { ...o, protectedBy: fa.id });
     b.wire('pos', [acr, 'b'], [fb, 'in'], { ...o, protectedBy: fb.id });

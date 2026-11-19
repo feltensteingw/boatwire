@@ -169,7 +169,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'beyond-sizes': {
     title: 'Bigger than the largest part',
-    why: 'Fuses, breakers, switches, relays and controllers come in standard sizes, up to a largest one. When a circuit needs more, BoatWire still draws the largest so the diagram is complete, and reports it: an error when that part is smaller than the current through it, a warning when only its safety margin is short or when a controller simply cannot deliver everything. Its cables are still sized for the full current. The cure is less current through one part: a higher system voltage (24 V halves the current), the load split across two circuits, banks or controllers, or a dedicated circuit with a larger part.',
+    why: 'Fuses, breakers, switches, relays and controllers come in standard sizes, up to a largest one. When a circuit needs more, BoatWire still draws the largest so the diagram is complete, and reports it: an error when that part is smaller than the current through it, a warning when only its safety margin is short or when a controller simply cannot deliver everything. Its cables are still sized for the full current. The cure is less current through one part: a higher system voltage (24 V halves the current), the load split across two circuits, banks or controllers, a smaller generator or inverter, or a dedicated circuit with a larger part.',
   },
   'voltage-choice': {
     title: 'System voltage',

@@ -20,9 +20,17 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
 
   const acV = acStd.volts;
   const minBrk = b.us ? 15 : 10;
-  /** AC breaker for `a` amps. AC parts that are too big are split, not moved to a higher DC voltage. */
-  const acBrk = (a: number, what: string, nodes?: string[]) =>
-    Math.max(minBrk, b.protection(a, { what, fix: 'Split the load across two circuits, or use a larger dedicated circuit with its own breaker and cable.', nodes }, 'breaker-ac'));
+  /**
+   * AC breaker for `a` amps. An appliance too big for one is split or given its own circuit; a
+   * source (generator or inverter) puts its whole output through one breaker, so splitting the loads
+   * does not help, and the fix is a smaller source or a larger breaker.
+   */
+  const acBrk = (a: number, what: string, nodes?: string[], source?: 'generator' | 'inverter') => {
+    const fix = source
+      ? `Choose a smaller ${source}${b.us ? ' or one with 120/240 V output (which splits the current between two legs)' : ''}, or fit a breaker rated for its full output.`
+      : 'Split the load across two circuits, or use a larger dedicated circuit with its own breaker and cable.';
+    return Math.max(minBrk, b.protection(a, { what, fix, nodes }, 'breaker-ac'));
+  };
   const acGnd = b.add('ac-ground-bus', 'ac-gnd', 'AC grounding bus', { zone: PZ, notes: ['ac-dc-bond'] });
   let sourceOut: End | undefined;
   let sourceAmps = 0;
@@ -49,7 +57,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
   if (genset) {
     const GW = num(genset, 'watts');
     const GA = GW / acV;
-    const gR = acBrk(GA, 'Generator main breaker', ['gen-brk']);
+    const gR = acBrk(GA, 'Generator main breaker', ['gen-brk'], 'generator');
     const g = b.add('generator', 'genset', genset.name, { zone: genset.zone, equipmentId: genset.id, sublabel: `${GW} W`, data: { watts: GW, amps: GA } });
     const gb = b.add('elci', 'gen-brk', 'Generator main breaker', { zone: genset.zone, sublabel: `${gR} A`, data: { rating: gR } });
     b.wire('ac', [g, 'l'], [gb, 'in'], { amps: GA, protect: gR, len: 2 });
@@ -98,7 +106,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     if (sourceOut) {
       b.wire('ac', sourceOut, [node, 'acin'], { amps: sourceAmps, protect: sourceAmps, len: run(srcZone, node.zone) });
     }
-    const mainA = sourceOut ? sourceAmps : acBrk(outA, 'AC panel main breaker', ['ac-panel']);
+    const mainA = sourceOut ? sourceAmps : acBrk(outA, 'AC panel main breaker', ['ac-panel'], 'inverter');
     mainPanel = acPanel('ac-panel', 'AC panel', mainA, sourceOut ? 'Inverter-backed' : 'Inverter only');
     b.wire('ac', [node, 'acout'], [mainPanel, 'in'], { amps: Math.max(outA, sourceAmps), protect: mainA, len: run(node.zone, PZ) });
     if (sourceOut && (shoreOnlyLoads.length || chargers.length)) {
@@ -113,7 +121,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     if (sourceOut) {
       const ats = b.add('transfer-switch', 'ats', 'Automatic transfer switch', { zone: PZ, sublabel: 'Shore/gen priority', data: { rating: sourceAmps }, notes: ['source-selector'] });
       b.wire('ac', sourceOut, [ats, 'in1'], { amps: sourceAmps, protect: sourceAmps, len: run(srcZone, PZ) });
-      b.wire('ac', [node, 'acout'], [ats, 'in2'], { amps: outA, protect: acBrk(outA, `${node.label} AC output`, [node.id, 'ats']), len: run(node.zone, PZ) });
+      b.wire('ac', [node, 'acout'], [ats, 'in2'], { amps: outA, protect: acBrk(outA, `${node.label} AC output`, [node.id, 'ats'], 'inverter'), len: run(node.zone, PZ) });
       mainPanel = acPanel('ac-panel', 'AC panel', sourceAmps, 'Inverter-backed');
       b.wire('ac', [ats, 'out'], [mainPanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: 2 });
       if (shoreOnlyLoads.length || chargers.length) {
@@ -121,7 +129,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
         b.wire('ac', sourceOut, [shorePanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: 2, notes: ['shore-only', 'charger-not-on-inverter'] });
       }
     } else {
-      const mainA = acBrk(outA, 'AC panel main breaker', ['ac-panel']);
+      const mainA = acBrk(outA, 'AC panel main breaker', ['ac-panel'], 'inverter');
       mainPanel = acPanel('ac-panel', 'AC panel', mainA, 'Inverter only');
       b.wire('ac', [node, 'acout'], [mainPanel, 'in'], { amps: outA, protect: mainA, len: run(node.zone, PZ) });
     }

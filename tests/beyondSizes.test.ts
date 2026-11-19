@@ -99,9 +99,23 @@ describe('every part of the generator reports a current beyond its largest size'
     const p = boat((q) => void (the(q, 'inverter-charger').props.watts = 8000));
     const d = generateIdeal(p);
     expect(about(d, 'Main DC current')).toEqual([
-      expect.objectContaining({ severity: 'error', message: 'Main DC current (~915 A) is beyond practical fuse and switch sizes.', nodes: ['house0-fuse'] }),
+      expect.objectContaining({
+        severity: 'error',
+        message: 'Main DC current (~915 A) is beyond practical fuse and switch sizes. The 800 A fuse, switch and buses shown are too small for that current.',
+        // Show highlights every part rated from the main fuse
+        nodes: ['house0-fuse', 'house-switch', 'pos-bus', 'neg-bus'],
+      }),
     ]);
     expect(rating(d, 'house0-fuse')).toBe(800);
+    // 704 A: the 800 A parts carry the current, but the fuse has too little margin
+    const margin = generateIdeal(boat((q) => void (the(q, 'inverter-charger').props.watts = 6000)));
+    expect(about(margin, 'Main DC current').map((f) => f.message)).toEqual(['Main DC current (~704 A) is beyond practical fuse and switch sizes. The 800 A fuse shown leaves too little margin.']);
+    // with an external BMS, its disconnect contactor is rated from the main fuse too
+    const bms = boat((q) => {
+      the(q, 'inverter-charger').props.watts = 8000;
+      Object.assign(q.equipment.find((e) => e.kind === 'battery-bank' && e.props.role === 'house')!.props, { chemistry: 'lifepo4', bms: 'external' });
+    });
+    expect(about(generateIdeal(bms), 'Main DC current')[0].nodes).toContain('house-contactor');
     const mainCable = d.wires.find((w) => w.from.node === 'house0-bat' && w.to.node === 'house0-fuse')!;
     expect(mainCable.amps).toBe(915.4);
     expect(mainCable.cable).toBe('3× 4/0');
@@ -178,6 +192,8 @@ describe('every part of the generator reports a current beyond its largest size'
     ]);
     const big = generateIdeal(boat((p) => void (the(p, 'engine').props.starterAmps = 400)));
     expect(about(big, 'Start battery fuse').map((f) => f.severity)).toEqual(['error']);
+    // an ANL fuse stops at 750 A, so only a Class T is suggested for 800 A
+    expect(about(big, 'Start battery fuse')[0].fix).toBe('Fit a larger start fuse (Class T, about 800 A) or the size the engine maker recommends, and check the starter current entered.');
     expect(beyond(generateIdeal(exampleProject()))).toEqual([]);
 
     const iso = generateIdeal(boat((p) => void Object.assign(the(p, 'engine').props, { alternatorAmps: 400, chargeSplit: 'isolator-fet' })));
@@ -189,6 +205,15 @@ describe('every part of the generator reports a current beyond its largest size'
     expect(about(alt, 'Alternator output fuse').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['warning', 'Alternator output fuse should be at least 875 A for about 700 A']]);
     const huge = generateIdeal(boat((p) => void (the(p, 'engine').props.alternatorAmps = 900)));
     expect(about(huge, 'Alternator output fuse').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['error', 'Alternator output fuse carries about 900 A']]);
+
+    // the charging relay carries the alternator's output on to the house bank; the largest is 500 A
+    for (const [split, what] of [['auto', 'Automatic charging relay'], ['relay-run', 'Charging relay']]) {
+      const relay = generateIdeal(boat((p) => void Object.assign(the(p, 'engine').props, { alternatorAmps: 520, chargeSplit: split })));
+      expect(about(relay, what).map((f) => [f.severity, f.message.split(',')[0], f.nodes])).toEqual([['error', `${what} carries about 520 A`, ['acr']]]);
+      expect(rating(relay, 'acr')).toBe(500);
+      // and its cables are labelled and sized for the 520 A
+      expect(relay.wires.filter((w) => w.kind === 'pos' && (w.to.node === 'acr' || w.from.node === 'acr')).map((w) => w.amps)).toEqual([520, 520]);
+    }
   });
 
   it('renewables: an MPPT controller and the PV disconnect', () => {
@@ -232,9 +257,10 @@ describe('every part of the generator reports a current beyond its largest size'
       add(q, 'air-conditioner', { watts: 7000 }, 'Air conditioner');
     });
     const gen = generateIdeal(p);
-    expect(beyond(gen).map((f) => [f.severity, f.message.split(',')[0]])).toEqual([
-      ['error', 'Generator main breaker carries about 67 A'],
-      ['error', 'Air conditioner breaker carries about 58 A'],
+    expect(beyond(gen).map((f) => [f.severity, f.message.split(',')[0], f.fix])).toEqual([
+      // a source's whole output goes through its breaker, so splitting the loads would not help
+      ['error', 'Generator main breaker carries about 67 A', 'Choose a smaller generator or one with 120/240 V output (which splits the current between two legs), or fit a breaker rated for its full output.'],
+      ['error', 'Air conditioner breaker carries about 58 A', 'Split the load across two circuits, or use a larger dedicated circuit with its own breaker and cable.'],
     ]);
     // the cables are sized for the current, not the 50 A breakers, so the check finds nothing else
     const genCable = gen.wires.find((w) => w.from.node === 'genset' && w.kind === 'ac')!;
@@ -243,6 +269,9 @@ describe('every part of the generator reports a current beyond its largest size'
     // the same equipment on 230 V draws less than half the current
     p.profile.acStandard = 'eu230';
     expect(beyond(generateIdeal(p))).toEqual([]);
+    // a bigger generator on 230 V: no 120/240 V advice
+    p.equipment.find((e) => e.kind === 'generator')!.props.watts = 12000;
+    expect(about(generateIdeal(p), 'Generator main breaker')[0].fix).toBe('Choose a smaller generator, or fit a breaker rated for its full output.');
 
     const invOnly = boat((q) => {
       q.equipment = q.equipment.filter((e) => e.kind !== 'shore-power' && e.kind !== 'inverter-charger');
@@ -250,6 +279,7 @@ describe('every part of the generator reports a current beyond its largest size'
     });
     const only = generateIdeal(invOnly, V24);
     expect(about(only, 'AC panel main breaker').map((f) => [f.severity, f.message.split(',')[0], f.nodes])).toEqual([['error', 'AC panel main breaker carries about 67 A', ['ac-panel']]]);
+    expect(about(only, 'AC panel main breaker')[0].fix).toMatch(/^Choose a smaller inverter/);
     const acOut = only.wires.find((w) => w.from.node === 'inv' && w.kind === 'ac')!;
     expect(acOut.amps).toBe(66.7);
     expect(ampacity(acOut.gauge!, false, true)).toBeGreaterThanOrEqual(66.7);
