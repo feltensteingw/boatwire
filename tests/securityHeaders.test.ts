@@ -34,6 +34,14 @@ describe('content-security policy in firebase.json', () => {
     expect(sources('img-src')).toContain('https://*.googleusercontent.com');
   });
 
+  it("allows Firestore's connection-check image, and nothing else on www.google.com", () => {
+    // Firestore's WebChannel transport loads www.google.com/images/cleardot.gif when a request
+    // fails (network blip). Allowing exactly that file keeps the console free of policy errors.
+    const img = sources('img-src');
+    expect(img).toContain('https://www.google.com/images/cleardot.gif');
+    expect(img.filter((s) => s.includes('www.google.com'))).toEqual(['https://www.google.com/images/cleardot.gif']);
+  });
+
   it('lets PDF import decode JPEG 2000 (WebAssembly) without allowing eval', () => {
     expect(sources('script-src')).toContain("'wasm-unsafe-eval'");
     expect(sources('script-src')).not.toContain("'unsafe-eval'");

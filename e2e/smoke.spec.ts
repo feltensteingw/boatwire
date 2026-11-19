@@ -348,6 +348,45 @@ test('the content-security policy from firebase.json is enforced here, and the a
   expect(errors.filter((e) => e.includes('Executing inline script'))).toHaveLength(1);
 });
 
+test("under the content-security policy, Firestore's connection-check image loads, and nothing else from www.google.com", async ({
+  page,
+}) => {
+  // When a Firestore request fails (wifi drops, laptop sleeps), its WebChannel transport loads
+  // https://www.google.com/images/cleardot.gif?zx=<random> to test the connection. The policy
+  // allows exactly that file, so a signed-in owner never sees a policy error from a network blip.
+  // Served locally here: no test reaches the real internet.
+  await page.route('https://www.google.com/**', (route) =>
+    route.fulfill({ contentType: 'image/gif', body: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') }),
+  );
+  const errors = await openFresh(page);
+  const result = await page.evaluate(
+    () =>
+      new Promise<Record<string, string>>((done) =>
+        // from a timer, so the page's policy (not Playwright's evaluate call) governs the loads
+        setTimeout(() => {
+          const out: Record<string, string> = {};
+          const violations: string[] = [];
+          document.addEventListener('securitypolicyviolation', (e) => violations.push(e.blockedURI));
+          const load = (name: string, src: string) =>
+            new Promise<void>((settled) => {
+              const img = new Image();
+              img.onload = () => ((out[name] = 'loaded'), settled());
+              img.onerror = () => ((out[name] = 'refused'), settled());
+              img.src = src;
+            });
+          void Promise.all([
+            load('cleardot', 'https://www.google.com/images/cleardot.gif?zx=abc123'),
+            load('other', 'https://www.google.com/images/branding/logo.png'),
+          ]).then(() => setTimeout(() => done({ ...out, violations: violations.join(' ') }), 100));
+        }),
+      ),
+  );
+  expect(result.cleardot).toBe('loaded');
+  expect(result.other).toBe('refused');
+  expect(result.violations).toBe('https://www.google.com/images/branding/logo.png');
+  expect(errors.filter((e) => !e.includes('branding/logo.png'))).toEqual([]);
+});
+
 test('under the content-security policy, a scanned PDF whose picture is JPEG 2000 still imports', async ({ page }) => {
   // pdf.js decodes JPEG 2000 with WebAssembly inside its worker. A policy without
   // 'wasm-unsafe-eval' refuses that silently (no page-level report, no error): the picture comes out
