@@ -146,8 +146,27 @@ function buildAlternator(b: Builder, p: Plan, core: Core, e: EngineInfo) {
   if (useIso && startBus) alternatorThroughIsolator(b, p, core, a, startBus);
   else alternatorToHouse(b, p, core, a);
   alternatorRegulation(b, p, core, a);
+  if (needsDcdc && !lfp) {
+    // Lead-acid house, lithium start battery: with no relay to the start battery, the house bank is the
+    // only battery on the alternator, and the house battery switch can disconnect it.
+    alternatorProtection(b, a, 'alternator-disconnect');
+    b.find(
+      'info',
+      'alternator-disconnect',
+      'The start battery is charged through a DC-DC charger, so the house bank is the only battery on the alternator. Switching the house bank off with the engine running would leave the alternator with no battery, and the voltage spike can destroy it. The design adds an alternator protection device to absorb that spike.',
+      'Never switch the house bank off while the engine is running.',
+    );
+  }
   // (not needed when an isolator feeds both banks)
   if (startBus && !useIso) chargeStartFromHouse(b, p, core, a, startBus);
+}
+
+/** An alternator protection device on the alternator output, which absorbs the spike if its battery is disconnected while it charges. */
+function alternatorProtection(b: Builder, a: Alt, note: string) {
+  const { alt, engineNode, EZ } = a;
+  const apd = b.add('apd', 'alt-apd', 'Alternator protection device', { zone: EZ, data: { part: 'Alternator protection device (APD)' }, notes: [note] });
+  b.wire('pos', [alt, 'b'], [apd, 'b'], { amps: 5, protect: 10, len: 1, gauge: '10', engine: true });
+  b.wire('neg', [apd, 'neg'], [engineNode, 'neg'], { amps: 5, len: 1, gauge: '10', engine: true });
 }
 
 /** Lithium house, lead-acid start battery, stock regulator: the alternator charges the start battery, and a DC-DC charger carries the charge on to the house bank. */
@@ -226,15 +245,13 @@ function alternatorToHouse(b: Builder, p: Plan, core: Core, a: Alt) {
 function alternatorRegulation(b: Builder, p: Plan, core: Core, a: Alt) {
   const { lfp } = p;
   const { posBus, bms } = core;
-  const { alt, altLen, engineNode, extReg, EZ, startBus } = a;
+  const { alt, altLen, extReg, EZ, startBus } = a;
 
   if (lfp) {
     const reg = b.add('regulator', 'alt-reg', 'Smart alternator regulator', { zone: EZ, sublabel: 'Lithium profile, belt/temperature limiting', data: { part: 'External regulator (e.g. Wakespeed WS500 / Balmar MC-618)' }, notes: ['alternator-lfp'] });
-    const apd = b.add('apd', 'alt-apd', 'Alternator protection device', { zone: EZ, data: { part: 'Alternator protection device (APD)' }, notes: ['alternator-lfp'] });
     b.wire('sig', [reg, 'field'], [alt, 'field'], { amps: 0, len: 2 });
     b.wire('sig', [reg, 'sense'], [posBus, b.stud(posBus, { pol: 'sig', label: 'sense' })], { amps: 0, len: altLen });
-    b.wire('pos', [alt, 'b'], [apd, 'b'], { amps: 5, protect: 10, len: 1, gauge: '10', engine: true });
-    b.wire('neg', [apd, 'neg'], [engineNode, 'neg'], { amps: 5, len: 1, gauge: '10', engine: true });
+    alternatorProtection(b, a, 'alternator-lfp');
     if (bms) b.wire('sig', [bms, 'atc'], [reg, 'atc'], { amps: 0, len: altLen });
     if (!extReg && startBus) b.find('error', 'alternator-lfp', 'Lithium house bank and lithium start battery with a stock regulator: there is no lead-acid battery the alternator can charge directly.', 'Make the start battery lead-acid (alternator → start, DC-DC → house) or fit an external regulator.');
     else if (!extReg) b.find('error', 'alternator-lfp', 'Lithium house bank with the alternator wired to it but no start battery and a stock regulator.', 'Add a lead-acid start battery (alternator → start, DC-DC → house) or fit an external regulator.');

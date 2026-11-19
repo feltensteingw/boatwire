@@ -28,7 +28,7 @@ const SYMBOLS: [NodeType, string, string, Record<string, unknown>?][] = [
   ['mppt', 'Solar MPPT controller', 'Converts panel voltage down to battery voltage.'],
   ['alternator', 'Alternator', 'Engine-driven charging.'],
   ['regulator', 'Regulator / BMS', 'Smart control box: field control, cell monitoring.'],
-  ['apd', 'Alternator protection', 'Absorbs the spike if a lithium BMS disconnects.'],
+  ['apd', 'Alternator protection', 'Absorbs the spike if the alternator loses its battery while charging (a lithium BMS or a battery switch opens).'],
   ['inverter-charger', 'Inverter / charger', 'DC ↔ AC. Makes mains power from batteries and charges them on shore.'],
   ['shore-inlet', 'Shore inlet', 'Where the shore cord plugs in.'],
   ['elci', 'Main breaker + ELCI', 'Trips on leakage that could electrocute swimmers.'],
@@ -283,8 +283,8 @@ const SECTIONS: Section[] = [
         <p>
           Lithium needs its own charge profile and must never be paralleled with lead-acid. If its BMS disconnects while the alternator is charging, the voltage spike can destroy the alternator. So for a lithium house bank, BoatWire either charges the lead-acid start battery
           from the alternator and feeds the house bank through a <b>DC-DC charger</b>, or, with an <b>external regulator</b>, charges lithium directly with an <b>alternator protection device</b>. A lithium start battery with a lead-acid house bank works the other
-          way round: the alternator charges the house bank, and a DC-DC charger set to a lithium profile keeps the start battery charged. If both are lithium, the alternator needs an external regulator. Whenever either battery is lithium, relay and isolator options are
-          ignored, with a note explaining why.
+          way round: the alternator charges the house bank, and a DC-DC charger set to a lithium profile keeps the start battery charged. The house battery switch is then the only thing between the alternator and a battery, so the design adds an alternator
+          protection device: never switch the house bank off with the engine running. If both are lithium, the alternator needs an external regulator. Whenever either battery is lithium, relay and isolator options are ignored, with a note explaining why.
         </p>
       </>
     ),

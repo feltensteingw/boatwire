@@ -1633,13 +1633,13 @@ exports[`more generated designs are unchanged (fingerprint only) > lithium house
 
 exports[`more generated designs are unchanged (fingerprint only) > lithium house, no start battery, stock regulator (an error the design reports) 1`] = `"53 components, 80 wires, 3 findings, e660ca02aebf6ee8"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery 1`] = `"57 components, 85 wires, 2 findings, 513296cc6cd30e14"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery 1`] = `"58 components, 87 wires, 3 findings, e4176d58e2d50e38"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an ACR chosen, 24 V 1`] = `"62 components, 91 wires, 4 findings, 14d305c72303d46c"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an ACR chosen, 24 V 1`] = `"63 components, 93 wires, 5 findings, b0dc016018f0eb89"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an isolator chosen 1`] = `"57 components, 85 wires, 3 findings, 52aa2411077b5c12"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an isolator chosen 1`] = `"58 components, 87 wires, 4 findings, 09921dd01a527ef0"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with the charging relay chosen and an external regulator 1`] = `"58 components, 87 wires, 3 findings, 5807edf64b4468cb"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with the charging relay chosen and an external regulator 1`] = `"59 components, 89 wires, 4 findings, 1273a1da6750cc4b"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > no AC at all 1`] = `"46 components, 67 wires, 1 findings, c1f47eacb8813b74"`;
 

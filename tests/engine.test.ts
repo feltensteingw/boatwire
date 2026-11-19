@@ -288,6 +288,20 @@ describe('start battery and house bank of different chemistries', () => {
     expect(splitNote(d)).toBeUndefined();
   });
 
+  it('lithium start battery, lead-acid house: the house switch is the only thing between the alternator and a battery, so it gets alternator protection', () => {
+    for (const chargeSplit of ['auto', 'acr', 'relay-run', 'isolator-fet', 'isolator-diode'])
+      for (const regulator of ['internal', 'external']) {
+        const d = generateIdeal(boat('agm', 'lifepo4', { chargeSplit, regulator }));
+        const what = `${chargeSplit}, ${regulator}`;
+        expect(d.wires.some((w) => w.from.node === 'alternator' && w.from.term === 'b' && w.to.node === 'alt-apd'), what).toBe(true);
+        expect(d.findings.find((f) => f.rule === 'alternator-disconnect'), what).toMatchObject({ severity: 'info', fix: 'Never switch the house bank off while the engine is running.' });
+      }
+    // with a relay to a lead-acid start battery, that battery stays on the alternator: no APD, no note
+    const lead = generateIdeal(boat('agm', 'agm'));
+    expect(lead.nodes.some((n) => n.type === 'apd')).toBe(false);
+    expect(lead.findings.some((f) => f.rule === 'alternator-disconnect')).toBe(false);
+  });
+
   for (const split of ['acr', 'relay-run', 'isolator-fet', 'isolator-diode']) {
     for (const regulator of ['internal', 'external']) {
       it(`lithium start battery: "${split}" with the ${regulator} regulator becomes a DC-DC charger, with a note`, () => {
