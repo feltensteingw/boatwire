@@ -80,7 +80,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
       what: `${n.label} DC fuse`,
       fix: V === 12 ? 'Use 24 V, which halves the current, or a smaller inverter.' : 'Use a smaller inverter, or a higher system voltage.',
       nodes: [`${n.id}-fuse`],
-    });
+    }, 'feeder-fuse');
     const cls = fuseClassFor(r, { lithium: lfp, mainFeeder: true, atBattery: lfp });
     const f = b.add('fuse', `${n.id}-fuse`, `${n.label} DC fuse`, { zone: BZ, col: 4, sublabel: fuseLabel(r, cls), data: { rating: r, fuseClass: cls }, notes: ['inverter-fuse', ...(cls === 'Class T' ? ['class-t'] : [])] });
     b.wire('pos', [posBus, b.stud(posBus)], [f, 'in'], { amps: dcAmps, protect: r, len: 0.5 });

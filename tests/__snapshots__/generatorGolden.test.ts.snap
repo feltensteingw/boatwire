@@ -1587,17 +1587,19 @@ exports[`generated designs are unchanged > shore power and generator, separate i
 
 exports[`more generated designs are unchanged (fingerprint only) > FET battery isolator 1`] = `"56 components, 83 wires, 1 findings, 4076b5e4612110d3"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a 12 kW generator on 120 V (beyond the largest AC breaker, cables sized for the current) 1`] = `"60 components, 88 wires, 2 findings, d087a76345332695"`;
+exports[`more generated designs are unchanged (fingerprint only) > a 12 kW generator on 120 V (beyond the largest AC breaker, cables sized for the current) 1`] = `"60 components, 88 wires, 2 findings, 3ff329d361eb7aa8"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a 200 A starter (twice that is beyond the largest start fuse) 1`] = `"57 components, 84 wires, 2 findings, f6eaa09a0ad8b50f"`;
+exports[`more generated designs are unchanged (fingerprint only) > a 200 A starter (twice that is beyond the largest start fuse) 1`] = `"57 components, 84 wires, 2 findings, 43bb8ce048e9d25e"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a 1500 W solar array on 12 V (beyond the largest controller and PV breaker) 1`] = `"57 components, 84 wires, 3 findings, f42a9378e8dd479e"`;
+exports[`more generated designs are unchanged (fingerprint only) > a 1500 W solar array on 12 V (beyond the largest controller and PV breaker) 1`] = `"57 components, 84 wires, 3 findings, dfc5a7e9a9ee61f6"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > a 5000 W inverter/charger on 12 V (an 800 A Class T inverter fuse) 1`] = `"57 components, 84 wires, 8 findings, d3688c971a82a095"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > a big alternator (heavier charging relay) 1`] = `"57 components, 84 wires, 1 findings, 58bef5e611388fcd"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > a dedicated winch bank with no winch aboard 1`] = `"65 components, 95 wires, 2 findings, d4c4a11fd102cca2"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a very large inverter on 12 V (parallel cables, beyond fuse sizes) 1`] = `"57 components, 84 wires, 10 findings, 88179864121c2ab6"`;
+exports[`more generated designs are unchanged (fingerprint only) > a very large inverter on 12 V (parallel cables, beyond fuse sizes) 1`] = `"57 components, 84 wires, 10 findings, 10b495cc06b1c94b"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > an engine with no alternator 1`] = `"52 components, 76 wires, 1 findings, 1b7207b53bb27507"`;
 

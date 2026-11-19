@@ -154,6 +154,9 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   boat('a very large inverter on 12 V (parallel cables, beyond fuse sizes)', (p) => {
     the(p, 'inverter-charger').props.watts = 8000;
   }),
+  boat('a 5000 W inverter/charger on 12 V (an 800 A Class T inverter fuse)', (p) => {
+    the(p, 'inverter-charger').props.watts = 5000;
+  }),
   boat('a 12 kW generator on 120 V (beyond the largest AC breaker, cables sized for the current)', (p) => {
     p.equipment.push(newEquipment('generator', { props: { watts: 12000 } }));
   }),

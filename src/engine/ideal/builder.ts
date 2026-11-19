@@ -151,7 +151,8 @@ export class Builder {
     const max = list[list.length - 1];
     const amps = o.carries ?? need;
     const fix = o.fix ?? (this.V === 12 ? 'Use 24 V, which halves the current, split the load across two circuits, or use a larger dedicated circuit.' : 'Split the load across two circuits, or use a larger dedicated circuit.');
-    const largest = `the largest BoatWire can choose is ${max} A`;
+    // ("for it": each kind of part has its own list, so the largest fuse differs between a branch and the main fuse)
+    const largest = `the largest BoatWire can choose for it is ${max} A`;
     if (max >= amps) {
       this.find('warning', 'beyond-sizes', `${o.what} should be at least ${Math.ceil(need)} A for about ${Math.round(amps)} A, but ${largest}. The ${max} A shown leaves too little margin.`, fix, o.nodes);
     } else if (o.limitsItself) {
@@ -162,7 +163,10 @@ export class Builder {
     return max;
   }
 
-  /** Rating of the fuse or breaker for a continuous load of `loadAmps`. See rating() for a load too big for any. */
+  /**
+   * Rating of the fuse or breaker for a continuous load of `loadAmps`. See rating() for a load too
+   * big for any. Use `feeder-fuse` for a fuse on a main feeder or at a battery (a Class T above 300 A).
+   */
   protection(loadAmps: number, o: Omit<SizeOpts, 'carries' | 'limitsItself'>, kind: ProtectionKind = 'fuse'): number {
     return this.rating(protectionNeeded(loadAmps), PROTECTION_SIZES[kind], { ...o, carries: loadAmps });
   }

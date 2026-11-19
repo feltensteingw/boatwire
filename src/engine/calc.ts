@@ -1,6 +1,7 @@
 import {
   AC_CABLE_AMPACITY,
   ENGINE_SPACE_DERATE,
+  FUSE_CLASSES,
   INVERTER_EFFICIENCY,
   LOW_BATTERY_FACTOR,
   MIN_GAUGE_AC,
@@ -105,8 +106,17 @@ export function nextStandard(amps: number, list: readonly number[]): number | un
   return list.find((s) => s >= amps);
 }
 
-/** Standard sizes of each kind of protective device. */
-export const PROTECTION_SIZES = { fuse: STANDARD_FUSES, 'breaker-dc': STANDARD_BREAKERS_DC, 'breaker-ac': STANDARD_BREAKERS_AC } as const;
+/**
+ * Standard sizes of each kind of protective device. A `feeder-fuse` is on a main feeder or at a
+ * battery, where it is a Class T above 300 A (see fuseClassFor), so its sizes go on up to the
+ * largest Class T, as the main battery fuse does. Other fuses stop at the largest standard size.
+ */
+export const PROTECTION_SIZES = {
+  fuse: STANDARD_FUSES,
+  'feeder-fuse': [...STANDARD_FUSES, FUSE_CLASSES['Class T'].max],
+  'breaker-dc': STANDARD_BREAKERS_DC,
+  'breaker-ac': STANDARD_BREAKERS_AC,
+} as const;
 export type ProtectionKind = keyof typeof PROTECTION_SIZES;
 
 /** Rating a protective device needs for a continuous load, before rounding up to a standard size. */

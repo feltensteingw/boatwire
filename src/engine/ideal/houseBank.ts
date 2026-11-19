@@ -3,7 +3,7 @@
 
 import { FUSE_CLASSES, VDROP } from '../../model/standards';
 import type { DNode } from '../../model/types';
-import { fuseClassFor, nextStandard } from '../calc';
+import { fuseClassFor, nextStandard, PROTECTION_SIZES } from '../calc';
 import { daysText, energyBudget } from '../energy';
 import { bankSummary, fuseLabel, SWITCH_SIZES, type Builder } from './builder';
 import type { Plan } from './plan';
@@ -24,8 +24,8 @@ export interface Core {
   bms?: DNode;
 }
 
-/** Main battery fuse sizes, smallest first. The largest is the largest Class T fuse. */
-const MAIN_FUSE_SIZES = [100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 600, FUSE_CLASSES['Class T'].max];
+/** Main battery fuse sizes, smallest first: the feeder fuses from 100 A, up to the largest Class T. */
+const MAIN_FUSE_SIZES = PROTECTION_SIZES['feeder-fuse'].filter((s) => s >= 100);
 
 export function buildHouseBank(b: Builder, p: Plan): Core {
   const { project, scenario, V, BZ, lfp, extBms, house, mainAmps } = p;

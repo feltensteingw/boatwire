@@ -101,7 +101,7 @@ function buildAlternator(b: Builder, p: Plan, core: Core, e: EngineInfo) {
   const { engine, startBus, altA, extReg, EZ } = e;
 
   const alt = b.add('alternator', 'alternator', 'Alternator', { zone: EZ, sublabel: `${Math.round(altA)} A${extReg ? ' · ext. reg.' : ''}`, data: { amps: altA, part: `${num(engine, 'alternatorAmps')} A alternator` } });
-  const altFuseR = b.protection(altA, { what: 'Alternator output fuse', fix: ALT_FIX, nodes: ['alt-fuse'] });
+  const altFuseR = b.protection(altA, { what: 'Alternator output fuse', fix: ALT_FIX, nodes: ['alt-fuse'] }, 'feeder-fuse');
   const altFuseCls = fuseClassFor(altFuseR, { lithium: lfp, mainFeeder: true });
   const altLen = run(EZ, BZ);
   const split = String(engine.props.chargeSplit ?? 'auto');
@@ -264,7 +264,7 @@ function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus:
       acr.terminals.push({ id: 'trig', pol: 'sig', side: 'N', label: 'D+' });
       b.wire('sig', [engineNode, 'run'], [acr, 'trig'], { amps: 0, len: crankLen });
     }
-    const fr = b.protection(Math.min(altA, acrR), { what: `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (each side)`, fix: ALT_FIX, nodes: ['acr-fuse-house', 'acr-fuse-start'] });
+    const fr = b.protection(Math.min(altA, acrR), { what: `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (each side)`, fix: ALT_FIX, nodes: ['acr-fuse-house', 'acr-fuse-start'] }, 'feeder-fuse');
     const cls = fuseClassFor(fr, { mainFeeder: true });
     const fa = b.add('fuse', 'acr-fuse-house', `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (house side)`, { zone: BZ, col: 5, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });
     const fb = b.add('fuse', 'acr-fuse-start', `${wantsRunRelay ? 'Relay' : 'ACR'} fuse (start side)`, { zone: startBus.zone, sublabel: fuseLabel(fr, cls), data: { rating: fr, fuseClass: cls }, notes: ['battery-fuse'] });

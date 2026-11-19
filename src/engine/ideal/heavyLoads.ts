@@ -43,7 +43,7 @@ function dedicatedBank(b: Builder, p: Plan, core: Core, e: Equipment, role: stri
   const lfpBank = s.chem === 'lifepo4';
   const dcA = V === 12 ? 30 : 15;
   const loadAmps = Math.max(dcA, served.reduce((sum, l) => sum + l.amps, 0));
-  const rating = b.protection(loadAmps, { what: `${label} battery fuse`, fix: MOTOR_FIX(b), nodes: [`${key}-fuse`] });
+  const rating = b.protection(loadAmps, { what: `${label} battery fuse`, fix: MOTOR_FIX(b), nodes: [`${key}-fuse`] }, 'feeder-fuse');
   const cls = fuseClassFor(rating, { atBattery: true, lithium: lfpBank });
   // At least the fuse, and at least the current when no fuse is big enough for it.
   const swRating = b.rating(Math.max(rating, loadAmps), SWITCH_SIZES, { what: `${label} battery switch`, fix: MOTOR_FIX(b), nodes: [`${key}-switch`] });
@@ -98,7 +98,7 @@ export function buildHeavyLoads(b: Builder, p: Plan, core: Core, housePanel: { p
     let rating: number;
     if (l.heavy) {
       const useFuse = l.amps * 1.25 > STANDARD_BREAKERS_DC[STANDARD_BREAKERS_DC.length - 1];
-      rating = b.protection(l.amps, { what: `${l.e.name} ${useFuse ? 'fuse' : 'breaker'}`, fix: MOTOR_FIX(b), nodes: [`prot-${l.e.id}`] }, useFuse ? 'fuse' : 'breaker-dc');
+      rating = b.protection(l.amps, { what: `${l.e.name} ${useFuse ? 'fuse' : 'breaker'}`, fix: MOTOR_FIX(b), nodes: [`prot-${l.e.id}`] }, useFuse ? 'feeder-fuse' : 'breaker-dc');
       const cls = useFuse ? fuseClassFor(rating, { lithium: lfp, mainFeeder: true }) : undefined;
       prot = useFuse
         ? b.add('fuse', `prot-${l.e.id}`, `${l.e.name} fuse`, { zone: srcZone, col: 6, sublabel: fuseLabel(rating, cls!), data: { rating, fuseClass: cls }, notes: ['heavy-load'] })

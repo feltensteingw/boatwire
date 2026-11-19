@@ -40,6 +40,10 @@ describe('picking a standard size', () => {
     expect(protectionFor(41, 'breaker-ac')).toBeUndefined();
     expect(protectionFor(120, 'breaker-dc')).toBe(150);
     expect(protectionFor(121, 'breaker-dc')).toBeUndefined();
+    // a fuse on a main feeder or at a battery is a Class T above 300 A, so it goes on to 800 A like the main fuse
+    expect(protectionFor(481, 'feeder-fuse')).toBe(800);
+    expect(protectionFor(640, 'feeder-fuse')).toBe(800);
+    expect(protectionFor(641, 'feeder-fuse')).toBeUndefined();
   });
 
   it('the builder draws the largest size and reports it: an error below the current, a warning when only the margin is short', () => {
@@ -51,9 +55,9 @@ describe('picking a standard size', () => {
     expect(b.rating(1000, [100, 800], { what: 'Short margin', carries: 700 })).toBe(800);
     expect(b.rating(1000, [100, 800], { what: 'Limits itself', carries: 900, limitsItself: true })).toBe(800);
     expect(b.findings.map((f) => [f.severity, f.message])).toEqual([
-      ['error', 'Too small carries about 900 A, but the largest BoatWire can choose is 800 A. The 800 A shown is too small for that current.'],
-      ['warning', 'Short margin should be at least 1000 A for about 700 A, but the largest BoatWire can choose is 800 A. The 800 A shown leaves too little margin.'],
-      ['warning', 'Limits itself would need to handle about 900 A, but the largest BoatWire can choose is 800 A. The 800 A shown limits its own output, so it cannot deliver all of it.'],
+      ['error', 'Too small carries about 900 A, but the largest BoatWire can choose for it is 800 A. The 800 A shown is too small for that current.'],
+      ['warning', 'Short margin should be at least 1000 A for about 700 A, but the largest BoatWire can choose for it is 800 A. The 800 A shown leaves too little margin.'],
+      ['warning', 'Limits itself would need to handle about 900 A, but the largest BoatWire can choose for it is 800 A. The 800 A shown limits its own output, so it cannot deliver all of it.'],
     ]);
     expect(b.findings[0].nodes).toEqual(['x']);
     expect(b.findings.every((f) => f.rule === 'beyond-sizes' && f.fix?.startsWith('Use 24 V'))).toBe(true);
@@ -111,19 +115,24 @@ describe('every part of the generator reports a current beyond its largest size'
   it('heavy loads: a thruster fuse and contactor, on the house bank or its own bank', () => {
     const p = boat((q) => void add(q, 'bow-thruster', { watts: 8000 }, 'Bow thruster'));
     const d = generateIdeal(p);
+    // 667 A: the 800 A Class T fuse is above the current, but without its 25% margin; the contactor is below it
     expect(about(d, 'Bow thruster').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([
-      ['error', 'Bow thruster fuse carries about 667 A'],
+      ['warning', 'Bow thruster fuse should be at least 834 A for about 667 A'],
       ['error', 'Bow thruster contactor carries about 667 A'],
     ]);
     expect(about(d, 'Bow thruster')[0].fix).toBe('Use 24 V, which halves the current, or choose a smaller model.');
 
-    // 583 A: the 600 A fuse is above the current, but without its 25% margin
-    const q = boat((r) => void add(r, 'bow-thruster', { watts: 7000 }, 'Bow thruster'));
-    expect(about(generateIdeal(q), 'Bow thruster').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['warning', 'Bow thruster fuse should be at least 730 A for about 583 A']]);
+    // 583 A: an 800 A Class T, the same family and top size as the main fuse, so nothing to report
+    const q = exampleProject();
+    const thruster = add(q, 'bow-thruster', { watts: 7000 }, 'Bow thruster');
+    const seven = generateIdeal(q);
+    expect(about(seven, 'Bow thruster')).toEqual([]);
+    expect(seven.nodes.find((n) => n.id === `prot-${thruster.id}`)?.sublabel).toBe('800 A Class T');
 
     add(p, 'battery-bank', { role: 'thruster', chemistry: 'agm', unitVolts: 12, unitAh: 100, units: 4 }, 'Thruster battery');
     const ded = generateIdeal(p);
-    expect(about(ded, 'Thruster battery').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['error', 'Thruster battery fuse carries about 667 A']]);
+    expect(about(ded, 'Thruster battery').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['warning', 'Thruster battery fuse should be at least 834 A for about 667 A']]);
+    expect(rating(ded, 'th-fuse')).toBe(800);
     // the bank's switch is sized for the current, which the 800 A switch carries
     expect(rating(ded, 'th-switch')).toBe(800);
   });
@@ -136,7 +145,7 @@ describe('every part of the generator reports a current beyond its largest size'
     expect(about(d, 'DC panel main breaker')).toEqual([
       expect.objectContaining({
         severity: 'error',
-        message: 'DC panel main breaker carries about 163 A, but the largest BoatWire can choose is 150 A. The 150 A shown is too small for that current.',
+        message: 'DC panel main breaker carries about 163 A, but the largest BoatWire can choose for it is 150 A. The 150 A shown is too small for that current.',
         fix: 'Split the loads between two panels, each with its own feeder and main breaker, or use 24 V, which halves the current.',
         nodes: ['dc-panel'],
       }),
@@ -163,7 +172,7 @@ describe('every part of the generator reports a current beyond its largest size'
     expect(about(typical, 'Start battery fuse')).toEqual([
       expect.objectContaining({
         severity: 'warning',
-        message: 'Start battery fuse should be at least 400 A for about 200 A, but the largest BoatWire can choose is 300 A. The 300 A shown leaves too little margin.',
+        message: 'Start battery fuse should be at least 400 A for about 200 A, but the largest BoatWire can choose for it is 300 A. The 300 A shown leaves too little margin.',
         fix: 'Fit a larger start fuse (Class T or ANL, about 400 A) or the size the engine maker recommends, and check the starter current entered.',
       }),
     ]);
@@ -175,8 +184,11 @@ describe('every part of the generator reports a current beyond its largest size'
     expect(about(iso, 'FET battery isolator').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['error', 'FET battery isolator carries about 400 A']]);
     expect(rating(iso, 'alt-isolator')).toBe(350);
 
+    // the alternator fuse is a Class T above 300 A, so it goes to 800 A
     const alt = generateIdeal(boat((p) => void (the(p, 'engine').props.alternatorAmps = 700)));
-    expect(about(alt, 'Alternator output fuse').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['error', 'Alternator output fuse carries about 700 A']]);
+    expect(about(alt, 'Alternator output fuse').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['warning', 'Alternator output fuse should be at least 875 A for about 700 A']]);
+    const huge = generateIdeal(boat((p) => void (the(p, 'engine').props.alternatorAmps = 900)));
+    expect(about(huge, 'Alternator output fuse').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['error', 'Alternator output fuse carries about 900 A']]);
   });
 
   it('renewables: an MPPT controller and the PV disconnect', () => {
@@ -207,7 +219,13 @@ describe('every part of the generator reports a current beyond its largest size'
     expect(about(inv, 'Inverter/charger DC fuse')).toEqual([
       expect.objectContaining({ severity: 'error', fix: 'Use 24 V, which halves the current, or a smaller inverter.', nodes: ['ic-fuse'] }),
     ]);
-    expect(about(inv, 'Inverter/charger DC fuse')[0].message.split(',')[0]).toBe('Inverter/charger DC fuse carries about 847 A');
+    expect(about(inv, 'Inverter/charger DC fuse')[0].message).toBe(
+      'Inverter/charger DC fuse carries about 847 A, but the largest BoatWire can choose for it is 800 A. The 800 A shown is too small for that current.',
+    );
+    // the same 800 A Class T top as the main fuse, so a 5000 W inverter/charger (529 A) fits
+    const five = generateIdeal(boat((p) => void (the(p, 'inverter-charger').props.watts = 5000)));
+    expect(five.nodes.find((n) => n.id === 'ic-fuse')?.sublabel).toBe('800 A Class T');
+    expect(beyond(five)).toEqual([]);
 
     const p = boat((q) => {
       add(q, 'generator', { watts: 8000 }, 'Generator');
