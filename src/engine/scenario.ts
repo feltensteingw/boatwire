@@ -11,12 +11,21 @@ export function scenarioVoltage(project: Project, scenario?: Scenario): SystemVo
 /**
  * Equipment list with scenario overrides applied (house bank chemistry and
  * capacity). Capacity overrides are distributed by changing the unit count.
+ *
+ * Every battery bank is kept buildable at the scenario's voltage: a single 12 V start battery
+ * becomes two in series in a 24 V what-if, as the house bank always has.
  */
 export function effectiveEquipment(project: Project, scenario?: Scenario): Equipment[] {
   if (!scenario) return project.equipment;
   const V = scenarioVoltage(project, scenario);
   return project.equipment.map((e) => {
-    if (e.kind !== 'battery-bank' || e.props.role !== 'house') return e;
+    if (e.kind !== 'battery-bank') return e;
+    if (e.props.role !== 'house') {
+      // Start and dedicated banks: only the count changes, and only when it has to.
+      const series = Math.max(1, Math.round(V / (Number(e.props.unitVolts) || 12)));
+      const units = Number(e.props.units) || 1;
+      return units % series === 0 ? e : { ...e, props: { ...e.props, units: Math.ceil(units / series) * series } };
+    }
     const props = { ...e.props };
     if (scenario.houseChemistry) {
       props.chemistry = scenario.houseChemistry;

@@ -347,7 +347,7 @@ cont-windlass <contactor> "Anchor windlass (1000 W) contactor" · @bow · rating
 ld-windlass <load> "Anchor windlass (1000 W)" · [1000 W · 41.7 A] · @bow · eq:windlass · amps=41.67 watts=1000 critical=false kind=windlass v24ok=true volts=24 glyph=WL · notes heavy-load · terms pos,neg
 helm-windlass <helm-switch> "Anchor windlass (1000 W) control" · @cockpit · notes heavy-load · terms out
 engine <engine> "Diesel engine (40 hp)" · [Starter ~75 A] · @engine · eq:engine · amps=75 kind=engine glyph=ENG · notes starter-exempt,common-negative · terms pos,neg,run
-start-bat <battery> "Start battery" · [1× 12 V 90 Ah AGM · 2S0P = 24 V 0 Ah] · @battery · eq:battery-bank-2 · chemistry=agm ah=0 volts=24 · notes house-start-split · terms pos,neg
+start-bat <battery> "Start battery" · [2× 12 V 90 Ah AGM · 2S1P = 24 V 90 Ah] · @battery · eq:battery-bank-2 · chemistry=agm ah=90 volts=24 · notes house-start-split · terms pos,neg
 start-fuse <fuse> "Start battery fuse" · [150 A MRBF] · @battery · rating=150 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
 start-switch <switch> "Start battery switch" · @battery · rating=300 · notes battery-switch · terms in,out
 start-bus <bus-pos> "Start positive bus" · @battery · terms s1,s2,s3
@@ -480,7 +480,7 @@ g1 warning bank-sizing: House bank is 200 Ah; daily use is ~92 Ah, which suggest
 g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel."
 `;
 
-exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"49c90ebe093250ec"`;
+exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"e1dc8830bdbf9a0d"`;
 
 exports[`generated designs are unchanged > 230 V shore power, metric units > design 1`] = `
 "Ideal (ideal), 12 V: 57 components, 84 wires, 1 findings
@@ -696,7 +696,7 @@ cont-windlass <contactor> "Anchor windlass (1000 W) contactor" · @bow · rating
 ld-windlass <load> "Anchor windlass (1000 W)" · [1000 W · 41.7 A] · @bow · eq:windlass · amps=41.67 watts=1000 critical=false kind=windlass v24ok=true volts=24 glyph=WL · notes heavy-load · terms pos,neg
 helm-windlass <helm-switch> "Anchor windlass (1000 W) control" · @cockpit · notes heavy-load · terms out,in
 engine <engine> "Diesel engine (40 hp)" · [Starter ~75 A] · @engine · eq:engine · amps=75 kind=engine glyph=ENG · notes starter-exempt,common-negative · terms pos,neg,run
-start-bat <battery> "Start battery" · [1× 12 V 90 Ah AGM · 2S0P = 24 V 0 Ah] · @battery · eq:battery-bank-2 · chemistry=agm ah=0 volts=24 · notes house-start-split · terms pos,neg
+start-bat <battery> "Start battery" · [2× 12 V 90 Ah AGM · 2S1P = 24 V 90 Ah] · @battery · eq:battery-bank-2 · chemistry=agm ah=90 volts=24 · notes house-start-split · terms pos,neg
 start-fuse <fuse> "Start battery fuse" · [150 A MRBF] · @battery · rating=150 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
 start-switch <switch> "Start battery switch" · @battery · rating=300 · notes battery-switch · terms in,out
 start-bus <bus-pos> "Start positive bus" · @battery · terms s1,s2,s3
@@ -869,7 +869,7 @@ g1 warning bank-sizing: House bank is 200 Ah; daily use is ~94 Ah, which suggest
 g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel."
 `;
 
-exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > fingerprint 1`] = `"335e10e01d66401a"`;
+exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > fingerprint 1`] = `"7b44c5cd54d9dbda"`;
 
 exports[`generated designs are unchanged > diode battery isolator with an excitation wire > design 1`] = `
 "Ideal (ideal), 12 V: 56 components, 84 wires, 1 findings
@@ -1607,7 +1607,7 @@ exports[`more generated designs are unchanged (fingerprint only) > equipment in 
 
 exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 12 V lithium 1`] = `"57 components, 86 wires, 1 findings, 696e57e8d80176dc"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 24 V lithium 1`] = `"62 components, 92 wires, 2 findings, 79860cb529be8249"`;
+exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 24 V lithium 1`] = `"62 components, 92 wires, 2 findings, ab6b19719247fd3b"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > generator only, no shore power 1`] = `"56 components, 84 wires, 1 findings, 79b9c3ba7aa03962"`;
 
