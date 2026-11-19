@@ -147,7 +147,7 @@ const SECTIONS: Section[] = [
       <>
         <ul>
           <li>
-            <b>DC system voltage</b>: 12 V or 24 V. Scenarios can override it, so you can compare both without changing anything here.
+            <b>DC system voltage</b>: 12 V or 24 V. Scenarios can override it, so you can compare both without changing anything here. Every battery bank must make this voltage, for example 12 V batteries in pairs for 24 V. A bank that cannot is drawn as you listed it, labelled “cannot make 24 V”, and shown as an error.
           </li>
           <li>
             <b>AC standard</b>: 120 V / 60 Hz (North America) or 230 V / 50 Hz. This sets AC cable sizes and outlet types.
@@ -307,6 +307,9 @@ const SECTIONS: Section[] = [
           </li>
           <li>
             <b>+ New scenario</b> adds one; edit its settings in the column header. <b>View diagram →</b> opens it.
+          </li>
+          <li>
+            A scenario keeps every battery bank buildable at its voltage. When that takes a different number of batteries from your equipment list, a design note says what it assumed: for example two 12 V start batteries in series for 24 V. Your equipment list is not changed.
           </li>
         </ul>
       </>

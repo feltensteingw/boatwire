@@ -6,7 +6,7 @@ import { fuseClassFor, nextStandard, protectionFor } from '../calc';
 import { num } from '../energy';
 import { bankSummary, fuseLabel, type Builder, type WOpts } from './builder';
 import type { Core } from './houseBank';
-import type { Plan } from './plan';
+import { reportBank, type Plan } from './plan';
 
 /** The engine as drawn, for the alternator wiring that hangs off it. */
 interface EngineInfo {
@@ -58,6 +58,7 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBus?: DNode
   if (startBank) {
     const s = bankSummary(startBank, V);
     const sbat = b.add('battery', 'start-bat', startBank.name, { zone: startBank.zone || BZ, equipmentId: startBank.id, sublabel: s.text, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['house-start-split'] });
+    reportBank(b, p, startBank, s, sbat);
     const sfRating = nextStandard(starterA * 2, [100, 150, 200, 250, 300]);
     const sfClass = fuseClassFor(sfRating, { atBattery: true, lithium: s.chem === 'lifepo4' });
     const sfuse = b.add('fuse', 'start-fuse', 'Start battery fuse', { zone: sbat.zone, sublabel: fuseLabel(sfRating, sfClass), data: { rating: sfRating, fuseClass: sfClass }, notes: ['battery-fuse', 'starter-exempt', ...(sfClass === 'Class T' ? ['class-t'] : [])] });

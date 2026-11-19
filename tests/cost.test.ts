@@ -42,8 +42,8 @@ describe('cost of a design', () => {
   it('prices every line of every generated design', () => {
     for (const b of [...SAMPLE_BOATS, ...FINGERPRINT_BOATS]) {
       const c = designCost(generateIdeal(b.project, b.scenario));
-      // (a bank that cannot be built at the system voltage holds 0 Ah as far as the design goes, and has no price)
-      expect(c.rows.filter((r) => r.cost === undefined && !/ 0 Ah/.test(r.spec)).map((r) => `${r.item} (${r.spec})`), b.name).toEqual([]);
+      // (a bank that cannot be built at the system voltage is priced as the batteries listed)
+      expect(c.rows.filter((r) => r.cost === undefined).map((r) => `${r.item} (${r.spec})`), b.name).toEqual([]);
       expect(c.total, b.name).toBeCloseTo(c.rows.reduce((s, r) => s + (r.cost ?? 0), 0), 6);
       expect(c.total).toBeCloseTo(c.byCategory.reduce((s, x) => s + x.cost, 0), 6);
     }

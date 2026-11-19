@@ -6,7 +6,7 @@ import type { DNode } from '../../model/types';
 import { fuseClassFor, nextStandard } from '../calc';
 import { daysText, energyBudget } from '../energy';
 import { bankSummary, fuseLabel, SWITCH_SIZES, type Builder } from './builder';
-import type { Plan } from './plan';
+import { reportBank, type Plan } from './plan';
 
 /** The backbone every other subsystem connects to. */
 export interface Core {
@@ -52,9 +52,6 @@ export function buildHouseBank(b: Builder, p: Plan): Core {
   house.forEach((h, i) => {
     const s = bankSummary(h, V);
     houseAhTotal += s.ah;
-    if (!s.valid) {
-      b.find('error', 'series-parallel', `${h.name}: ${s.units}× ${s.unitV} V batteries can't make a ${V} V bank (need a multiple of ${s.series}).`, `Use ${Math.ceil(s.units / s.series) * s.series} batteries or a different battery voltage.`);
-    }
     const bat = b.add('battery', `house${i}-bat`, h.name, {
       zone: h.zone || BZ,
       sublabel: s.text,
@@ -62,6 +59,7 @@ export function buildHouseBank(b: Builder, p: Plan): Core {
       data: { chemistry: s.chem, ah: s.ah, volts: V, bms: lfp ? String(h.props.bms ?? 'internal') : undefined, part: s.text },
       notes: ['series-parallel', ...(lfp ? ['no-mixed-chemistry'] : [])],
     });
+    reportBank(b, p, h, s, bat);
     const fuse = b.add('fuse', `house${i}-fuse`, 'House main fuse', {
       zone: bat.zone,
       sublabel: fuseLabel(mainFuseRating, mainFuseClass),
@@ -103,7 +101,7 @@ export function buildHouseBank(b: Builder, p: Plan): Core {
   // Bank sizing check
   const budget = energyBudget(project, scenario);
   if (budget.totalAhPerDay > 0 && houseAhTotal < budget.recommendedAh * 0.9) {
-    b.find('warning', 'bank-sizing', `House bank is ${houseAhTotal} Ah; daily use is ~${Math.round(budget.totalAhPerDay)} Ah, which suggests ~${budget.recommendedAh} Ah for ${daysText(budget.daysAutonomy)} at safe depth of discharge.`, 'Increase house capacity or reduce loads.');
+    b.find('warning', 'bank-sizing', `House bank is ${Math.round(houseAhTotal)} Ah; daily use is ~${Math.round(budget.totalAhPerDay)} Ah, which suggests ~${budget.recommendedAh} Ah for ${daysText(budget.daysAutonomy)} at safe depth of discharge.`, 'Increase house capacity or reduce loads.');
   }
 
   return { houseSwitch, posBus, negBus, shunt, firstMainFuse, mainOpts, mainCable, mainCableRuns, bms };

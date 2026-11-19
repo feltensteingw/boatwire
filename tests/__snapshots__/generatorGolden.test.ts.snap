@@ -305,7 +305,7 @@ g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which sugges
 exports[`generated designs are unchanged > 12 V lithium house with a lead-acid start battery (alternator to start, DC-DC to house) > fingerprint 1`] = `"696e57e8d80176dc"`;
 
 exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > design 1`] = `
-"24 V (v24), 24 V: 66 components, 101 wires, 2 findings
+"24 V (v24), 24 V: 66 components, 101 wires, 3 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=300 · part "Battery switch, 300 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=300 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9
@@ -477,10 +477,11 @@ w100 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · d
 w101 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
 g1 warning bank-sizing: House bank is 200 Ah; daily use is ~92 Ah, which suggests ~230 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
-g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel."
+g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel.
+g3 info series-parallel: Start battery: 2 batteries assumed for 24 V; your list has 1. → 12 V batteries make 24 V in strings of 2. If you make this change, list 2 batteries. [start-bat]"
 `;
 
-exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"e1dc8830bdbf9a0d"`;
+exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"8bd277a38d0e0c38"`;
 
 exports[`generated designs are unchanged > 230 V shore power, metric units > design 1`] = `
 "Ideal (ideal), 12 V: 57 components, 84 wires, 1 findings
@@ -634,7 +635,7 @@ g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which sugges
 exports[`generated designs are unchanged > 230 V shore power, metric units > fingerprint 1`] = `"d4af1197099108ac"`;
 
 exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > design 1`] = `
-"24 V (v24), 24 V: 92 components, 135 wires, 2 findings
+"24 V (v24), 24 V: 92 components, 135 wires, 3 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=300 · part "Battery switch, 300 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=300 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12
@@ -866,10 +867,11 @@ w134 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · d
 w135 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
 g1 warning bank-sizing: House bank is 200 Ah; daily use is ~94 Ah, which suggests ~380 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
-g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel."
+g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel.
+g3 info series-parallel: Start battery: 2 batteries assumed for 24 V; your list has 1. → 12 V batteries make 24 V in strings of 2. If you make this change, list 2 batteries. [start-bat]"
 `;
 
-exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > fingerprint 1`] = `"7b44c5cd54d9dbda"`;
+exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > fingerprint 1`] = `"82039e2e390d281a"`;
 
 exports[`generated designs are unchanged > diode battery isolator with an excitation wire > design 1`] = `
 "Ideal (ideal), 12 V: 56 components, 84 wires, 1 findings
@@ -1607,7 +1609,7 @@ exports[`more generated designs are unchanged (fingerprint only) > equipment in 
 
 exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 12 V lithium 1`] = `"57 components, 86 wires, 1 findings, 696e57e8d80176dc"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 24 V lithium 1`] = `"62 components, 92 wires, 2 findings, ab6b19719247fd3b"`;
+exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 24 V lithium 1`] = `"62 components, 92 wires, 3 findings, 05ecea447edebc4b"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > generator only, no shore power 1`] = `"56 components, 84 wires, 1 findings, 79b9c3ba7aa03962"`;
 
@@ -1649,7 +1651,7 @@ exports[`more generated designs are unchanged (fingerprint only) > template: Lar
 
 exports[`more generated designs are unchanged (fingerprint only) > template: Offshore cruiser, lithium and solar 1`] = `"60 components, 93 wires, 5 findings, 6d00206133f24e1d"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > three 12 V batteries on a 24 V boat (cannot be arranged) 1`] = `"62 components, 90 wires, 3 findings, fae5696e41432509"`;
+exports[`more generated designs are unchanged (fingerprint only) > three 12 V batteries on a 24 V boat (cannot be arranged) 1`] = `"62 components, 90 wires, 4 findings, 57f91cc7938f976c"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > thruster and winch on their own banks 1`] = `"81 components, 118 wires, 1 findings, f92e991f1907ec43"`;
 

@@ -9,7 +9,7 @@ import { fuseClassFor, nextStandard, protectionFor, runLength } from '../calc';
 import { bankSummary, fuseLabel, SWITCH_SIZES, type Builder, type WOpts } from './builder';
 import { loadNode } from './distribution';
 import type { Core } from './houseBank';
-import type { Plan } from './plan';
+import { reportBank, type Plan } from './plan';
 
 /** The buses of a dedicated bank, which its loads connect to. */
 export interface DedicatedBank {
@@ -40,6 +40,7 @@ function dedicatedBank(b: Builder, p: Plan, core: Core, e: Equipment, role: stri
   const cls = fuseClassFor(rating, { atBattery: true, lithium: lfpBank });
   const swRating = nextStandard(rating, SWITCH_SIZES);
   const bat = b.add('battery', `${key}-bat`, e.name, { zone: e.zone, sublabel: s.text, equipmentId: e.id, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['dedicated-bank'] });
+  reportBank(b, p, e, s, bat);
   const bus = b.add('bus-pos', `${key}-bus`, `${label} positive bus`, { zone: e.zone });
   const nbus = b.add('bus-neg', `${key}-nbus`, `${label} negative bus`, { zone: e.zone });
   const fuse = b.add('fuse', `${key}-fuse`, `${label} battery fuse`, { zone: e.zone, sublabel: fuseLabel(rating, cls), data: { rating, fuseClass: cls }, notes: ['battery-fuse'] });
