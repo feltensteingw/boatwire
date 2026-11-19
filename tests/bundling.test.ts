@@ -41,21 +41,31 @@ describe('ampacity of bundled DC conductors', () => {
     }
   });
 
-  it('in the engine space as well: within 0.5 A of the printed inside figure', () => {
-    for (const g of GAUGES) expect(Math.abs(ampacity(g.awg, true, false, 2) - BLUE_SEA_VI_B[g.awg][1]), g.awg).toBeLessThanOrEqual(0.5);
+  it('in the engine space as well: the printed inside figure, except 3/0 at 1 A more', () => {
+    for (const g of GAUGES) {
+      // 270 × 0.85 = 229.5 rounds to 230; Blue Sea prints 229. No stock fuse or breaker lies between.
+      const printed = g.awg === '3/0' ? 230 : BLUE_SEA_VI_B[g.awg][1];
+      expect(ampacity(g.awg, true, false, 2), g.awg).toBe(printed);
+    }
   });
 
-  it('larger bundles multiply the up-to-three figure by 0.857, 0.714 and 0.571', () => {
-    const tiers: [others: number, factor: number][] = [
-      [3, 0.857],
-      [5, 0.857],
-      [6, 0.714],
-      [23, 0.714],
-      [24, 0.571],
-      [60, 0.571],
+  it('larger bundles multiply the up-to-three figure by 0.857, 0.714 and 0.571, in whole amps', () => {
+    const tiers: [others: number, amps: number][] = [
+      [3, 36], // 42 × 0.857 = 35.99
+      [5, 36],
+      [6, 30], // 42 × 0.714 = 29.99
+      [23, 30],
+      [24, 24], // 42 × 0.571 = 23.98
+      [60, 24],
     ];
-    for (const [others, factor] of tiers) expect(ampacity('10', false, false, others), `${others} others`).toBeCloseTo(42 * factor, 5);
-    expect(ampacity('10', true, false, 3)).toBeCloseTo(42 * 0.857 * 0.85, 5);
+    for (const [others, amps] of tiers) expect(ampacity('10', false, false, others), `${others} others`).toBe(amps);
+    expect(ampacity('10', true, false, 3)).toBe(31); // 42 × 0.857 × 0.85 = 30.6
+  });
+
+  it('every DC rating is in whole amps, so a finding never says a wire is rated the same as the fuse it rejects', () => {
+    for (const g of GAUGES)
+      for (const engine of [false, true])
+        for (let others = 0; others <= 30; others++) expect(Number.isInteger(ampacity(g.awg, engine, false, others)), `${g.awg} ${engine} ${others}`).toBe(true);
   });
 
   it('every size is rated lower the bigger the bundle', () => {
@@ -113,6 +123,26 @@ describe('the design check of a bundled wire', () => {
 
   it('bundled with one other it is rated 32 A, enough for its fuse', () => {
     expect(about(circuit({ bundledWith: 1 }))).toEqual([]);
+  });
+
+  // Blue Sea's 7-to-24 multiplier, 0.714, on the up-to-three figure comes to a hair under the
+  // stock fuse sizes these wires usually carry. In whole amps, as printed, they fit.
+  for (const [gauge, fuse] of [['18', 10], ['10', 30], ['8', 40], ['6', 60], ['4', 80]] as const) {
+    it(`${gauge} AWG bundled with 6 others is rated ${fuse} A and passes on a ${fuse} A fuse`, () => {
+      const d = circuit({ gauge, bundledWith: 6 });
+      d.nodes[1].data.rating = fuse;
+      d.nodes[2].data.amps = fuse / 2;
+      expect(about(d)).toEqual([]);
+      d.nodes[1].data.rating = fuse + 5;
+      expect(about(d)).toEqual([expect.stringContaining(`is only rated ${fuse} A.`)]);
+    });
+  }
+
+  it('2 AWG bundled with one other in the engine space is rated 125 A, as printed, and passes on a 125 A fuse', () => {
+    const d = circuit({ gauge: '2', bundledWith: 1, inEngineSpace: true });
+    d.nodes[1].data.rating = 125;
+    d.nodes[2].data.amps = 90;
+    expect(about(d)).toEqual([]);
   });
 });
 
