@@ -17,28 +17,51 @@ describe('equipment the generator cannot draw is reported, not dropped silently'
     for (const s of p.scenarios) expect(notDrawn(generateIdeal(p, s)), s.name).toHaveLength(0);
   });
 
-  it('reports a second engine and names the one that was used', () => {
+  it('draws a second engine, and reports a third, naming the two that were used', () => {
     const p = exampleProject();
     const first = p.equipment.find((e) => e.kind === 'engine')!;
     add(p, 'engine', 'Port engine');
+    expect(notDrawn(generateIdeal(p))).toHaveLength(0);
+    add(p, 'engine', 'Wing engine');
     const d = generateIdeal(p);
-    expect(d.nodes.filter((n) => n.type === 'engine')).toHaveLength(1);
+    expect(d.nodes.filter((n) => n.type === 'engine').map((n) => n.label)).toEqual([first.name, 'Port engine']);
     const f = notDrawn(d);
     expect(f).toHaveLength(1);
     expect(f[0].severity).toBe('warning');
-    expect(f[0].message).toBe(`Port engine is not in this design. BoatWire draws one engine per boat and used ${first.name}.`);
+    expect(f[0].message).toBe(`Wing engine is not in this design. BoatWire draws up to two engines per boat and used ${first.name} and Port engine.`);
   });
 
-  it('reports each extra of every single-instance kind', () => {
+  it('draws one start battery per engine, and reports any more', () => {
+    const p = exampleProject();
+    add(p, 'battery-bank', 'Second start battery', { role: 'start' });
+    // one engine: its one start battery
+    expect(notDrawn(generateIdeal(p)).map((f) => f.message)).toEqual(['Second start battery is not in this design. BoatWire draws one engine start battery per engine and used Start battery.']);
+    add(p, 'engine', 'Port engine');
+    expect(notDrawn(generateIdeal(p))).toHaveLength(0);
+    add(p, 'battery-bank', 'Third start battery', { role: 'start' });
+    expect(notDrawn(generateIdeal(p)).map((f) => f.message)).toEqual(['Third start battery is not in this design. BoatWire draws one engine start battery per engine and used Start battery and Second start battery.']);
+  });
+
+  it('with no engine, still counts one start battery as drawn', () => {
+    const p = exampleProject();
+    p.equipment = p.equipment.filter((e) => e.kind !== 'engine');
+    expect(notDrawn(generateIdeal(p))).toHaveLength(0);
+    add(p, 'battery-bank', 'Second start battery', { role: 'start' });
+    expect(notDrawn(generateIdeal(p)).map((f) => f.message.split(' is not in this design')[0])).toEqual(['Second start battery']);
+  });
+
+  it('reports each extra of every kind drawn a limited number of times', () => {
     const p = exampleProject();
     add(p, 'engine', 'Port engine');
+    add(p, 'engine', 'Wing engine');
     add(p, 'shore-power', 'Second shore inlet');
     add(p, 'generator', 'Genset A');
     add(p, 'generator', 'Genset B');
     add(p, 'inverter-charger', 'Spare inverter/charger');
     add(p, 'battery-bank', 'Second start battery', { role: 'start' });
+    add(p, 'battery-bank', 'Third start battery', { role: 'start' });
     const names = notDrawn(generateIdeal(p)).map((f) => f.message.split(' is not in this design')[0]);
-    expect(names.sort()).toEqual(['Genset B', 'Port engine', 'Second shore inlet', 'Second start battery', 'Spare inverter/charger'].sort());
+    expect(names.sort()).toEqual(['Genset B', 'Second shore inlet', 'Spare inverter/charger', 'Third start battery', 'Wing engine'].sort());
   });
 
   it('reports a plain inverter that is ignored because there is an inverter/charger', () => {

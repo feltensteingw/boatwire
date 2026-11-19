@@ -246,7 +246,7 @@ function Energy() {
         </div>
         <div className="tile">
           <div className="tv">{isFinite(b.engineHoursToBalance) ? `${b.engineHoursToBalance.toFixed(1)} h` : '—'}</div>
-          <div className="tl">engine run per day to break even</div>
+          <div className="tl">{b.alternators > 1 ? 'both engines' : 'engine'} run per day to break even</div>
         </div>
       </div>
       <div className="energy-cols">

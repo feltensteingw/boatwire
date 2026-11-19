@@ -283,7 +283,7 @@ export const CATALOG: CatalogItem[] = [
  */
 const PROP_HELP: Record<string, string> = {
   // batteries
-  role: 'What this bank does. House runs everything aboard; Engine start only cranks the engine. A dedicated bank (windlass, thruster, winch or refrigeration) sits next to its equipment and supplies its power, so the heavy cables stay short. The equipment is still switched from the house panel through a relay, and the bank is recharged from the house bank by a DC-DC charger.',
+  role: 'What this bank does. House runs everything aboard; Engine start only cranks the engine (with two engines, add one for each, or one they share). A dedicated bank (windlass, thruster, winch or refrigeration) sits next to its equipment and supplies its power, so the heavy cables stay short. The equipment is still switched from the house panel through a relay, and the bank is recharged from the house bank by a DC-DC charger.',
   chemistry: 'Battery type. Lead-acid (flooded, AGM, gel) is cheaper but only ~50% is usable. Lithium (LiFePO4) gives ~80% usable, is lighter and charges faster, but needs a BMS, Class T fuse and alternator protection.',
   unitVolts: 'Voltage of each individual battery. They are wired in series to reach the system voltage (e.g. two 6 V golf-cart batteries make 12 V).',
   unitAh: 'Amp-hour rating printed on each battery (20-hour rate).',
@@ -348,6 +348,9 @@ export function dedicatedRoleFor(kind: EquipmentKind): string | undefined {
 
 /** Heavy DC loads that are fed directly from the main bus rather than the panel. */
 export const HEAVY_DC_THRESHOLD_A = 30;
+
+/** Engines the ideal design draws. Any more are reported as not drawn. */
+export const MAX_ENGINES = 2;
 
 export const DEFAULT_ZONES: Zone[] = [
   { id: 'bow', name: 'Bow / anchor locker', x: 0, rise: 2 },
