@@ -1,10 +1,13 @@
 import { BaseEdge, EdgeLabelRenderer, getSmoothStepPath, type Edge, type EdgeProps } from '@xyflow/react';
 import { memo } from 'react';
 import { gaugeIndex, isUnsized } from '../engine/calc';
-import type { LayerSettings, Wire } from '../model/types';
+import type { LayerSettings, Units, Wire } from '../model/types';
+import { cableLabel, fmtLen } from '../model/units';
 
 export type WireData = {
   wire: Wire;
+  /** Feet + AWG or metres + mm² for the label. */
+  units?: Units;
   points?: { x: number; y: number }[];
   labels: LayerSettings['labels'];
   amps?: number;
@@ -31,11 +34,12 @@ export function wireLabel(d: WireData): string {
   const w = d.wire;
   const parts: string[] = [];
   const L = d.labels;
+  const units = d.units ?? 'imperial';
   // A wire nobody has sized yet always says so: it is not being checked.
   if (isUnsized(w)) parts.push('size?');
-  if (L.gauge && w.gauge && w.kind !== 'sig') parts.push(w.cable ?? (w.kind === 'ac' ? `${w.gauge}/3` : `${w.gauge}`));
+  if (L.gauge && w.gauge && w.kind !== 'sig') parts.push(cableLabel(w, units)!);
   if (L.current && d.amps !== undefined && w.kind !== 'sig' && w.kind !== 'gnd') parts.push(`${d.amps >= 10 ? Math.round(d.amps) : d.amps.toFixed(1)} A`);
-  if (L.length && w.kind !== 'sig') parts.push(`${w.lengthFt} ft`);
+  if (L.length && w.kind !== 'sig') parts.push(fmtLen(w.lengthFt, units));
   if (L.vdrop && w.vdropPct !== undefined && w.kind !== 'neg') parts.push(`${w.vdropPct.toFixed(1)}%`);
   // A wire drawn through a hidden fuse always says so, even with fuse labels off.
   if (d.protection && (L.protection || w.viaFuse)) parts.push(d.protection);

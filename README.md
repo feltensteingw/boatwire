@@ -16,6 +16,8 @@ hand-drawn diagrams of existing boats.
 npm install
 npm run dev        # http://localhost:5173
 npm test           # engine + layout tests (vitest)
+npm run lint       # ESLint (TypeScript + React hook rules)
+npm run test:e2e   # browser tests (Playwright) against a production build; uses your installed Chrome
 npm run build      # static site in dist/ — host anywhere, no backend (fails if the initial download exceeds the size budget)
 npm run size       # re-check the bundle-size budget for an existing dist/
 ```
@@ -47,6 +49,13 @@ in this browser. `window.fakeCloud` can then act as a second device (`remoteSave
 `offline`). It follows the same size limit and "has it changed since I looked?" rule as the real
 thing, but it is not Firestore: check real cloud behaviour on a PR preview.
 
+**Security headers** are set in `firebase.json` for every response: no MIME sniffing, no framing
+(`X-Frame-Options: DENY`; Firebase's own `/__/auth/*` sign-in pages are not affected by custom
+headers), a strict referrer policy, and device features switched off. A Content-Security-Policy is
+sent in **report-only** mode: it blocks nothing yet, but the browser console lists anything it
+would block. The browser tests enforce the same policy locally (`E2E_CSP`). Once sign-in and cloud
+saving show no reports on the live site, rename the header to `Content-Security-Policy` to enforce it.
+
 | Task | Command |
 |------|---------|
 | Deploy site manually | `npm run deploy` |
@@ -77,7 +86,9 @@ Every pull request gets a 7-day preview URL posted as a PR comment. Both need th
 
 ```
 src/model/      types, equipment catalog, node (symbol) definitions, standards data
-src/engine/     generate.ts  equipment + scenario → ideal Design (topology + sizing)
+src/engine/     generate.ts  equipment + scenario → ideal Design; sets the order of work only
+                ideal/       one module per subsystem: plan, houseBank, distribution, heavyLoads,
+                             engine, renewables, ac (all drawing through builder.ts)
                 audit.ts     rule checks on any Design (net tracing in graph.ts)
                 calc.ts      ampacity, voltage drop, protection sizing, run lengths
                 reports.ts   wire schedule, BOM, scenario metrics, upgrade plan
@@ -86,6 +97,16 @@ src/engine/     generate.ts  equipment + scenario → ideal Design (topology + s
 src/layout/     ELK (elkjs) layered orthogonal layout, run in a Web Worker; manual layout for drawings
 src/ui/         React + React Flow canvas, symbols, inspector, reports
 ```
+
+**Tests that guard the engine** (all run by `npm test`):
+
+- `tests/generatorGolden.test.ts` records the generated design for a set of boats
+  (`tests/sampleBoats.ts`). If a change to the generator alters any design, the test shows the
+  changed components and wires line by line. When the change is intended, update the record with
+  `npx vitest run -u tests/generatorGolden.test.ts` and commit it.
+- `tests/auditRules.test.ts` has, for every design-check rule, one small drawing that breaks it and
+  one that does not. It fails if a rule is added to `audit.ts` without a case.
+- `tests/idealPassesAudit.test.ts` checks that every generated design passes the design check.
 
 **Download size:** the page loads only the app, React and React Flow up front (about 170 KB gzipped).
 The layout engine, Firebase, PDF import, the help guide, Compare and Reports load on first use.

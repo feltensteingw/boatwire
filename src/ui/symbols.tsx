@@ -288,6 +288,13 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
           ))
       : null;
 
+  if (n.type === 'note') {
+    return (
+      <div className={cls} style={{ width: laid.w, minHeight: laid.h }}>
+        <div className="note-text">{n.label}</div>
+      </div>
+    );
+  }
   if (isBus) {
     return (
       <div className={cls} style={{ width: laid.w, height: laid.h }} onClick={keepTerminalClicks} title={n.label}>

@@ -5,6 +5,10 @@ import { isUntouched } from '../model/examples';
 import { useStore } from '../state/store';
 import { parseProject } from '../model/validate';
 import { toast } from '../ui/toastStore';
+import { askConfirm, showMessage } from '../ui/dialogs';
+import { Modal } from '../ui/Modal';
+import { useMenu } from '../ui/useMenu';
+import { useNewBoat } from '../ui/NewBoat';
 import { applyOutsideChange } from '../state/history';
 import { CloudConflict, explainSaveError, isDirty, onRemote, signature, sizeProblem, type RemoteCopy } from './sync';
 import { cloudEnabled, fakeCloud } from './config';
@@ -174,7 +178,7 @@ function useTheirs() {
     useStore.getState().loadProject(project, id, { rev: conflict.rev ?? 0, sig: signature(conflict.data ?? '') });
     cloud().set({ status: 'saved', conflict: undefined });
   } catch (e) {
-    alert(`The other version could not be opened. ${(e as Error).message}`);
+    void showMessage('The other version could not be opened', (e as Error).message);
   }
 }
 
@@ -197,7 +201,7 @@ async function saveMineAsCopy() {
     cloud().set({ status: 'saved', conflict: undefined, error: undefined });
     toast(`Saved here as “${name}”. The other device's version is still in My boats.`, { ms: 12000 });
   } catch (e) {
-    alert(`Could not save a copy. ${sizeProblem(data) ?? explainSaveError(e).message}`);
+    void showMessage('Could not save a copy', sizeProblem(data) ?? explainSaveError(e).message);
   }
 }
 
@@ -342,7 +346,7 @@ const STATUS_TIP: Record<Status, string> = {
 export function CloudControls() {
   const { user, ready, status, set } = useCloud();
   const cloudId = useStore((s) => s.cloudId);
-  const [menu, setMenu] = useState(false);
+  const account = useMenu();
   const [busy, setBusy] = useState(false);
   if (!cloudEnabled || !ready) return null;
 
@@ -358,7 +362,7 @@ export function CloudControls() {
             await (await fb()).signInWithGoogle();
           } catch (e) {
             const msg = (e as Error).message;
-            if (!msg.includes('popup-closed')) alert(`Sign-in failed: ${msg}`);
+            if (!msg.includes('popup-closed')) void showMessage('Sign-in failed', msg);
           } finally {
             setBusy(false);
           }
@@ -390,11 +394,11 @@ export function CloudControls() {
         </button>
       )}
       <button onClick={() => set({ dialog: true })} data-tip="Open, switch between, or delete the boats saved in your account.">My boats</button>
-      <button className="avatar" onClick={() => setMenu(!menu)} title={user.email ?? ''}>
+      <button className="avatar" {...account.trigger} aria-label={`Account: ${user.displayName ?? user.email ?? 'signed in'}`} title={user.email ?? ''}>
         {user.photoURL ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" /> : (user.displayName ?? user.email ?? '?').slice(0, 1)}
       </button>
-      {menu && (
-        <div className="menu" onMouseLeave={() => setMenu(false)}>
+      {account.open && (
+        <div className="menu" aria-label="Account" {...account.panel}>
           <div className="menu-who">
             <b>{user.displayName}</b>
             <span>{user.email}</span>
@@ -402,7 +406,6 @@ export function CloudControls() {
           <hr />
           <button
             onClick={async () => {
-              setMenu(false);
               await (await fb()).signOutUser();
             }}
           >
@@ -421,7 +424,7 @@ async function saveAsNewBoat(user: User): Promise<boolean> {
   const data = text(project);
   const tooBig = sizeProblem(data, project.existing?.underlay?.src.length ?? 0);
   if (tooBig) {
-    alert(tooBig);
+    void showMessage('This boat is too large for your account', tooBig);
     return false;
   }
   try {
@@ -430,7 +433,7 @@ async function saveAsNewBoat(user: User): Promise<boolean> {
     cloud().set({ status: 'saved', error: undefined, conflict: undefined });
     return true;
   } catch (e) {
-    alert(`Could not save “${project.profile.name}” to your account. ${explainSaveError(e).message}`);
+    void showMessage(`Could not save “${project.profile.name}” to your account`, explainSaveError(e).message);
     return false;
   }
 }
@@ -456,8 +459,8 @@ function BoatsDialog() {
     setBusy(what.kind === 'open' ? what.boat.id : 'new');
     try {
       if (what.kind === 'new') {
-        useStore.getState().newProject();
-        await saveAsNewBoat(user);
+        // The wizard builds the boat; once it exists it goes straight into the account.
+        useNewBoat.getState().start(() => void saveAsNewBoat(user));
       } else {
         const remote = await (await fb()).readBoat(user.uid, what.boat.id);
         if (!remote.exists) throw new Error('It is no longer in your account.');
@@ -468,7 +471,7 @@ function BoatsDialog() {
       }
       close();
     } catch (e) {
-      alert(`Could not open “${what.kind === 'open' ? what.boat.name : 'a new boat'}”. ${(e as Error).message}`);
+      void showMessage(`Could not open ${what.kind === 'open' ? `“${what.boat.name}”` : 'a new boat'}`, (e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -483,7 +486,12 @@ function BoatsDialog() {
       const ok = cloud().status === 'conflict' ? false : await saveNow();
       setBusy(null);
       if (!ok) {
-        alert(`Your latest changes to “${st.project.profile.name}” are not in your account yet${cloud().status === 'conflict' ? ', because another device changed it too. Choose which version to keep first (see the message under the header)' : ` (${cloud().error ?? 'the save did not go through'})`}. Nothing was opened.`);
+        void showMessage(
+          `“${st.project.profile.name}” is not fully saved yet`,
+          cloud().status === 'conflict'
+            ? 'Another device changed this boat too. Choose which version to keep first (see the message under the header). Nothing was opened.'
+            : `Your latest changes are not in your account yet: ${cloud().error ?? 'the save did not go through'} Nothing was opened.`,
+        );
         return;
       }
       return go(what);
@@ -494,8 +502,7 @@ function BoatsDialog() {
   };
 
   return (
-    <div className="modal-back" onClick={close}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <Modal label="My boats" onClose={close}>
         <div className="modal-head">
           <h3>My boats</h3>
           <button className="icon" onClick={close} aria-label="Close">
@@ -549,7 +556,7 @@ function BoatsDialog() {
                     className="link danger"
                     disabled={!!busy}
                     onClick={async () => {
-                      if (!window.confirm(`Delete “${b.name}” from your cloud boats? This cannot be undone.`)) return;
+                      if (!(await askConfirm(`Delete “${b.name}”?`, 'It will be removed from your account on every device. This cannot be undone.', { label: 'Delete it', danger: true }))) return;
                       setBusy(b.id);
                       try {
                         await (await fb()).deleteBoat(user.uid, b.id);
@@ -558,7 +565,7 @@ function BoatsDialog() {
                           toast(`“${b.name}” was deleted from your account. It is still open here: use “Save to cloud” to keep it.`, { ms: 15000 });
                         }
                       } catch (e) {
-                        alert(`Could not delete “${b.name}”. ${explainSaveError(e).message}`);
+                        void showMessage(`Could not delete “${b.name}”`, explainSaveError(e).message);
                       } finally {
                         setBusy(null);
                       }
@@ -576,8 +583,7 @@ function BoatsDialog() {
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 

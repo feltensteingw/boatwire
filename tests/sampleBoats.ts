@@ -1,0 +1,213 @@
+// A fixed set of boats that between them exercise every branch of the design generator.
+// Used to lock the generator's output (tests/generatorGolden.test.ts) and to check that every
+// design it produces passes BoatWire's own audit (tests/idealPassesAudit.test.ts).
+
+import { exampleProject, newEquipment } from '../src/model/examples';
+import { buildBoat, TEMPLATES } from '../src/model/templates';
+import type { Equipment, EquipmentKind, Project, Scenario } from '../src/model/types';
+
+export interface SampleBoat {
+  name: string;
+  project: Project;
+  scenario?: Scenario;
+}
+
+/**
+ * Equipment ids are random when a boat is created. Replace them with ones made from the kind of
+ * equipment ("fridge", "bilge-pump", "bilge-pump-2"), so generated designs are the same every run.
+ */
+export function stableIds(p: Project): Project {
+  const seen = new Map<string, number>();
+  for (const e of p.equipment) {
+    const n = (seen.get(e.kind) ?? 0) + 1;
+    seen.set(e.kind, n);
+    e.id = n === 1 ? e.kind : `${e.kind}-${n}`;
+  }
+  return p;
+}
+
+const the = (p: Project, kind: EquipmentKind, role?: string): Equipment => {
+  const e = p.equipment.find((x) => x.kind === kind && (role === undefined || x.props.role === role));
+  if (!e) throw new Error(`sample boat has no ${kind}${role ? ` (${role})` : ''}`);
+  return e;
+};
+const without = (p: Project, keep: (e: Equipment) => boolean) => void (p.equipment = p.equipment.filter(keep));
+
+function boat(name: string, change: (p: Project) => Scenario | void, base: Project = exampleProject()): SampleBoat {
+  const scenario = change(base) ?? undefined;
+  return { name, project: stableIds(base), scenario };
+}
+
+/** Boats whose whole generated design is recorded line by line. */
+export const SAMPLE_BOATS: SampleBoat[] = [
+  boat('12 V lead-acid cruiser (the example boat)', () => {}),
+
+  boat('24 V lithium with external BMS and external regulator', (p) => {
+    Object.assign(the(p, 'battery-bank', 'house').props, { chemistry: 'lifepo4', bms: 'external' });
+    the(p, 'engine').props.regulator = 'external';
+    return { id: 'v24', name: '24 V', systemVoltage: 24 };
+  }),
+
+  boat('no start battery: the engine starts from the house bank', (p) => without(p, (e) => e.props.role !== 'start')),
+
+  boat('diode battery isolator with an excitation wire', (p) => {
+    the(p, 'engine').props.chargeSplit = 'isolator-diode';
+  }),
+
+  boat('engine-run charging relay', (p) => {
+    the(p, 'engine').props.chargeSplit = 'relay-run';
+  }),
+
+  boat(
+    'inverter only: no shore power, no generator',
+    () => {},
+    buildBoat({ ...TEMPLATES[0].answers, name: 'Inverter only', engine: true, startBattery: true, alternatorAmps: 60, inverter: 'inverter', inverterWatts: 1000, loads: [...TEMPLATES[0].answers.loads, 'ac-outlets'] }),
+  ),
+
+  boat('shore power and generator, separate inverter and two-output charger, shore-only loads', (p) => {
+    without(p, (e) => e.kind !== 'inverter-charger');
+    p.equipment.push(
+      newEquipment('inverter', { name: 'Inverter', props: { watts: 1500 } }),
+      newEquipment('battery-charger', { name: 'Battery charger', props: { amps: 40, outputs: 2 } }),
+      newEquipment('generator', {}),
+      newEquipment('air-conditioner', {}),
+    );
+  }),
+
+  boat('12 V lithium house with a lead-acid start battery (alternator to start, DC-DC to house)', (p) => p.scenarios.find((s) => s.id === 'lfp12')),
+
+  boat('dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads', (p) => {
+    p.equipment.push(
+      newEquipment('battery-bank', { name: 'Bow battery', zone: 'bow', props: { role: 'windlass', chemistry: 'agm', unitVolts: 12, unitAh: 100, units: 2 } }),
+      newEquipment('battery-bank', { name: 'Fridge battery', zone: 'galley', props: { role: 'fridge', chemistry: 'agm', unitVolts: 12, unitAh: 100, units: 2 } }),
+      newEquipment('wind', {}),
+      newEquipment('hydro', {}),
+      newEquipment('bow-thruster', {}),
+    );
+    return { id: 'v24', name: '24 V', systemVoltage: 24 };
+  }),
+
+  boat('230 V shore power, metric units', (p) => {
+    p.profile.acStandard = 'eu230';
+    p.profile.units = 'metric';
+  }),
+];
+
+/** More boats, locked by a fingerprint of the whole design rather than line by line. */
+export const FINGERPRINT_BOATS: SampleBoat[] = [
+  ...TEMPLATES.map((t) => ({ name: `template: ${t.name}`, project: stableIds(buildBoat(t.answers)) })),
+  ...exampleProject().scenarios.slice(1).map((s) => ({ name: `example boat, scenario ${s.name}`, project: stableIds(exampleProject()), scenario: s })),
+  boat('FET battery isolator', (p) => {
+    the(p, 'engine').props.chargeSplit = 'isolator-fet';
+  }),
+  boat('diode isolator, alternator sense lead moved', (p) => {
+    Object.assign(the(p, 'engine').props, { chargeSplit: 'isolator-diode', isolatorSense: 'sense' });
+  }),
+  boat('lithium house, no start battery, stock regulator (an error the design reports)', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    without(p, (e) => e.props.role !== 'start');
+  }),
+  boat('two of everything that is drawn once', (p) => {
+    p.equipment.push(newEquipment('engine', { name: 'Second engine' }), newEquipment('shore-power', { name: 'Second inlet' }), newEquipment('generator', {}), newEquipment('generator', { name: 'Second generator' }));
+  }),
+  boat('equipment in a zone that no longer exists', (p) => {
+    the(p, 'fridge').zone = 'gone';
+  }),
+  boat('no house bank at all', (p) => without(p, (e) => e.kind !== 'battery-bank')),
+
+  // --- AC arrangements
+  boat('generator only, no shore power', (p) => {
+    without(p, (e) => e.kind !== 'shore-power' && e.kind !== 'inverter-charger');
+    p.equipment.push(newEquipment('generator', {}), newEquipment('battery-charger', {}));
+  }),
+  boat('inverter/charger with no shore power or generator, plus a charger and a shore-only load', (p) => {
+    without(p, (e) => e.kind !== 'shore-power');
+    p.equipment.push(newEquipment('battery-charger', {}), newEquipment('air-conditioner', {}));
+  }),
+  boat('inverter/charger with shore power, a separate charger and a shore-only load', (p) => {
+    p.equipment.push(newEquipment('battery-charger', {}), newEquipment('air-conditioner', {}));
+  }),
+  boat('shore power with a charger and no inverter', (p) => {
+    without(p, (e) => e.kind !== 'inverter-charger');
+    p.equipment.push(newEquipment('battery-charger', {}));
+  }),
+  boat('separate inverter with no shore power, and a charger with nothing to feed it', (p) => {
+    without(p, (e) => e.kind !== 'shore-power' && e.kind !== 'inverter-charger');
+    p.equipment.push(newEquipment('inverter', {}), newEquipment('battery-charger', {}), newEquipment('air-conditioner', {}));
+  }),
+  boat('no AC at all', (p) => without(p, (e) => !['shore-power', 'inverter-charger', 'ac-outlets', 'microwave', 'water-heater'].includes(e.kind))),
+
+  // --- batteries
+  boat('two house banks of different chemistry', (p) => {
+    p.equipment.push(newEquipment('battery-bank', { name: 'Second house bank', props: { role: 'house', chemistry: 'lifepo4', unitVolts: 12, unitAh: 100, units: 2 } }));
+  }),
+  boat('three 12 V batteries on a 24 V boat (cannot be arranged)', (p) => {
+    p.profile.systemVoltage = 24;
+    the(p, 'battery-bank', 'house').props.units = 3;
+  }),
+  boat('lithium start battery', (p) => {
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+  }),
+  boat('a dedicated winch bank with no winch aboard', (p) => {
+    p.equipment.push(newEquipment('battery-bank', { name: 'Winch battery', zone: 'cockpit', props: { role: 'winch', chemistry: 'lifepo4', unitVolts: 12, unitAh: 100, units: 1 } }));
+  }),
+  boat('a very large inverter on 12 V (parallel cables, beyond fuse sizes)', (p) => {
+    the(p, 'inverter-charger').props.watts = 8000;
+  }),
+
+  // --- engine and charging
+  boat('lithium house, external regulator, no start battery', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.regulator = 'external';
+    without(p, (e) => e.props.role !== 'start');
+  }),
+  boat('lead-acid with an external regulator', (p) => {
+    the(p, 'engine').props.regulator = 'external';
+  }),
+  boat('lithium house with the charging relay chosen', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.chargeSplit = 'relay-run';
+  }),
+  boat('lithium house with an isolator chosen and an external regulator', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    Object.assign(the(p, 'engine').props, { chargeSplit: 'isolator-fet', regulator: 'external' });
+  }),
+  boat('charging relay chosen with only one battery bank', (p) => {
+    the(p, 'engine').props.chargeSplit = 'relay-run';
+    without(p, (e) => e.props.role !== 'start');
+  }),
+  boat('isolator chosen with only one battery bank', (p) => {
+    the(p, 'engine').props.chargeSplit = 'isolator-diode';
+    without(p, (e) => e.props.role !== 'start');
+  }),
+  boat('diode isolator with no compensation', (p) => {
+    Object.assign(the(p, 'engine').props, { chargeSplit: 'isolator-diode', isolatorSense: 'none' });
+  }),
+  boat('a big alternator (heavier charging relay)', (p) => {
+    the(p, 'engine').props.alternatorAmps = 150;
+  }),
+  boat('an engine with no alternator', (p) => {
+    the(p, 'engine').props.alternatorAmps = 0;
+  }),
+  boat('no engine', (p) => without(p, (e) => e.kind !== 'engine')),
+
+  // --- heavy loads
+  boat('bow thruster and electric winch on 12 V, fed from the house bank', (p) => {
+    p.equipment.push(newEquipment('bow-thruster', {}), newEquipment('electric-winch', {}));
+  }),
+  boat('thruster and winch on their own banks', (p) => {
+    p.equipment.push(
+      newEquipment('bow-thruster', {}),
+      newEquipment('electric-winch', {}),
+      newEquipment('battery-bank', { name: 'Thruster battery', zone: 'bow', props: { role: 'thruster', chemistry: 'agm', unitVolts: 12, unitAh: 100, units: 2 } }),
+      newEquipment('battery-bank', { name: 'Winch battery', zone: 'cockpit', props: { role: 'winch', chemistry: 'lifepo4', unitVolts: 12, unitAh: 100, units: 1 } }),
+    );
+  }),
+  boat('nothing but a house bank', () => {}, (() => {
+    const p = exampleProject();
+    p.equipment = p.equipment.filter((e) => e.props.role === 'house');
+    return p;
+  })()),
+];
+
+export const acVoltsOf = (p: Project) => (p.profile.acStandard === 'eu230' ? 230 : 120);

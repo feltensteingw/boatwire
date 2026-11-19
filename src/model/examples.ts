@@ -32,6 +32,7 @@ export function blankProject(): Project {
       batteryZone: 'battery',
       panelZone: 'nav',
       helmZone: 'cockpit',
+      units: 'imperial',
       zones: DEFAULT_ZONES.map((z) => ({ ...z })),
     },
     equipment: [newEquipment('battery-bank', { name: 'House bank' })],

@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { makeNode } from '../model/nodeDefs';
 import type { NodeType } from '../model/types';
 import { useHelp } from './Help';
+import { Modal } from './Modal';
 import { Icon } from './symbols';
 
 // ---------------------------------------------------------------- content
@@ -132,8 +133,8 @@ const SECTIONS: Section[] = [
         </ul>
         <h4>Energy budget box</h4>
         <p>
-          Shows your daily use in amp-hours, the house bank size and its usable part, and the recommended size. The recommendation covers about two days without charging at a safe depth of discharge: about 50% for lead-acid and 80% for lithium. It turns orange when the bank is too
-          small.
+          Shows your daily use in amp-hours, the house bank size and its usable part, and the recommended size. The recommendation covers two days without charging at a safe depth of discharge: about 50% for lead-acid and 80% for lithium. It turns orange when the bank is too
+          small. You can change the number of days, and the other figures behind the budget, under <b>Reports → Energy budget → Assumptions</b>.
         </p>
       </>
     ),
@@ -154,6 +155,7 @@ const SECTIONS: Section[] = [
           <li>
             <b>Battery / main bus location</b> and <b>Main panel location</b> are the two hubs every circuit is measured from.
           </li>
+          <li><b>Units</b>: feet and AWG, or metres and mm². In metric, each wire shows the standard mm² cable to buy (the next size up from the AWG size it was worked out as), and lengths are in metres. Changing units never changes a result.</li>
         </ul>
         <h4>Zones</h4>
         <p>
@@ -301,7 +303,7 @@ const SECTIONS: Section[] = [
             The <b>Scenario</b> menu at the top picks which one the diagram shows.
           </li>
           <li>
-            <b>Compare</b> puts all scenarios side by side: house bank, main fuse and cable, largest cable, estimated copper weight, total cable length, component count, errors and warnings. The best value in each row is highlighted, and components that exist in only some scenarios are listed.
+            <b>Compare</b> puts all scenarios side by side: house bank, main fuse and cable, largest cable, estimated copper weight, total cable length, component count, errors and warnings, and an estimated parts cost with its breakdown. The best value in each row is highlighted, and components that exist in only some scenarios are listed. The costs are rough estimates from a price list you can edit under <b>Reports → Bill of materials → Prices…</b>
           </li>
           <li>
             <b>+ New scenario</b> adds one; edit its settings in the column header. <b>View diagram →</b> opens it.
@@ -313,7 +315,7 @@ const SECTIONS: Section[] = [
   {
     id: 'existing',
     title: 'Existing boat & upgrade plan',
-    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram',
+    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag',
     body: (
       <>
         <p>Use this when you're improving a boat you already own. Draw the wiring as it really is; BoatWire checks it and lists the changes needed to reach the ideal design.</p>
@@ -334,12 +336,21 @@ const SECTIONS: Section[] = [
         </ul>
         <h4>Drawing</h4>
         <ul>
-          <li><b>+ Add component…</b> adds fuses, switches, bus bars, panels and the rest. <b>+ Place equipment</b> adds items from your list that aren't drawn yet.</li>
+          <li>The <b>Quick add</b> strip has the parts most drawings need many of. Click one to add it in the middle of the view, or drag it to where it goes. <b>+ Add component…</b> lists every kind of component. <b>+ Place equipment</b> adds items from your list that aren't drawn yet.</li>
           <li>Drag from one terminal dot to another to draw a wire. Red dots are positive, black are negative, orange are AC, green are ground, and blue are signal.</li>
           <li>Click a component to set its rating, chemistry or capacity. Panels and bus bars can have studs or circuits added.</li>
           <li>A new wire opens on the right so you can set its real size, length and type, and whether it runs through the hot engine space. Click any wire to change these later.</li>
           <li>A dotted wire labelled <b>size?</b> has no size yet. BoatWire cannot check it, and the status stays amber until every power wire has a size.</li>
+          <li>To move a wire to a different terminal, click the wire, then drag the round grip beside either end onto the new terminal. BoatWire refuses a move that would join, say, positive to negative.</li>
+          <li>A <b>Note</b> is free text for anything BoatWire has no symbol for. Notes show on the drawing and in exported pictures. They are not part of the checks or the reports.</li>
           <li>Press <kbd>Delete</kbd> to remove the selection. <b>Auto-arrange</b> tidies the layout.</li>
+        </ul>
+        <h4>Working on several components at once</h4>
+        <ul>
+          <li>Hold <kbd>Shift</kbd> and drag on the empty canvas to draw a box around components, or <kbd>Shift</kbd>-click them one by one. On a touch screen, turn on <b>Select area</b> at the top left of the canvas and drag a box.</li>
+          <li>Drag any one of the selected components to move them all. The arrow keys nudge them one grid square; with <kbd>Shift</kbd>, five.</li>
+          <li><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>D</kbd> duplicates the selection, including the wires between the selected components. <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>C</kbd> and <kbd>V</kbd> copy and paste. A copy is a new generic part: it is not linked to your equipment list.</li>
+          <li><kbd>Delete</kbd> removes everything selected, and one undo brings it all back.</li>
         </ul>
         <h4>Upgrade plan</h4>
         <p>The status button (e.g. “2 errors · 3 warnings → Upgrade plan”) opens <b>Reports → Upgrade plan</b>. The plan is grouped into <b>Safety: fix first</b>, <b>Recommended</b>, and <b>Improvements</b> that bring you to the ideal design.</p>
@@ -349,7 +360,7 @@ const SECTIONS: Section[] = [
   {
     id: 'reports',
     title: 'Reports',
-    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list',
+    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list full report electrician pdf cost price prices estimate money budget currency assumptions sun hours solar season winter summer latitude tropics autonomy days marina anchor passage engine hours balance shortfall',
     body: (
       <>
         <table className="g-table">
@@ -357,11 +368,29 @@ const SECTIONS: Section[] = [
             <tr><td><b>Design check</b></td><td>All findings for the chosen design.</td></tr>
             <tr><td><b>Upgrade plan</b></td><td>Prioritized changes from your existing wiring to the ideal.</td></tr>
             <tr><td><b>Wire schedule</b></td><td>Every conductor: from, to, size, length, current, voltage drop, protection. Hand it to whoever is pulling cable.</td></tr>
-            <tr><td><b>Bill of materials</b></td><td>A shopping list: cable by size and total length, fuses, breakers, bus bars, lugs, and so on.</td></tr>
+            <tr><td><b>Bill of materials</b></td><td>A shopping list: cable by size and total length, fuses, breakers, bus bars, lugs, and so on, with an estimated cost for each line and a total.</td></tr>
             <tr><td><b>Energy budget</b></td><td>Daily consumption per item, and how the house bank and charging compare.</td></tr>
+            <tr><td><b>Full report</b></td><td>All of the above plus the wiring diagram, the date, the BoatWire version and the standards notice, in one printable document for your electrician.</td></tr>
           </tbody>
         </table>
         <p>Switch between <b>Ideal</b> and <b>Existing</b> at the top. <b>Download CSV</b> opens in Excel or Google Sheets. <b>Print</b> gives a clean paper copy.</p>
+        <h4>Energy budget: a typical day and its assumptions</h4>
+        <ul>
+          <li><b>A typical day</b> sets what the boat uses against what each source puts back: solar, wind and hydro, the shore charger and the engine. The list beside the bars gives every figure. Below it, BoatWire says what is left to find and how long the engine would have to run to make it up.</li>
+          <li><b>Assumptions</b> holds the figures behind it. Pick the conditions from the two lists (where and when; how the boat is used), or type your own: peak sun hours, how much of the panels' rating arrives, wind and hydro output, hours on shore power, hours motoring.</li>
+          <li><b>Days of autonomy</b> sets the recommended house bank: that many days of use at a safe depth of discharge. By default no charging is counted in those days. If you sail where the sun is dependable you can count a share of the usual solar and wind charge, and the recommended bank then follows the sun hours too.</li>
+          <li>A charger or an alternator is only counted up to what the batteries need, since it cannot put back more than was taken out. Sun and wind can exceed the day's use, and the extra is shown as to spare.</li>
+          <li>Tick <b>Different for the scenario</b> to give one scenario its own conditions, for example winter beside summer. <b>Compare</b> then shows the recommended bank and the engine hours for each.</li>
+          <li>The starting figures are rough, typical values, not measurements for any place. They are saved with the boat.</li>
+        </ul>
+        <h4>Cost estimates</h4>
+        <ul>
+          <li>The costs are <b>rough estimates of parts only</b>, not quotes. Labour, shipping and tax are not included.</li>
+          <li>They come from a price list of ballpark US-dollar figures that have not been checked against any supplier. Open <b>Bill of materials → Prices…</b> to change any of them to what you actually pay. Your prices are saved with the boat.</li>
+          <li>Batteries are priced by the energy they hold (per kWh, by chemistry), cable by length and size, and equipment such as chargers and inverters by its rating.</li>
+          <li>You can change the currency symbol. The numbers are not converted.</li>
+          <li><b>Compare</b> shows the total for each scenario and where it goes. The <b>Upgrade plan</b> shows the parts cost of each priority group, for the changes whose parts are known.</li>
+        </ul>
       </>
     ),
   },
@@ -389,11 +418,12 @@ const SECTIONS: Section[] = [
   {
     id: 'export',
     title: 'Exporting & printing',
-    keywords: 'export png svg image print pdf diagram share',
+    keywords: 'export png svg image print pdf diagram share electrician full report',
     body: (
       <ul>
         <li><b>File → Export diagram (PNG)</b> saves a picture of the current diagram, and <b>SVG</b> saves a scalable drawing for printing large or editing.</li>
         <li><b>File → Wire schedule (CSV)</b> and <b>Bill of materials (CSV)</b> save spreadsheets.</li>
+        <li><b>File → Full report for an electrician</b> (or <b>Reports → Full report</b>) puts the diagram, design check, upgrade plan, wire schedule, bill of materials and energy budget on one page. Click <b>Print / Save as PDF</b> and choose “Save as PDF” to get a single file to email.</li>
         <li><b>File → Print current view</b>, or <b>Print</b> in Reports, prints without the toolbars. Choose “Save as PDF” in the print dialog to make a PDF.</li>
         <li>Exports use the current colour scheme. Switch to Light first for a white background.</li>
       </ul>
@@ -417,6 +447,23 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: 'offline',
+    title: 'Working offline & installing',
+    keywords: 'offline no connection signal internet install app home screen pwa tablet phone update new version',
+    body: (
+      <>
+        <p>After you have opened BoatWire once, it works with no connection: at the dock, at anchor, or in a boatyard shed. Your boat is saved on the device you are using.</p>
+        <ul>
+          <li>The word <b>Offline</b> appears in the header while there is no connection. Everything except signing in and cloud saving carries on working.</li>
+          <li>If the boat is saved to your account, changes made offline are sent when the connection returns.</li>
+          <li><b>Install it as an app:</b> in Chrome or Edge use the install icon in the address bar (or the menu → “Install BoatWire”). On an iPad or iPhone use Share → “Add to Home Screen”. It then opens in its own window like any other app.</li>
+          <li>When a new version is ready you are told, with a <b>Reload</b> button. Nothing changes until you reload or next open the app.</li>
+        </ul>
+        <p className="hint">The copy on the device is only as safe as the device. Sign in and save to the cloud, or use <b>File → Save project file</b>, to keep a second copy.</p>
+      </>
+    ),
+  },
+  {
     id: 'shortcuts',
     title: 'Keyboard & mouse',
     keywords: 'keyboard shortcuts mouse delete zoom pan help undo redo mistake restore touch tablet phone ipad tap hold mobile',
@@ -424,10 +471,15 @@ const SECTIONS: Section[] = [
       <table className="g-table">
         <tbody>
           <tr><td><kbd>?</kbd></td><td>Open this guide</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Close the guide or dialogs</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close the guide or dialogs; clear the selection on the drawing</td></tr>
           <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Z</kbd></td><td>Undo the last change. The ↶ ↷ buttons in the header do the same and say what they will undo.</td></tr>
           <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td><td>Redo (also <kbd>Ctrl</kbd> + <kbd>Y</kbd>)</td></tr>
-          <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Remove the selected component or wire (Existing boat)</td></tr>
+          <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Remove the selected components and wires (Existing boat)</td></tr>
+          <tr><td><kbd>Shift</kbd> + drag background</td><td>Draw a box to select several components (Existing boat). <kbd>Shift</kbd>-click adds or removes one.</td></tr>
+          <tr><td>Arrow keys</td><td>Nudge the selected components one grid square; with <kbd>Shift</kbd>, five</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>D</kbd></td><td>Duplicate the selected components</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>C</kbd> / <kbd>V</kbd></td><td>Copy and paste components</td></tr>
+          <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>A</kbd></td><td>Select every component on the drawing</td></tr>
           <tr><td>Scroll / pinch</td><td>Zoom the diagram</td></tr>
           <tr><td>Drag background</td><td>Pan</td></tr>
           <tr><td>Drag terminal → terminal</td><td>Draw a wire (Existing boat). Clicking or tapping one terminal and then another does the same.</td></tr>
@@ -481,8 +533,7 @@ export default function HelpGuidePanel() {
   if (!topic) return null;
   const current = shown.find((s) => s.id === topic) ?? shown[0];
   return (
-    <div className="modal-back" onClick={close}>
-      <div className="modal guide" role="dialog" aria-label="BoatWire how-to guide" onClick={(e) => e.stopPropagation()}>
+    <Modal label="BoatWire how-to guide" className="guide" onClose={close}>
         <div className="modal-head">
           <h3>How to use BoatWire</h3>
           <button className="icon" onClick={close} aria-label="Close">
@@ -509,8 +560,7 @@ export default function HelpGuidePanel() {
             )}
           </article>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

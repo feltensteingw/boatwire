@@ -1,12 +1,18 @@
-import { useMemo } from 'react';
-import { energyBudget } from '../engine/energy';
-import { billOfMaterials, changeList, wireSchedule } from '../engine/reports';
-import { ruleInfo } from '../engine/rules';
+import { useMemo, useState } from 'react';
+import { daysText, energyBudget } from '../engine/energy';
+import { planCosts, priceBom } from '../engine/cost';
+import { billOfMaterials, changeList, findingCounts, wireSchedule } from '../engine/reports';
+import { ruleInfo, STANDARDS_NOTICE } from '../engine/rules';
 import { activeScenario } from '../engine/scenario';
 import { acVoltsOf, useExisting, useFindings, useIdeal } from '../state/derived';
+import type { Design } from '../model/types';
 import { useStore, type ReportTab } from '../state/store';
+import { Diagram } from './Diagram';
 import { downloadText, toCsv } from './download';
 import { FindingsList } from './Findings';
+import { currencyOf, fmtMoney } from '../model/prices';
+import { PriceList } from './PriceList';
+import { DailyBalance, EnergyAssumptionsPanel } from './EnergyBalance';
 
 const TABS: { id: ReportTab; label: string; tip: string }[] = [
   { id: 'findings', label: 'Design check', tip: 'Every error, warning and note for the chosen design, with suggested fixes.' },
@@ -14,6 +20,11 @@ const TABS: { id: ReportTab; label: string; tip: string }[] = [
   { id: 'wires', label: 'Wire schedule', tip: 'Every conductor: from, to, size, length, current, voltage drop and protection.' },
   { id: 'bom', label: 'Bill of materials', tip: 'Shopping list: cable by size and length, fuses, breakers, bus bars and other parts.' },
   { id: 'energy', label: 'Energy budget', tip: 'Daily consumption per item compared with house bank capacity and charging.' },
+  {
+    id: 'full',
+    label: 'Full report',
+    tip: 'Everything an electrician needs on one printable page: diagram, design check, upgrade plan, wire schedule, bill of materials and energy budget. Print, then choose “Save as PDF” to email it.',
+  },
 ];
 
 export function Reports() {
@@ -47,7 +58,9 @@ export function Reports() {
             </button>
           </div>
         )}
-        <button onClick={() => window.print()}>Print</button>
+        <button className={tab === 'full' ? 'primary' : ''} onClick={() => window.print()} data-tip={tab === 'full' ? 'Print the full report. Choose “Save as PDF” in the print dialog to make a PDF you can email.' : 'Print this report.'}>
+          {tab === 'full' ? 'Print / Save as PDF' : 'Print'}
+        </button>
       </div>
       <div className="report-body">
         {tab === 'findings' && <FindingsList findings={findings} design={design === ideal ? 'ideal' : 'existing'} />}
@@ -55,6 +68,7 @@ export function Reports() {
         {tab === 'wires' && <WireTable />}
         {tab === 'bom' && <Bom />}
         {tab === 'energy' && <Energy />}
+        {tab === 'full' && <FullReport />}
       </div>
     </div>
   );
@@ -69,13 +83,16 @@ function useReportDesign() {
 
 function WireTable() {
   const design = useReportDesign();
-  const rows = useMemo(() => wireSchedule(design), [design]);
+  const units = useStore((s) => s.project.profile.units);
+  const metric = units === 'metric';
+  const rows = useMemo(() => wireSchedule(design, units), [design, units]);
+  // Metric boats get the cable to buy in mm² and metres, with the AWG design size alongside for reference.
   const csv = () =>
     downloadText(
       'wire-schedule.csv',
       toCsv([
-        ['Circuit', 'From', 'To', 'Type', 'Colour', 'Size (AWG)', 'mm²', 'Length (ft)', 'Current (A)', 'Protection', 'V drop %', 'Limit %'],
-        ...rows.map((r) => [r.circuit, r.from, r.to, r.kind, r.color, r.gauge, r.mm2, r.lengthFt, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2), r.vdropLimit]),
+        ['Circuit', 'From', 'To', 'Type', 'Colour', metric ? 'Size (mm²)' : 'Size (AWG)', metric ? 'Design size (AWG)' : 'mm²', metric ? 'Length (m)' : 'Length (ft)', 'Current (A)', 'Protection', 'V drop %', 'Limit %'],
+        ...rows.map((r) => [r.circuit, r.from, r.to, r.kind, r.color, metric ? r.size : r.gauge, metric ? r.gauge : r.mm2, r.length, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2), r.vdropLimit]),
       ]),
     );
   return (
@@ -107,8 +124,10 @@ function WireTable() {
               <td>
                 <i className={`lw ${r.kind}`} /> {r.color}
               </td>
-              <td className="mono">{r.gauge}</td>
-              <td className="r">{r.lengthFt} ft</td>
+              <td className="mono">{r.size}</td>
+              <td className="r">
+                {r.length} {metric ? 'm' : 'ft'}
+              </td>
               <td className="r">{r.amps !== undefined ? `${r.amps.toFixed(1)} A` : ''}</td>
               <td>{r.protection}</td>
               <td className={`r ${r.vdrop !== undefined && r.vdropLimit !== undefined && r.vdrop > r.vdropLimit ? 'bad' : ''}`}>
@@ -124,21 +143,41 @@ function WireTable() {
 
 function Bom() {
   const design = useReportDesign();
-  const rows = useMemo(() => billOfMaterials(design), [design]);
-  const csv = () => downloadText('bill-of-materials.csv', toCsv([['Category', 'Item', 'Specification', 'Qty', 'Unit'], ...rows.map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]));
+  const units = useStore((s) => s.project.profile.units);
+  const prices = useStore((s) => s.project.prices);
+  const [pricing, setPricing] = useState(false);
+  const cost = useMemo(() => priceBom(billOfMaterials(design, units), prices), [design, units, prices]);
+  const { rows, currency } = cost;
+  const money = (n: number | undefined) => (n === undefined ? '—' : fmtMoney(n, currency));
+  const csv = () =>
+    downloadText(
+      'bill-of-materials.csv',
+      toCsv([
+        ['Category', 'Item', 'Specification', 'Qty', 'Unit', `Unit price (${currency}, estimate)`, `Cost (${currency}, estimate)`],
+        ...rows.map((r) => [r.category, r.item, r.spec, r.qty, r.unit, r.unitPrice === undefined ? '' : Math.round(r.unitPrice * 100) / 100, r.cost === undefined ? '' : Math.round(r.cost * 100) / 100]),
+        ['', 'Total (estimate, parts only)', cost.unpriced ? `${cost.unpriced} line${cost.unpriced === 1 ? '' : 's'} not priced` : '', '', '', '', Math.round(cost.total * 100) / 100],
+      ]),
+    );
   let lastCat = '';
   return (
     <div>
       <div className="report-actions">
         <span className="hint">Cable quantities include 10% for routing and waste. Parts are specifications, not brand recommendations.</span>
-        <button onClick={csv}>Download CSV</button>
+        <span className="report-buttons">
+          <button onClick={() => setPricing(true)} data-tip="See and change the prices the cost estimate uses.">
+            Prices…
+          </button>
+          <button onClick={csv}>Download CSV</button>
+        </span>
       </div>
-      <table className="grid">
+      <table className="grid bom">
         <thead>
           <tr>
             <th>Item</th>
             <th>Specification</th>
             <th className="r">Qty</th>
+            <th className="r">Unit price</th>
+            <th className="r">Cost</th>
           </tr>
         </thead>
         <tbody>
@@ -148,7 +187,8 @@ function Bom() {
             return [
               head && (
                 <tr key={`h${i}`} className="cat">
-                  <td colSpan={3}>{r.category}</td>
+                  <td colSpan={4}>{r.category}</td>
+                  <td className="r">{money(cost.byCategory.find((c) => c.category === r.category)?.cost)}</td>
                 </tr>
               ),
               <tr key={i}>
@@ -157,20 +197,32 @@ function Bom() {
                 <td className="r">
                   {r.qty} {r.unit === 'ea' ? '' : r.unit}
                 </td>
+                <td className="r">{money(r.unitPrice)}</td>
+                <td className="r">{money(r.cost)}</td>
               </tr>,
             ];
           })}
         </tbody>
+        <tfoot>
+          <tr className="total">
+            <td colSpan={4}>Estimated parts cost</td>
+            <td className="r">{money(cost.total)}</td>
+          </tr>
+        </tfoot>
       </table>
+      <p className="hint cost-note">
+        <b>The costs are rough estimates, not quotes.</b> They cover parts only (no labour, shipping or tax) and come from a price list of ballpark figures that you can correct under <b>Prices…</b>
+        {cost.unpriced > 0 && ` ${cost.unpriced} line${cost.unpriced === 1 ? ' has' : 's have'} no price and ${cost.unpriced === 1 ? 'is' : 'are'} left out of the total.`}
+      </p>
+      {pricing && <PriceList onClose={() => setPricing(false)} />}
     </div>
   );
 }
 
-const pct = (x: number) => `${Math.round(x * 100)}%`;
-
 function Energy() {
   const project = useStore((s) => s.project);
-  const b = energyBudget(project, activeScenario(project));
+  const scenario = activeScenario(project);
+  const b = energyBudget(project, scenario);
   const rows = [...b.rows].sort((x, y) => y.ahPerDay - x.ahPerDay);
   const max = Math.max(1, ...rows.map((r) => r.ahPerDay));
   return (
@@ -186,16 +238,20 @@ function Energy() {
         </div>
         <div className={`tile ${b.houseAh < b.recommendedAh * 0.9 ? 'warn' : 'ok'}`}>
           <div className="tv">{b.recommendedAh} Ah</div>
-          <div className="tl">recommended for {b.daysAutonomy} days</div>
+          <div className="tl">recommended for {daysText(b.daysAutonomy)}</div>
         </div>
         <div className="tile">
-          <div className="tv">{Math.round(b.solarAhPerDay + b.windHydroAhPerDay)} Ah</div>
-          <div className="tl">renewable charging / day (est.)</div>
+          <div className="tv">{Math.round(b.chargingAhPerDay)} Ah</div>
+          <div className="tl">charging / day (est.)</div>
         </div>
         <div className="tile">
           <div className="tv">{isFinite(b.engineHoursToBalance) ? `${b.engineHoursToBalance.toFixed(1)} h` : '—'}</div>
           <div className="tl">engine run per day to break even</div>
         </div>
+      </div>
+      <div className="energy-cols">
+        <DailyBalance b={b} />
+        <EnergyAssumptionsPanel b={b} scenario={scenario} boatValues={project.energy} />
       </div>
       <table className="grid">
         <thead>
@@ -225,10 +281,7 @@ function Energy() {
           ))}
         </tbody>
       </table>
-      <p className="hint">
-        Assumptions: solar {b.assumptions.solarPeakHours} peak sun hours at {pct(b.assumptions.solarDerate)} of rating; wind/hydro at {pct(b.assumptions.windHydroCapacityFactor)} capacity factor; inverter {pct(b.assumptions.inverterEfficiency)} efficient; {pct(b.assumptions.alternatorChargeEfficiency)} of the alternator's rating reaches the bank. Edit hours per day and duty cycle on each load in the
-        Equipment list.
-      </p>
+      <p className="hint">Edit hours per day for each load in the Equipment list. The figures behind the charging estimates are under Assumptions above.</p>
     </div>
   );
 }
@@ -238,7 +291,8 @@ function Changes() {
   const setView = useStore((s) => s.setView);
   const ideal = useIdeal();
   const existing = useExisting();
-  const changes = useMemo(() => (existing ? changeList(existing, ideal, acVoltsOf(project)) : []), [existing, ideal, project]);
+  const changes = useMemo(() => (existing ? changeList(existing, ideal, acVoltsOf(project), project.profile.units) : []), [existing, ideal, project]);
+  const costs = useMemo(() => planCosts(changes, project.prices), [changes, project.prices]);
   if (!existing)
     return (
       <div className="empty">
@@ -264,13 +318,19 @@ function Changes() {
           <section key={g.id} className={`chg-${g.id}`}>
             <h3>
               {g.title} <span className="count">{items.length}</span>
+              {costs[g.id].priced > 0 && (
+                <span className="chg-cost" data-tip="A rough estimate of the parts for these changes, from the price list (Bill of materials → Prices…). Labour is not included.">
+                  about {fmtMoney(costs[g.id].cost, currencyOf(project.prices))} in parts
+                  {costs[g.id].unpriced > 0 && ` for ${costs[g.id].priced} of the ${items.length}; the rest ${costs[g.id].unpriced === 1 ? 'is' : 'are'} rewiring or cannot be estimated`}
+                </span>
+              )}
             </h3>
             <ol>
               {items.map((c, i) => (
                 <li key={i}>
                   <div className="chg-title">{c.title}</div>
                   {c.detail && <div className="chg-detail">{c.detail}</div>}
-                  {c.rule && !c.detail?.includes(ruleInfo(c.rule).why) && <div className="chg-rule">{ruleInfo(c.rule).title}</div>}
+                  {c.rule && !c.detail?.includes(ruleInfo(c.rule, project.profile.units).why) && <div className="chg-rule">{ruleInfo(c.rule).title}</div>}
                 </li>
               ))}
             </ol>
@@ -278,6 +338,80 @@ function Changes() {
         );
       })}
       {changes.length === 0 && <p>Your existing system already matches the ideal design.</p>}
+    </div>
+  );
+}
+
+/** One printable document for a reviewer: every report for the chosen design, plus the diagram and the standards notice. */
+function FullReport() {
+  const project = useStore((s) => s.project);
+  const which = useStore((s) => s.reportDesign);
+  const ideal = useIdeal();
+  const existing = useExisting();
+  const isExisting = which === 'existing' && !!existing;
+  const design = isExisting ? existing : ideal;
+  const findings = useFindings(design);
+  const counts = findingCounts(findings);
+  const scen = activeScenario(project);
+  const [shot, setShot] = useState<{ id: Design; url: string } | null>(null);
+  const picture = shot?.id === design ? shot.url : undefined;
+  const p = project.profile;
+  const today = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  return (
+    <div className="full-report">
+      <header className="fr-head">
+        <h1>{p.name || 'Untitled boat'} — electrical system report</h1>
+        <div className="fr-meta">
+          <span>{isExisting ? 'Existing wiring (as drawn)' : `Ideal design · scenario “${scen?.name ?? 'base'}”`}</span>
+          <span>{design.systemVoltage} V DC</span>
+          <span>Prepared {today}</span>
+          <span>
+            BoatWire v{__APP_VERSION__} ({__APP_COMMIT__})
+          </span>
+        </div>
+        <p className="fr-summary">
+          Design check: <b>{counts.errors}</b> error{counts.errors === 1 ? '' : 's'}, <b>{counts.warnings}</b> warning{counts.warnings === 1 ? '' : 's'}, <b>{counts.notes}</b> note{counts.notes === 1 ? '' : 's'}.
+        </p>
+        <p className="fr-notice">
+          <b>For review by a qualified marine electrician.</b> {STANDARDS_NOTICE} Cable lengths are one-way estimates from zone distances, not measured runs.
+        </p>
+      </header>
+
+      <section className="fr-section fr-diagram">
+        <h2>Wiring diagram</h2>
+        {picture ? <img src={picture} alt="Wiring diagram" /> : <p className="hint">Drawing the diagram…</p>}
+        {/* Laid out off-screen, then turned into a picture that scales to the printed page. */}
+        <div className="fr-diagram-render" aria-hidden>
+          <Diagram key={isExisting ? 'existing' : 'ideal'} design={design} findings={findings} mode={isExisting ? 'manual' : 'auto'} readOnly onSnapshot={(url) => setShot({ id: design, url })} />
+        </div>
+      </section>
+
+      <section className="fr-section">
+        <h2>Design check</h2>
+        <FindingsList findings={findings} design={isExisting ? 'existing' : 'ideal'} expanded />
+      </section>
+
+      {existing && (
+        <section className="fr-section">
+          <h2>Upgrade plan (existing → ideal)</h2>
+          <Changes />
+        </section>
+      )}
+
+      <section className="fr-section">
+        <h2>Wire schedule</h2>
+        <WireTable />
+      </section>
+
+      <section className="fr-section">
+        <h2>Bill of materials</h2>
+        <Bom />
+      </section>
+
+      <section className="fr-section">
+        <h2>Energy budget</h2>
+        <Energy />
+      </section>
     </div>
   );
 }

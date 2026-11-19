@@ -5,10 +5,12 @@
 // repaired and reported as notes; something that is not a project at all throws ProjectError
 // with a message a boat owner can act on.
 
+import { ENERGY_LIMITS } from './standards';
+import { DEFAULT_CURRENCY, priceDef, type PriceOverrides } from './prices';
 import { CATALOG_BY_KIND } from './catalog';
 import { blankProject, uid } from './examples';
 import { makeNode, NODE_DEFS } from './nodeDefs';
-import type { Design, DNode, Equipment, EquipmentKind, NodeType, Polarity, Project, PropValue, Scenario, Terminal, Underlay, Wire, WireKind, Zone } from './types';
+import type { Design, DNode, EnergyAssumptions, Equipment, EquipmentKind, NodeType, Polarity, Project, PropValue, Scenario, Terminal, Underlay, Wire, WireKind, Zone } from './types';
 
 /** Format of the project data. Raise it, and add a step to MIGRATIONS, when the shape changes. */
 export const PROJECT_VERSION = 1;
@@ -33,7 +35,15 @@ export interface Parsed {
   notes: string[];
 }
 
-export function parseProject(raw: unknown): Parsed {
+export interface ParseOptions {
+  /**
+   * Accept a trace-over picture given as a reference to this browser's picture store ("idb:…").
+   * Only true for the copy in browser storage; in a file or the cloud such a reference is meaningless.
+   */
+  storedImages?: boolean;
+}
+
+export function parseProject(raw: unknown, opts: ParseOptions = {}): Parsed {
   if (!isObj(raw)) throw new ProjectError('This is not a BoatWire project.');
   if (!isObj(raw.profile) && !Array.isArray(raw.equipment)) throw new ProjectError('This is not a BoatWire project.');
   const notes: string[] = [];
@@ -77,6 +87,8 @@ export function parseProject(raw: unknown): Parsed {
     panelZone: zoneOr(p.panelZone, blank.profile.panelZone),
     // Boats saved before the helm had its own setting used the cockpit.
     helmZone: zoneOr(p.helmZone, blank.profile.helmZone),
+    // Boats saved before there was a choice were all in feet and AWG.
+    units: p.units === 'metric' ? 'metric' : 'imperial',
     zones,
   };
 
@@ -117,6 +129,8 @@ export function parseProject(raw: unknown): Parsed {
     if (s.systemVoltage === 12 || s.systemVoltage === 24) out.systemVoltage = s.systemVoltage;
     if (typeof s.houseChemistry === 'string' && ['flooded', 'agm', 'gel', 'lifepo4'].includes(s.houseChemistry)) out.houseChemistry = s.houseChemistry as Scenario['houseChemistry'];
     if (typeof s.houseCapacityAh === 'number' && s.houseCapacityAh > 0) out.houseCapacityAh = s.houseCapacityAh;
+    const energy = parseEnergy(s.energy);
+    if (energy) out.energy = energy;
     scenarios.push(out);
   }
   if (!scenarios.length) scenarios.push(...blank.scenarios);
@@ -124,14 +138,44 @@ export function parseProject(raw: unknown): Parsed {
 
   const project: Project = { version: PROJECT_VERSION, profile, equipment, scenarios, activeScenario };
   if (data.existing !== undefined && data.existing !== null) {
-    const existing = parseDrawing(data.existing, profile.systemVoltage, notes);
+    const existing = parseDrawing(data.existing, profile.systemVoltage, notes, opts);
     if (existing) project.existing = existing;
     else notes.push('The existing-boat drawing was damaged and has been left out.');
   }
+  const prices = parsePrices(data.prices);
+  if (prices) project.prices = prices;
+  const energy = parseEnergy(data.energy);
+  if (energy) project.energy = energy;
   return { project, notes };
 }
 
-function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[]): Design | undefined {
+/** The owner's energy-budget assumptions: known ones only, each held to its range. */
+function parseEnergy(raw: unknown): Partial<EnergyAssumptions> | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: Partial<EnergyAssumptions> = {};
+  for (const k of Object.keys(ENERGY_LIMITS) as (keyof EnergyAssumptions)[]) {
+    const v = raw[k];
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const [lo, hi] = ENERGY_LIMITS[k];
+    out[k] = Math.min(hi, Math.max(lo, v));
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** The owner's own prices: only known price-list entries with a sensible number are kept. */
+function parsePrices(raw: unknown): PriceOverrides | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: PriceOverrides = {};
+  if (typeof raw.currency === 'string' && raw.currency.trim() && raw.currency.trim() !== DEFAULT_CURRENCY) out.currency = raw.currency.trim().slice(0, 4);
+  if (isObj(raw.rates)) {
+    const rates: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw.rates)) if (priceDef(k) && typeof v === 'number' && Number.isFinite(v) && v >= 0) rates[k] = v;
+    if (Object.keys(rates).length) out.rates = rates;
+  }
+  return out.currency || out.rates ? out : undefined;
+}
+
+function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[], opts: ParseOptions): Design | undefined {
   if (!isObj(raw) || !Array.isArray(raw.nodes)) return undefined;
   const nodes: DNode[] = [];
   const ids = new Set<string>();
@@ -195,7 +239,8 @@ function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[]): Design | u
 
   const design: Design = { id: 'existing', name: 'Existing', systemVoltage: volts, nodes, wires, findings: [] };
   const u = raw.underlay;
-  if (isObj(u) && typeof u.src === 'string' && u.src.startsWith('data:image/') && num(u.width, 0) > 0 && num(u.height, 0) > 0) {
+  const picture = isObj(u) && typeof u.src === 'string' && (u.src.startsWith('data:image/') || (!!opts.storedImages && u.src.startsWith('idb:img-')));
+  if (isObj(u) && picture && typeof u.src === 'string' && num(u.width, 0) > 0 && num(u.height, 0) > 0) {
     const underlay: Underlay = { src: u.src, name: str(u.name, 'diagram'), x: num(u.x, 0), y: num(u.y, 0), width: num(u.width, 0), height: num(u.height, 0), opacity: Math.min(1, Math.max(0.05, num(u.opacity, 0.5))), visible: u.visible !== false, locked: u.locked === true };
     design.underlay = underlay;
   } else if (u !== undefined && u !== null) {

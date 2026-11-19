@@ -7,3 +7,6 @@ firebase-debug.log
 firestore-debug.log
 *-service-account*.json
 *.tsbuildinfo
+dist-e2e
+test-results
+playwright-report

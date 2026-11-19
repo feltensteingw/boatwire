@@ -1,7 +1,11 @@
 import { HelpLink } from './Help';
 import { useMemo } from 'react';
 import { generateIdeal } from '../engine/generate';
+import { designCost } from '../engine/cost';
+import { daysText, energyBudget } from '../engine/energy';
 import { designMetrics, type Metrics } from '../engine/reports';
+import { fmtMoney } from '../model/prices';
+import { lenUnit, toLen, toWeight, weightUnit } from '../model/units';
 import type { Chemistry, Scenario, SystemVoltage } from '../model/types';
 import { acVoltsOf } from '../state/derived';
 import { useStore } from '../state/store';
@@ -23,13 +27,14 @@ export function Compare() {
   const setScenario = useStore((s) => s.setScenario);
   const setView = useStore((s) => s.setView);
   const acV = acVoltsOf(project);
+  const units = project.profile.units;
   const metrics = useMemo(
     () =>
       project.scenarios.map((s) => {
         const d = generateIdeal(project, s);
-        return { s, d, m: designMetrics(d, acV) };
+        return { s, d, m: designMetrics(d, acV, units), cost: designCost(d, project.prices, units), energy: energyBudget(project, s) };
       }),
-    [project, acV],
+    [project, acV, units],
   );
   const allRoles = new Set(metrics.flatMap((x) => [...x.m.roles]));
   const differing = [...allRoles].filter((r) => !metrics.every((x) => x.m.roles.has(r))).sort();
@@ -43,6 +48,37 @@ export function Compare() {
         {vals.map((v, i) => (
           <td key={i} className={!isNaN(target) && nums[i] === target && metrics.length > 1 ? 'best' : ''}>
             {v}
+          </td>
+        ))}
+      </tr>
+    );
+  };
+  const energyRow = (label: string, f: (e: (typeof metrics)[number]['energy']) => string) => (
+    <tr key={label}>
+      <th>{label}</th>
+      {metrics.map((x) => (
+        <td key={x.s.id}>{f(x.energy)}</td>
+      ))}
+    </tr>
+  );
+  // Estimated cost: the total, then each bill-of-materials category that any scenario spends on.
+  const costCategories = [...new Set(metrics.flatMap((x) => x.cost.byCategory.map((c) => c.category)))];
+  const costRow = (label: string, f: (c: (typeof metrics)[number]['cost']) => number, total = false) => {
+    const vals = metrics.map((x) => f(x.cost));
+    const low = Math.min(...vals);
+    return (
+      <tr key={label} className={total ? 'cost-total' : 'cost-part'}>
+        <th>{label}</th>
+        {vals.map((v, i) => (
+          <td key={i} className={total && metrics.length > 1 && Math.round(v) === Math.round(low) ? 'best' : ''}>
+            {v > 0 ? fmtMoney(v, metrics[i].cost.currency) : '—'}
+            {total && v > low + 0.5 && <span className="more"> (+{fmtMoney(v - low, metrics[i].cost.currency)})</span>}
+            {total && metrics[i].cost.unpriced > 0 && (
+              <span className="more" data-tip="Lines with no price are left out of this total. The bill of materials for this scenario shows which.">
+                {' '}
+                · {metrics[i].cost.unpriced} not priced
+              </span>
+            )}
           </td>
         ))}
       </tr>
@@ -90,11 +126,27 @@ export function Compare() {
             {row('Main fuse', (m) => m.mainFuse)}
             {row('Main battery cable', (m) => m.mainCable)}
             {row('Largest cable', (m) => m.largestCable)}
-            {row('Copper (lb, est.)', (m) => m.copperLb, 'min')}
-            {row('Cable length (ft)', (m) => m.cableFt, 'min')}
+            {row(`Copper (${weightUnit(units)}, est.)`, (m) => toWeight(m.copperLb, units), 'min')}
+            {row(`Cable length (${lenUnit(units)})`, (m) => Math.round(toLen(m.cableFt, units)), 'min')}
             {row('Components', (m) => m.components, 'min')}
             {row('Errors', (m) => m.errors, 'min')}
             {row('Warnings', (m) => m.warnings, 'min')}
+            <tr className="cat">
+              <td colSpan={metrics.length + 1}>
+                Energy <span className="hint">(under each scenario's own assumptions; set them under Reports → Energy budget)</span>
+              </td>
+            </tr>
+            {energyRow('Used per day', (e) => `${Math.round(e.totalAhPerDay)} Ah`)}
+            {energyRow('Charging per day', (e) => `${Math.round(e.chargingAhPerDay)} Ah`)}
+            {energyRow('Recommended house bank', (e) => `${e.recommendedAh} Ah for ${daysText(e.daysAutonomy)}`)}
+            {energyRow('Engine hours a day to break even', (e) => (isFinite(e.engineHoursToBalance) ? `${e.engineHoursToBalance.toFixed(1)} h` : '—'))}
+            <tr className="cat">
+              <td colSpan={metrics.length + 1}>
+                Estimated parts cost <span className="hint">(rough figures from the price list; change them under Reports → Bill of materials → Prices…)</span>
+              </td>
+            </tr>
+            {costRow('Total', (c) => c.total, true)}
+            {costCategories.map((cat) => costRow(cat, (c) => c.byCategory.find((x) => x.category === cat)?.cost ?? 0))}
             {differing.length > 0 && (
               <tr className="cat">
                 <td colSpan={metrics.length + 1}>Components that differ</td>
@@ -129,9 +181,10 @@ export function Compare() {
 function ScenarioEditor({ s, onChange, onRemove }: { s: Scenario; onChange: (p: Partial<Scenario>) => void; onRemove?: () => void }) {
   return (
     <div className="scen-edit">
-      <TextInput value={s.name} onChange={(v) => onChange({ name: v })} />
+      <TextInput label="Scenario name" value={s.name} onChange={(v) => onChange({ name: v })} />
       <span data-tip="System voltage for this scenario. “Boat voltage” uses the one set on the Boat & zones tab.">
       <Select<string>
+        label={`${s.name}: system voltage`}
         value={String(s.systemVoltage ?? '')}
         options={[
           { value: '', label: 'Boat voltage' },
@@ -142,10 +195,10 @@ function ScenarioEditor({ s, onChange, onRemove }: { s: Scenario; onChange: (p: 
       />
       </span>
       <span data-tip="House battery chemistry for this scenario. “As specified” uses your equipment list.">
-        <Select<string> value={s.houseChemistry ?? ''} options={CHEM} onChange={(v) => onChange({ houseChemistry: (v || undefined) as Chemistry | undefined })} />
+        <Select<string> label={`${s.name}: house battery chemistry`} value={s.houseChemistry ?? ''} options={CHEM} onChange={(v) => onChange({ houseChemistry: (v || undefined) as Chemistry | undefined })} />
       </span>
       <span data-tip="House bank capacity in amp-hours at this scenario's system voltage (a 24 V 200 Ah bank stores the same energy as 12 V 400 Ah). Leave empty to keep your equipment list's size.">
-        <NumInput value={s.houseCapacityAh} unit="Ah @ sys V" onChange={(v) => onChange({ houseCapacityAh: v > 0 ? v : undefined })} />
+        <NumInput label={`${s.name}: house bank capacity, amp-hours`} value={s.houseCapacityAh} unit="Ah @ sys V" onChange={(v) => onChange({ houseCapacityAh: v > 0 ? v : undefined })} />
       </span>
       {onRemove && (
         <button className="link danger" onClick={onRemove}>

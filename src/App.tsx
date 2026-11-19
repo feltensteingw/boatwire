@@ -18,12 +18,20 @@ import { THEMES, useApplyTheme, type ThemeId } from './ui/themes';
 import { TipLayer } from './ui/Tips';
 import { ToastLayer } from './ui/Toasts';
 import { isNarrow, usePane } from './ui/panes';
+import { DialogLayer, showMessage } from './ui/dialogs';
+import { useMenu } from './ui/useMenu';
+import { NewBoatWizard, useNewBoat } from './ui/NewBoat';
+import { isUntouched } from './model/examples';
+import { lenUnit } from './model/units';
 import { redo, undo, useHistory } from './state/history';
 import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
 import { parseProject } from './model/validate';
 import { toast } from './ui/toastStore';
 import { HelpButton, HelpGuide, HelpLink } from './ui/Help';
 import { UNDERLAY_ACCEPT, underlayFromFile } from './ui/underlayFile';
+import { freeSpot } from './engine/drawing';
+import { PART_MIME } from './ui/Diagram';
+import { viewCentre } from './ui/viewCentre';
 
 // Compare and Reports load on first use to keep the initial download small.
 const Compare = lazy(() => import('./ui/Compare').then((m) => ({ default: m.Compare })));
@@ -33,7 +41,7 @@ const VIEWS: { id: View; label: string; tip: string }[] = [
   { id: 'ideal', label: 'Ideal design', tip: 'The best-practice wiring for your equipment list, drawn automatically. Change equipment on the left and it redraws instantly.' },
   { id: 'existing', label: 'Existing boat', tip: 'Draw how your boat is wired today. BoatWire checks it against the rules and builds an upgrade plan toward the ideal design.' },
   { id: 'compare', label: 'Compare', tip: 'What-if scenarios side by side: 12 V vs 24 V, lead-acid vs lithium, bigger banks. See how cable sizes, fuses, weight and cost change.' },
-  { id: 'reports', label: 'Reports', tip: 'Design check, upgrade plan, wire schedule, bill of materials and energy budget. Printable and downloadable as CSV.' },
+  { id: 'reports', label: 'Reports', tip: 'Design check, upgrade plan, wire schedule, bill of materials and energy budget, plus a full printable report for an electrician. Printable and downloadable as CSV.' },
 ];
 
 export default function App() {
@@ -54,6 +62,8 @@ export default function App() {
         <CloudSync />
         <TipLayer />
         <ToastLayer />
+        <NewBoatWizard />
+        <DialogLayer />
         <HelpGuide />
         <Header />
         <RecoveryBanner />
@@ -107,13 +117,16 @@ function Header() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const setScenario = useStore((s) => s.setScenario);
+  const setReportTab = useStore((s) => s.setReportTab);
   const loadProject = useStore((s) => s.loadProject);
-  const newProject = useStore((s) => s.newProject);
+  const startNewBoat = useNewBoat((s) => s.start);
   const loadExample = useStore((s) => s.loadExample);
   const fileRef = useRef<HTMLInputElement>(null);
   const ideal = useIdeal();
   const existing = useExisting();
-  const [menu, setMenu] = useState(false);
+  const units = project.profile.units;
+  const fileMenu = useMenu();
+  const { open: menu, setOpen: setMenu } = fileMenu;
   const diagramDesign = view === 'existing' && existing ? existing : ideal;
   const slug = project.profile.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
   return (
@@ -137,7 +150,7 @@ function Header() {
       <UndoRedo />
       <div className="scen">
         <span className="hint">Scenario</span>
-        <select data-tip="Which what-if version of the boat to draw. Scenarios can change system voltage, house battery chemistry and capacity without touching your equipment list. Manage them under Compare." value={project.activeScenario} onChange={(e) => setScenario(e.target.value)}>
+        <select aria-label="Scenario" data-tip="Which what-if version of the boat to draw. Scenarios can change system voltage, house battery chemistry and capacity without touching your equipment list. Manage them under Compare." value={project.activeScenario} onChange={(e) => setScenario(e.target.value)}>
           {project.scenarios.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -148,21 +161,24 @@ function Header() {
       </div>
       <ThemePicker />
       <HelpButton />
+      <OfflineChip />
       <CloudControls />
       <div className="file">
-        <button onClick={() => setMenu(!menu)} data-tip="New boat, example boat, open / save a project file, and export the diagram or reports.">File ▾</button>
+        <button {...fileMenu.trigger} data-tip="New boat, example boat, open / save a project file, and export the diagram or reports.">
+          File ▾
+        </button>
         {menu && (
-          <div className="menu" onMouseLeave={() => setMenu(false)}>
+          <div className="menu" aria-label="File" {...fileMenu.panel}>
             <div className="menu-theme">
               <ThemePicker />
             </div>
             <button
               onClick={() => {
-                newProject();
+                startNewBoat();
                 setMenu(false);
               }}
             >
-              New boat
+              New boat…
             </button>
             <button
               onClick={() => {
@@ -189,16 +205,25 @@ function Header() {
                 downloadText(
                   `${slug}-wires.csv`,
                   toCsv([
-                    ['Circuit', 'From', 'To', 'Colour', 'Size', 'Length ft', 'Amps', 'Protection', 'Vdrop %'],
-                    ...wireSchedule(diagramDesign).map((r) => [r.circuit, r.from, r.to, r.color, r.gauge, r.lengthFt, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2)]),
+                    ['Circuit', 'From', 'To', 'Colour', units === 'metric' ? 'Size mm²' : 'Size AWG', `Length ${lenUnit(units)}`, 'Amps', 'Protection', 'Vdrop %'],
+                    ...wireSchedule(diagramDesign, units).map((r) => [r.circuit, r.from, r.to, r.color, r.size, r.length, r.amps?.toFixed(1), r.protection, r.vdrop?.toFixed(2)]),
                   ]),
                 )
               }
             >
               Wire schedule (CSV)
             </button>
-            <button onClick={() => downloadText(`${slug}-bom.csv`, toCsv([['Category', 'Item', 'Spec', 'Qty', 'Unit'], ...billOfMaterials(diagramDesign).map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]))}>
+            <button onClick={() => downloadText(`${slug}-bom.csv`, toCsv([['Category', 'Item', 'Spec', 'Qty', 'Unit'], ...billOfMaterials(diagramDesign, units).map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]))}>
               Bill of materials (CSV)
+            </button>
+            <button
+              onClick={() => {
+                setReportTab('full');
+                setView('reports');
+                setMenu(false);
+              }}
+            >
+              Full report for an electrician (print / PDF)…
             </button>
             <button onClick={() => window.print()}>Print current view</button>
           </div>
@@ -222,7 +247,7 @@ function Header() {
               loadProject(project);
               if (notes.length) toast(`Opened with repairs: ${notes.join(' ')}`, { ms: 15000 });
             } catch (err) {
-              alert(`Could not open “${f.name}”. ${(err as Error).message}`);
+              void showMessage(`Could not open “${f.name}”`, (err as Error).message);
             }
             e.target.value = '';
             setMenu(false);
@@ -230,6 +255,28 @@ function Header() {
         />
       </div>
     </header>
+  );
+}
+
+/** Shown only while the browser has no connection: the app keeps working from its offline copy. */
+function OfflineChip() {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+  if (online) return null;
+  return (
+    <span className="offline-chip" role="status" data-tip="No connection. BoatWire keeps working, and your changes are saved on this device. Signing in and cloud saving resume when the connection returns.">
+      <span aria-hidden>●</span>
+      <span className="offline-text"> Offline</span>
+    </span>
   );
 }
 
@@ -307,7 +354,7 @@ function ThemePicker() {
 function exportDiagram(fmt: 'png' | 'svg') {
   const fn = (window as unknown as { boatwireExport?: (f: 'png' | 'svg') => Promise<void> }).boatwireExport;
   if (fn && document.querySelector('.react-flow__viewport')) fn(fmt);
-  else alert('Open a diagram (Ideal design or Existing boat) first.');
+  else toast('Open a diagram first (Ideal design or Existing boat), then export it.');
 }
 
 function LayerBar({ manual }: { manual?: boolean }) {
@@ -324,7 +371,7 @@ function LayerBar({ manual }: { manual?: boolean }) {
         <span className="lg-title">Show</span>
         <Toggle checked={layers.dc} label="DC" tip="Show the 12 / 24 V battery system: batteries, buses, panels, chargers and DC loads." onChange={(v) => setLayers((l) => ({ ...l, dc: v, ac: !v && !l.ac ? true : l.ac }))} />
         <Toggle checked={layers.ac} label="AC" tip="Show the 120 / 230 V mains system: shore power, generator, inverter, AC panel and outlets." onChange={(v) => setLayers((l) => ({ ...l, ac: v, dc: !v && !l.dc ? true : l.dc }))} />
-        <select value={layers.negatives} onChange={(e) => setLayers((l) => ({ ...l, negatives: e.target.value as typeof l.negatives }))} data-tip={'How to draw the negative (return) wires.\nAll: every negative wire.\nBuses only: hide the many short load returns, keep the main ones.\nHide: positives only, the cleanest view.'}>
+        <select aria-label="Negative wires" value={layers.negatives} onChange={(e) => setLayers((l) => ({ ...l, negatives: e.target.value as typeof l.negatives }))} data-tip={'How to draw the negative (return) wires.\nAll: every negative wire.\nBuses only: hide the many short load returns, keep the main ones.\nHide: positives only, the cleanest view.'}>
           <option value="full">All negatives</option>
           <option value="buses">Negatives: buses only</option>
           <option value="hidden">Hide negatives</option>
@@ -368,6 +415,7 @@ function LayerBar({ manual }: { manual?: boolean }) {
 }
 
 function IdealView() {
+  const startNewBoat = useNewBoat((s) => s.start);
   const ideal = useIdeal();
   const findings = useFindings(ideal);
   const project = useStore((s) => s.project);
@@ -376,6 +424,16 @@ function IdealView() {
     <div className="workspace">
       <div className="canvas-col">
         <LayerBar />
+        {isUntouched(project) && (
+          <div className="example-note">
+            <span>
+              This is an <b>example boat</b> to look around in.
+            </span>
+            <button className="primary" onClick={() => startNewBoat()}>
+              Start my own boat
+            </button>
+          </div>
+        )}
         <div className="canvas-title">
           <b>Ideal design</b> · {project.profile.name} · {scen?.name} · {ideal.systemVoltage} V
           <span className="hint"> — generated from your equipment list. Edit equipment on the left; the design updates instantly.</span>
@@ -386,6 +444,21 @@ function IdealView() {
     </div>
   );
 }
+
+/** The parts most drawings need many of. One click (or a drag onto the canvas) adds one. Everything else is in the Add component list. */
+const QUICK_PARTS: [NodeType, string][] = [
+  ['battery', 'Battery'],
+  ['fuse', 'Fuse'],
+  ['breaker', 'Breaker'],
+  ['switch', 'Switch'],
+  ['bus-pos', '+ Bus'],
+  ['bus-neg', '− Bus'],
+  ['fuse-block', 'Fuse block'],
+  ['dc-panel', 'DC panel'],
+  ['shunt', 'Shunt'],
+  ['load', 'Load'],
+  ['note', 'Note'],
+];
 
 function ExistingView() {
   const existing = useExisting();
@@ -451,7 +524,7 @@ function ExistingView() {
                 const underlay = await underlayFromFile(f);
                 setExisting({ id: 'existing', name: 'Existing', systemVoltage: project.profile.systemVoltage, nodes: [], wires: [], findings: [], underlay });
               } catch (err) {
-                alert(`Could not use that file: ${(err as Error).message}`);
+                void showMessage('Could not use that file', (err as Error).message);
               } finally {
                 setBusy(false);
               }
@@ -472,18 +545,23 @@ function ExistingView() {
   }
   const errs = findings.filter((f) => f.severity === 'error').length;
   const warns = findings.filter((f) => f.severity === 'warning').length;
+  /** Add a generic part in the middle of what the user is looking at. */
+  const addPart = (type: NodeType) => {
+    const n = paletteNode(type, project.profile.batteryZone);
+    n.pos = freeSpot(existing, viewCentre());
+    addExistingNode(n);
+  };
   return (
     <div className="workspace">
       <div className="canvas-col">
         <div className="toolbar">
           <select
             value=""
-            data-tip="Add a generic component (fuse, switch, bus bar, panel…) to your drawing. Click it afterwards to set its rating."
+            aria-label="Add a component to the drawing"
+            data-tip="Every kind of component. It is added in the middle of the view; click it afterwards to set its rating."
             onChange={(e) => {
               if (!e.target.value) return;
-              const n = paletteNode(e.target.value as NodeType, project.profile.batteryZone);
-              n.pos = { x: 80 + Math.random() * 200, y: 80 + Math.random() * 200 };
-              addExistingNode(n);
+              addPart(e.target.value as NodeType);
             }}
           >
             <option value="">+ Add component…</option>
@@ -500,13 +578,14 @@ function ExistingView() {
           <select
             value=""
             disabled={!missingEq.length}
+            aria-label="Place equipment from your list on the drawing"
             data-tip="Place an item from your equipment list that is not on the drawing yet."
             onChange={(e) => {
               const eq = project.equipment.find((x) => x.id === e.target.value);
               if (!eq) return;
               const n = equipmentNode(eq, project);
               if (!n) return;
-              n.pos = { x: n.col * 240, y: 40 + Math.random() * 300 };
+              n.pos = freeSpot(existing, viewCentre());
               addExistingNode(n);
             }}
           >
@@ -545,10 +624,27 @@ function ExistingView() {
             Discard drawing
           </button>
         </div>
+        <div className="partbar" role="toolbar" aria-label="Common parts">
+          <span className="partbar-title">Quick add</span>
+          {QUICK_PARTS.map(([type, label]) => (
+            <button
+              key={type}
+              draggable
+              data-tip={`Click to add ${type === 'note' ? 'a note (free text for anything BoatWire has no symbol for)' : NODE_DEFS[type].label.toLowerCase()} in the middle of the view, or drag it to where it goes.`}
+              onDragStart={(e) => {
+                e.dataTransfer.setData(PART_MIME, type);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+              onClick={() => addPart(type)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <LayerBar manual />
         <div className="canvas-title">
           <b>Existing boat</b>
-          <span className="hint"> — drag from one terminal dot to another to draw a wire, or tap one dot and then the other. Click a wire to set its size and length. Delete removes the selection.</span>
+          <span className="hint"> — drag from one terminal dot to another to draw a wire, or tap one dot and then the other. Click a wire to set its size and length, or drag one of its ends to another terminal. Shift-drag selects several components; Delete removes the selection.</span>
         </div>
         <Diagram design={existing} findings={findings} mode="manual" />
       </div>

@@ -7,7 +7,7 @@
   --border-2: #c9d2db;
   --text: #17222d;
   --muted: #5d6b79;
-  --faint: #8b97a3;
+  --faint: #68747f;
   --navy: #0f2b46;
   --navy-2: #173c60;
   --accent: #1f7a8c;
@@ -23,11 +23,11 @@
 
   --err: #c62828;
   --err-bg: #fdecea;
-  --warn: #b26a00;
+  --warn: #955800;
   --warn-bg: #fff4e0;
   --info: #2c6aa0;
   --info-bg: #e8f1fa;
-  --ok: #2b8a3e;
+  --ok: #267a37;
 
   --sym-bg: #ffffff;
   --sym-border: #9aa7b4;
@@ -37,7 +37,7 @@
   --bus-gnd: #2b9348;
   --radius: 8px;
   --shadow: 0 1px 2px rgba(15, 43, 70, 0.08), 0 2px 8px rgba(15, 43, 70, 0.06);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: 'Inter Variable', Inter, system-ui, -apple-system, sans-serif;
   font-size: 13px;
   color: var(--text);
   color-scheme: light;
@@ -54,10 +54,15 @@
     --border-2: #334452;
     --text: #e3e9ef;
     --muted: #9aa8b5;
-    --faint: #6d7c89;
+    --faint: #8a99a6;
+    --err: #ff8a80;
+    --warn: #f0b35a;
+    --info: #7fbcec;
+    --ok: #6fd08c;
     --navy: #0a1f33;
     --navy-2: #12304d;
     --accent: #4fb3c4;
+    --accent-fg: #06222a;
     --accent-soft: #15323a;
     --grid: #22303c;
     --mini: #3a4a58;
@@ -88,10 +93,15 @@
   --border-2: #334452;
   --text: #e3e9ef;
   --muted: #9aa8b5;
-  --faint: #6d7c89;
+  --faint: #8a99a6;
+  --err: #ff8a80;
+  --warn: #f0b35a;
+  --info: #7fbcec;
+  --ok: #6fd08c;
   --navy: #0a1f33;
   --navy-2: #12304d;
   --accent: #4fb3c4;
+  --accent-fg: #06222a;
   --accent-soft: #15323a;
   --grid: #22303c;
   --mini: #3a4a58;
@@ -160,6 +170,7 @@
   --navy: #160606;
   --navy-2: #2a0d0b;
   --accent: #e0574b;
+  --accent-fg: #1a0503;
   --accent-soft: #2c0f0d;
   --grid: #24100e;
   --mini: #3d1a17;
@@ -205,6 +216,7 @@
   --navy: #082544;
   --navy-2: #0e3a66;
   --accent: #7fd3ff;
+  --accent-fg: #06222a;
   --accent-soft: #154e82;
   --grid: #2b5f92;
   --mini: #4f80b3;
@@ -304,7 +316,8 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  /* Text on the accent colour: white on the dark accents, near-black on the light ones (dark and blueprint themes). */
+  color: var(--accent-fg, #fff);
 }
 button.danger,
 .link.danger {
@@ -436,6 +449,12 @@ h4 {
 .undo {
   display: flex;
   gap: 2px;
+}
+.offline-chip {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffcf7a;
+  white-space: nowrap;
 }
 .header .undo button {
   border: none;
@@ -817,6 +836,116 @@ table.zones td:nth-child(3) {
     display: none;
   }
 }
+/* ---- drawing tools (Existing boat): quick-add strip, selection bar, notes ---- */
+.partbar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  flex-shrink: 0;
+}
+.partbar-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+.partbar button {
+  padding: 3px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: grab;
+}
+.partbar button:active {
+  cursor: grabbing;
+}
+.draw-tools {
+  margin: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.draw-tools > button,
+.draw-tools .picked {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+}
+.draw-tools > button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg, #fff);
+}
+.draw-tools .picked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 5px 3px 10px;
+}
+.draw-tools .picked button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+/* the rectangle dragged out to select several components, and the frame around what it caught */
+.diagram .react-flow__selection,
+.diagram .react-flow__nodesselection-rect {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px dashed var(--accent);
+}
+/* grips on the ends of the selected wire: drag one to another terminal */
+.diagram .react-flow__edgeupdater {
+  cursor: move;
+  fill: var(--accent);
+  fill-opacity: 0.35;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.sym.t-note {
+  background: var(--note-bg, #fff8c9);
+  border: 1px solid var(--note-border, #d6c35a);
+  border-radius: 3px;
+  color: #3a3410;
+  box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.12);
+}
+.note-text {
+  padding: 7px 9px;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+textarea.note-edit {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+}
+textarea.note-edit:focus {
+  outline: 2px solid var(--accent-soft);
+}
+.note-read {
+  white-space: pre-wrap;
+  margin: 8px 0;
+}
+@media print {
+  .partbar,
+  .draw-tools {
+    display: none;
+  }
+}
 /* ---- removing a zone that is in use ---- */
 .zone-move {
   margin: 8px 0;
@@ -839,6 +968,155 @@ table.zones td:nth-child(3) {
 .zone-move-row select {
   flex: 1;
   min-width: 120px;
+}
+/* ---- new boat wizard ---- */
+.modal.wizard {
+  width: min(760px, calc(100vw - 32px));
+  max-height: 88vh;
+}
+.wiz-steps {
+  display: flex;
+  gap: 6px;
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.wiz-steps li {
+  flex: 1;
+  padding: 4px 0 6px;
+  border-top: 3px solid var(--border);
+}
+.wiz-steps li.on {
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.wiz-steps li.done {
+  border-color: var(--accent);
+}
+.wiz-body > p {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.wiz-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.wiz-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.wiz-card span {
+  flex: 1;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.wiz-card-actions,
+.wiz-alt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.wiz-alt {
+  margin-top: 14px;
+}
+.wiz-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 20px;
+  align-items: end;
+}
+.wiz-loads {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 14px;
+}
+.wiz-loads fieldset {
+  margin: 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wiz-loads legend {
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.wiz-budget {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.wiz-budget.warn {
+  background: var(--warn-bg);
+}
+.modal-foot.wiz-foot {
+  justify-content: space-between;
+}
+.example-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+@media (max-width: 699px) {
+  .wiz-cards,
+  .wiz-form,
+  .wiz-loads {
+    grid-template-columns: 1fr;
+  }
+}
+@media print {
+  .example-note {
+    display: none;
+  }
+}
+/* ---- in-app message and question dialogs ---- */
+/* A message or question always sits above any dialog that raised it. */
+.modal-back:has(> .ask) {
+  z-index: 200;
+}
+.modal.ask {
+  width: min(440px, calc(100vw - 32px));
+}
+.modal.ask h3 {
+  margin: 0 0 8px;
+}
+.modal.ask p {
+  margin: 0;
+  line-height: 1.5;
+}
+.modal.ask .modal-foot {
+  gap: 8px;
+}
+.modal:focus {
+  outline: none;
+}
+.modal button.danger {
+  color: var(--err);
+  border-color: var(--err);
 }
 /* ---- crash screen and recovery banner ---- */
 .crash {
@@ -1093,7 +1371,7 @@ table.zones td:nth-child(3) {
   text-overflow: ellipsis;
 }
 .plabel.pl-panel {
-  font-family: Inter, sans-serif;
+  font-family: 'Inter Variable', Inter, sans-serif;
   font-size: 10.5px;
   color: var(--text);
 }
@@ -1142,6 +1420,26 @@ table.zones td:nth-child(3) {
 }
 .badge.info {
   background: var(--info);
+}
+/* A mark as well as a colour, so the three kinds can be told apart without relying on colour. */
+.badge::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 800 8px/1 'Inter Variable', Inter, sans-serif;
+  color: #fff;
+}
+.badge.error::after {
+  content: '×';
+  font-size: 10px;
+}
+.badge.warning::after {
+  content: '!';
+  color: #3b2600;
+}
+.badge.info::after {
+  content: 'i';
 }
 .react-flow__handle.h {
   width: 7px;
@@ -1693,6 +1991,357 @@ table.cmp td.best {
   }
 }
 
+/* ---- cost estimate: bill of materials, upgrade plan, Compare, price list ---- */
+.report-buttons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+table.bom tfoot .total td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-2);
+  padding-top: 8px;
+}
+table.bom tr.cat td.r {
+  font-weight: 600;
+}
+.cost-note {
+  margin-top: 10px;
+  max-width: 760px;
+}
+.chg-cost {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+table.cmp tr.cost-total th,
+table.cmp tr.cost-total td {
+  font-weight: 700;
+}
+table.cmp tr.cost-part th {
+  font-weight: 400;
+  padding-left: 22px;
+}
+table.cmp .more {
+  font-weight: 400;
+  color: var(--muted);
+}
+table.cmp tr.cat .hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.modal.prices {
+  width: min(680px, calc(100vw - 32px));
+  max-height: 86vh;
+}
+.modal.prices h3 {
+  margin: 0;
+}
+.modal.prices h4 {
+  margin: 16px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.prices-note {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border-left: 4px solid var(--warn);
+  background: var(--panel-2);
+  border-radius: 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.prices-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+.prices-tools label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.prices-tools input[type='text'] {
+  width: 56px;
+}
+.prices-tools .spacer {
+  flex: 1;
+}
+table.prices-table th {
+  text-align: left;
+  font-weight: 400;
+}
+table.prices-table th,
+table.prices-table td {
+  vertical-align: middle;
+}
+table.prices-table td.basis {
+  color: var(--muted);
+  white-space: nowrap;
+  width: 80px;
+}
+table.prices-table td.r {
+  width: 130px;
+}
+table.prices-table td.r input {
+  width: 84px;
+  text-align: right;
+}
+table.prices-table td.was {
+  width: 150px;
+  font-size: 12px;
+}
+table.prices-table tr.own th {
+  font-weight: 700;
+}
+table.prices-table tr.own td.r input {
+  border-color: var(--accent);
+}
+
+/* ---- energy report: a typical day (balance bars) and the assumptions behind it ----
+   The four charging sources wear the first four slots of a categorical palette, in a fixed
+   order: solar, wind and hydro, shore charger, engine. The set was checked for colour-blind
+   separation against each theme's panel colour. Two of the light colours are below 3:1 against
+   white, which is allowed only because every name and figure is also in the list beside the
+   bars: colour is never the only way to tell the sources apart. */
+:root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+}
+:root[data-theme='dark'],
+:root[data-theme='blueprint'] {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+  }
+}
+/* night watch keeps to red: one hue in four steps, light to dark */
+:root[data-theme='night'] {
+  --viz-1: #ffa398;
+  --viz-2: #e2695d;
+  --viz-3: #b8463b;
+  --viz-4: #8c2f27;
+}
+.energy-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+@media (max-width: 1250px) {
+  .energy-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.balance,
+.assume {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.balance h3,
+.assume h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.bal-rows {
+  margin: 12px 0 14px;
+  display: grid;
+  gap: 10px;
+}
+.bal-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 62px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.bal-name {
+  color: var(--muted);
+}
+.bal-val {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bal-track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+}
+.bal-bar,
+.bal-stack {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+}
+.bal-bar.used {
+  background: var(--muted);
+  position: relative;
+}
+/* 2px of the panel colour between segments does the separating; no outlines */
+.bal-stack {
+  gap: 2px;
+  overflow: hidden;
+}
+.bal-seg {
+  position: relative;
+  min-width: 3px;
+  flex-basis: 0;
+}
+/* the bars are thin, so each gets a taller area to hover or press */
+.bal-seg::after,
+.bal-bar.used::after {
+  content: '';
+  position: absolute;
+  inset: -9px 0;
+}
+.bal-stack:has(.bal-seg:hover) {
+  overflow: visible;
+}
+.bal-seg:hover,
+.bal-bar.used:hover {
+  filter: brightness(1.15);
+}
+.bal-seg.s1,
+.bal-key.s1 {
+  background: var(--viz-1);
+}
+.bal-seg.s2,
+.bal-key.s2 {
+  background: var(--viz-2);
+}
+.bal-seg.s3,
+.bal-key.s3 {
+  background: var(--viz-3);
+}
+.bal-seg.s4,
+.bal-key.s4 {
+  background: var(--viz-4);
+}
+table.bal-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+table.bal-list th,
+table.bal-list td {
+  text-align: left;
+  padding: 5px 6px;
+  border-top: 1px solid var(--border);
+  font-weight: 400;
+  vertical-align: top;
+}
+table.bal-list thead th {
+  border-top: none;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+table.bal-list tbody th {
+  white-space: nowrap;
+  font-weight: 600;
+}
+table.bal-list td:nth-child(2) {
+  color: var(--muted);
+}
+table.bal-list .r {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+table.bal-list tr.none th,
+table.bal-list tr.none td {
+  color: var(--faint);
+}
+table.bal-list tfoot th,
+table.bal-list tfoot td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-2);
+}
+.bal-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 7px;
+}
+.bal-verdict {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.assume-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.assume-head h3 {
+  margin-right: auto;
+}
+.assume .hint {
+  margin: 8px 0;
+}
+.presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.preset {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.assume-grid {
+  display: grid;
+  gap: 2px;
+}
+.assume-grid .field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  align-items: center;
+  gap: 10px;
+}
+.assume-grid .field-label {
+  width: auto;
+}
+.assume-grid .own .field-label {
+  font-weight: 700;
+}
+.assume-grid .own input {
+  border-color: var(--accent);
+}
+@media print {
+  .assume-head .toggle,
+  .assume-head button,
+  .presets {
+    display: none;
+  }
+}
+
 /* ---------------------------------------------------------------- cloud */
 .cloud {
   position: relative;
@@ -1812,7 +2461,7 @@ table.cmp td.best {
 .modal button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg, #fff);
 }
 .modal button.link.danger {
   color: var(--err);
@@ -2076,89 +2725,6 @@ table.cmp td.best {
   }
 }
 
-/* ---- trace-over underlay (Existing boat) ---- */
-.underlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: -1; /* beneath wires and components, inside the viewport */
-  transform-origin: 0 0;
-}
-.underlay img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-.underlay.locked {
-  pointer-events: none;
-}
-.underlay.adjusting {
-  pointer-events: all; /* the React Flow viewport itself is pointer-events: none */
-  cursor: move;
-  /* sizes divided by zoom so the outline and handle stay the same size on screen */
-  outline: calc(2px * var(--inv-zoom, 1)) dashed var(--accent);
-  outline-offset: calc(2px * var(--inv-zoom, 1));
-}
-.underlay-handle {
-  position: absolute;
-  --s: calc(18px * var(--inv-zoom, 1));
-  right: calc(var(--s) / -2);
-  bottom: calc(var(--s) / -2);
-  width: var(--s);
-  height: var(--s);
-  box-sizing: border-box;
-  border-radius: calc(3px * var(--inv-zoom, 1));
-  background: var(--accent);
-  border: calc(2px * var(--inv-zoom, 1)) solid var(--canvas);
-  cursor: nwse-resize;
-}
-.underlay-panel {
-  margin: 8px;
-}
-.underlay-panel > button,
-.underlay-bar {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-}
-.underlay-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
-  font-size: 12px;
-}
-.underlay-bar label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.underlay-name {
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.underlay-bar input[type='range'] {
-  width: 80px;
-}
-.underlay-bar button {
-  padding: 2px 8px;
-}
-.underlay-bar button.on {
-  background: var(--accent);
-  color: var(--accent-fg, #fff);
-  border-color: var(--accent);
-}
-@media print {
-  .underlay-panel {
-    display: none;
-  }
-}
-
 /* ================================================================ narrow screens (tablets and phones)
    Below 1200 px the equipment list and the details panel no longer fit beside the diagram. They
    become panels that slide over it, switched from a bar at the bottom of the screen (see
@@ -2355,6 +2921,7 @@ table.cmp td.best {
     max-width: none;
   }
   .cloud-status,
+  .offline-text,
   .brand > span:not(.version) {
     display: none;
   }
@@ -2441,5 +3008,160 @@ table.cmp td.best {
 @media print {
   .panebar {
     display: none;
+  }
+}
+
+/* ---- trace-over underlay (Existing boat) ---- */
+.underlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1; /* beneath wires and components, inside the viewport */
+  transform-origin: 0 0;
+}
+.underlay img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.underlay.locked {
+  pointer-events: none;
+}
+.underlay.adjusting {
+  pointer-events: all; /* the React Flow viewport itself is pointer-events: none */
+  cursor: move;
+  /* sizes divided by zoom so the outline and handle stay the same size on screen */
+  outline: calc(2px * var(--inv-zoom, 1)) dashed var(--accent);
+  outline-offset: calc(2px * var(--inv-zoom, 1));
+}
+.underlay-handle {
+  position: absolute;
+  --s: calc(18px * var(--inv-zoom, 1));
+  right: calc(var(--s) / -2);
+  bottom: calc(var(--s) / -2);
+  width: var(--s);
+  height: var(--s);
+  box-sizing: border-box;
+  border-radius: calc(3px * var(--inv-zoom, 1));
+  background: var(--accent);
+  border: calc(2px * var(--inv-zoom, 1)) solid var(--canvas);
+  cursor: nwse-resize;
+}
+.underlay-panel {
+  margin: 8px;
+}
+.underlay-panel > button,
+.underlay-bar {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.underlay-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.underlay-bar label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.underlay-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.underlay-bar input[type='range'] {
+  width: 80px;
+}
+.underlay-bar button {
+  padding: 2px 8px;
+}
+.underlay-bar button.on {
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  border-color: var(--accent);
+}
+@media print {
+  .underlay-panel {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- full (printable) report */
+.full-report {
+  max-width: 1100px;
+}
+.fr-head h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+.fr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.fr-summary {
+  margin: 10px 0 6px;
+}
+.fr-notice {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--warn, #d97706);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.fr-section {
+  margin-top: 28px;
+}
+.fr-section > h2 {
+  font-size: 16px;
+  margin: 0 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.fr-diagram {
+  position: relative;
+}
+.fr-diagram img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+}
+/* the live canvas the picture is taken from: laid out at a fixed size, off-screen */
+.fr-diagram-render {
+  position: absolute;
+  left: -20000px;
+  top: 0;
+  width: 1400px;
+  height: 900px;
+  display: flex;
+  pointer-events: none;
+}
+@media print {
+  .fr-diagram-render {
+    display: none;
+  }
+  .fr-section > h2 {
+    break-after: avoid;
+  }
+  .fr-diagram img {
+    max-height: 90vh;
+    margin: 0 auto;
+    object-fit: contain;
+    break-inside: avoid;
+  }
+  .full-report .finding,
+  .full-report tr {
+    break-inside: avoid;
   }
 }
