@@ -203,11 +203,15 @@ const batteries = (n: number) => `${n} ${n === 1 ? 'battery' : 'batteries'}`;
  */
 export function reportBank(b: Builder, p: Plan, e: Equipment, s: BankSummary, node: DNode) {
   const { V } = p;
+  if (s.units < 1) {
+    b.find('error', 'series-parallel', `${e.name}: no batteries listed.`, 'Set the number of batteries in the equipment list.', [node.id]);
+    return;
+  }
   if (!s.valid) {
     if (s.unitV > V) {
       b.find('error', 'series-parallel', `${e.name}: ${s.unitV} V batteries can't make a ${V} V bank.`, `Use ${V} V batteries, or smaller ones in series.`, [node.id]);
     } else {
-      b.find('error', 'series-parallel', `${e.name}: ${s.units}× ${s.unitV} V ${s.units === 1 ? 'battery' : 'batteries'} can't make a ${V} V bank (need a multiple of ${s.series}).`, `Use ${Math.max(s.series, Math.ceil(s.units / s.series) * s.series)} batteries or a different battery voltage.`, [node.id]);
+      b.find('error', 'series-parallel', `${e.name}: ${s.units}× ${s.unitV} V ${s.units === 1 ? 'battery' : 'batteries'} can't make a ${V} V bank (need a multiple of ${s.series}).`, `Use ${batteries(Math.max(s.series, Math.ceil(s.units / s.series) * s.series))} or a different battery voltage.`, [node.id]);
     }
   }
 
@@ -219,11 +223,13 @@ export function reportBank(b: Builder, p: Plan, e: Equipment, s: BankSummary, no
   const sameV = wasV === s.unitV;
   const assumed = sameV ? batteries(s.units) : `${s.units}× ${s.unitV} V ${s.unitAh} Ah`;
   const listed = sameV ? `${was}` : `${was}× ${wasV} V ${s.unitAh} Ah`;
+  // Whole strings can store more than the list does (three 6 V batteries become two 12 V ones), never less.
+  const more = s.units * s.unitV > was * wasV;
   const [reason, why] =
     c.why === 'capacity'
       ? [`to make ${s.ah} Ah at ${V} V`, 'This scenario sets the house bank capacity.']
       : c.why === 'energy'
-        ? ['to store the same energy', '']
+        ? [`to store ${more ? 'at least ' : ''}the same energy`, '']
         : [`for ${V} V`, `${s.unitV} V batteries make ${V} V in strings of ${s.series}.`];
   const volts = c.batteryVolts === 'lithium' ? `Lithium batteries are taken as ${s.unitV} V each.` : c.batteryVolts === 'too-high' ? `${wasV} V batteries can't make a ${V} V bank.` : '';
   const fix = [volts, why, `If you make this change, list ${batteries(s.units)}${sameV ? '' : ` of ${s.unitV} V`}.`].filter(Boolean).join(' ');

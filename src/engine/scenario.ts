@@ -24,6 +24,12 @@ export interface BankChange {
   batteryVolts?: 'lithium' | 'too-high';
 }
 
+/** The number of batteries listed, read as the design reads it (a missing or empty count is 1, a count of 0 stays 0). */
+function listedCount(e: Equipment): number {
+  const v = e.props.units;
+  return typeof v === 'number' ? v : typeof v === 'string' && v !== '' && !isNaN(+v) ? +v : 1;
+}
+
 /**
  * The bank as this scenario has it, or undefined when the scenario leaves it as listed.
  *
@@ -38,7 +44,7 @@ function assumeBank(project: Project, scenario: Scenario, V: SystemVoltage, e: E
   const chem = house ? scenario.houseChemistry : undefined;
   const cap = house && scenario.houseCapacityAh ? scenario.houseCapacityAh : undefined;
   const unitAh = Number(e.props.unitAh) || 100;
-  const listedUnits = Number(e.props.units) || 1;
+  const listedUnits = listedCount(e);
   const listedUnitV = Number(e.props.unitVolts) || 12;
   // What the listed batteries store, as amp-hours at the scenario's voltage.
   const listedAh = (listedUnits * listedUnitV * unitAh) / V;
@@ -65,8 +71,8 @@ function assumeBank(project: Project, scenario: Scenario, V: SystemVoltage, e: E
     why = 'capacity';
   } else if (unitV !== listedUnitV) {
     // Keep the energy the bank stores, in whole strings: four 6 V 225 Ah batteries become two
-    // 12 V 225 Ah.
-    props.units = Math.max(1, Math.ceil((listedUnits * listedUnitV) / V)) * series;
+    // 12 V 225 Ah. (A bank listed with no batteries keeps none.)
+    props.units = Math.ceil((listedUnits * listedUnitV) / V) * series;
     why = 'energy';
   } else {
     props.units = Math.ceil(listedUnits / series) * series;

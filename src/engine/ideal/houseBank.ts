@@ -49,9 +49,11 @@ export function buildHouseBank(b: Builder, p: Plan): Core {
 
   let firstMainFuse: DNode | undefined;
   let houseAhTotal = 0;
+  let houseBuildable = true;
   house.forEach((h, i) => {
     const s = bankSummary(h, V);
     houseAhTotal += s.ah;
+    houseBuildable &&= s.valid;
     const bat = b.add('battery', `house${i}-bat`, h.name, {
       zone: h.zone || BZ,
       sublabel: s.text,
@@ -101,7 +103,9 @@ export function buildHouseBank(b: Builder, p: Plan): Core {
   // Bank sizing check
   const budget = energyBudget(project, scenario);
   if (budget.totalAhPerDay > 0 && houseAhTotal < budget.recommendedAh * 0.9) {
-    b.find('warning', 'bank-sizing', `House bank is ${Math.round(houseAhTotal)} Ah; daily use is ~${Math.round(budget.totalAhPerDay)} Ah, which suggests ~${budget.recommendedAh} Ah for ${daysText(budget.daysAutonomy)} at safe depth of discharge.`, 'Increase house capacity or reduce loads.');
+    // (a bank that cannot be built has no capacity of its own: say what its batteries store)
+    const has = houseBuildable ? `House bank is ${Math.round(houseAhTotal)} Ah` : `The house batteries as listed store about ${Math.round(houseAhTotal)} Ah at ${V} V`;
+    b.find('warning', 'bank-sizing', `${has}; daily use is ~${Math.round(budget.totalAhPerDay)} Ah, which suggests ~${budget.recommendedAh} Ah for ${daysText(budget.daysAutonomy)} at safe depth of discharge.`, 'Increase house capacity or reduce loads.');
   }
 
   return { houseSwitch, posBus, negBus, shunt, firstMainFuse, mainOpts, mainCable, mainCableRuns, bms };

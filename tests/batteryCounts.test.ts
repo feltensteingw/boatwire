@@ -64,6 +64,23 @@ describe("at the boat's own voltage, a bank that cannot make it is drawn as list
     const kWh = (3 * 12 * 100 + 1 * 12 * 90 + 1 * 12 * 100) / 1000;
     expect(c.byCategory.find((x) => x.category === 'Batteries')!.cost).toBeCloseTo(kWh * priceFor('battery:agm')!, 6);
     expect(node(d, bank(p, 'house')).data.ah).toBe(energyBudget(p, asSpecified).houseAh);
+    // the sizing check says what the batteries store, not that the bank (which cannot be built) has that capacity
+    expect(d.findings.find((f) => f.rule === 'bank-sizing')!.message).toMatch(/^The house batteries as listed store about 150 Ah at 24 V; daily use is/);
+    expect(generateIdeal(boat(24, 2)).findings.find((f) => f.rule === 'bank-sizing')!.message).toMatch(/^House bank is 100 Ah; daily use is/);
+  });
+
+  it('a bank with no batteries is reported plainly, also in a what-if that does not set its size', () => {
+    const q = boat(12, 0);
+    for (const s of [undefined, { id: 'v', name: '24 V', systemVoltage: 24 } as Scenario, { id: 'l', name: 'Lithium', houseChemistry: 'lifepo4' } as Scenario]) {
+      const d = generateIdeal(q, s);
+      const n = node(d, bank(q, 'house'));
+      expect(n.sublabel, s?.name).toMatch(/^0× 12 V 100 Ah (AGM|LiFePO4) · cannot make (12|24) V$/);
+      expect(about(d, n.id), s?.name).toEqual(['error: House bank: no batteries listed.']);
+      expect(d.findings.find((f) => f.nodes?.includes(n.id))!.fix).toBe('Set the number of batteries in the equipment list.');
+    }
+    // a scenario capacity does set its size, and says so
+    const d = generateIdeal(q, { id: 'c', name: '300 Ah', houseCapacityAh: 300 });
+    expect(about(d, node(d, bank(q, 'house')).id)).toEqual(['info: House bank: 3 batteries assumed to make 300 Ah at 12 V; your list has 0.']);
   });
 
   it('batteries of a higher voltage than the boat are reported plainly', () => {
@@ -236,6 +253,15 @@ describe('a lithium what-if keeps the energy of a bank of 6 V, 2 V or 24 V batte
   it('six 2 V 600 Ah cells become one 12 V 600 Ah battery', () => {
     const p = house({ chemistry: 'flooded', unitVolts: 2, unitAh: 600, units: 6 });
     expect(node(generateIdeal(p, lithium), bank(p, 'house')).sublabel).toBe('1× 12 V 600 Ah LiFePO4 · 1S1P = 12 V 600 Ah');
+  });
+
+  it('when whole batteries store more than the list, the note says "at least"', () => {
+    // three 6 V 225 Ah batteries store 4.05 kWh; two 12 V 225 Ah store 5.4 kWh
+    const p = house({ ...golfCart, units: 3 });
+    const d = generateIdeal(p, lithium);
+    const n = node(d, bank(p, 'house'));
+    expect(n.sublabel).toBe('2× 12 V 225 Ah LiFePO4 · 1S2P = 12 V 450 Ah');
+    expect(about(d, n.id)).toEqual(['info: House bank: 2× 12 V 225 Ah assumed to store at least the same energy; your list has 3× 6 V 225 Ah.']);
   });
 
   it('two 24 V 100 Ah batteries on a 24 V boat become four 12 V 100 Ah: 200 Ah at 24 V', () => {
