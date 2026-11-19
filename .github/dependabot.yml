@@ -1,6 +1,9 @@
 # Weekly pull requests for dependency updates. Each one runs the full CI (lint, unit tests,
-# build, browser tests) and gets a preview site, so an update that breaks something is caught
-# before it is merged.
+# build, browser tests).
+#
+# Careful: on a Dependabot PR the check ALWAYS ends red, even when every test passed. The
+# last step (the preview deploy) cannot get the deploy secret on Dependabot runs. Before
+# merging one, open its check and confirm that every step up to "npm run test:e2e" is green.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -13,24 +16,21 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # Major versions of these change APIs the app depends on; take them deliberately.
-      - dependency-name: firebase
-        update-types: [version-update:semver-major]
-      - dependency-name: '@xyflow/react'
-        update-types: [version-update:semver-major]
-      - dependency-name: react
-        update-types: [version-update:semver-major]
-      - dependency-name: react-dom
-        update-types: [version-update:semver-major]
-      # These majors broke the build in November 2026 and were rolled back. Each needs
-      # companion upgrades first: TypeScript 7 needs a typescript-eslint that accepts it,
-      # Vite 8 needs @vitejs/plugin-react 5+ and a matching vitest, and react-hooks 7 adds
-      # new lint rules the code does not pass yet. Take them deliberately in their own PR.
-      - dependency-name: typescript
-        update-types: [version-update:semver-major]
-      - dependency-name: vite
-        update-types: [version-update:semver-major]
-      - dependency-name: eslint-plugin-react-hooks
+      # No major-version updates at all. On 19 Nov 2026, ten Dependabot PRs were merged
+      # in two batches (eight of them major versions), and main stopped building twice:
+      # most majors need companion upgrades that Dependabot does not make. Take each
+      # major deliberately, in its own PR, with the code changes it needs. Notes for when
+      # you do:
+      #   TypeScript 7        needs a typescript-eslint that accepts it
+      #   Vite 6+             needs @vitejs/plugin-react 5+ (and is what vitest 5 needs)
+      #   vitest 5            needs Vite 6.4+ and Node 22.12+
+      #   ESLint 10           @eslint/js 10 only works with eslint 10
+      #   react-hooks 7       adds lint rules the code does not pass yet
+      #   pdfjs-dist 6        not tried; check PDF import, including JPEG 2000 scans
+      #   immer 11            not tried
+      # Remove this rule to get major-version PRs again. Minor and patch updates still
+      # arrive weekly as one grouped PR.
+      - dependency-name: '*'
         update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
