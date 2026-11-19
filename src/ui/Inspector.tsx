@@ -477,7 +477,7 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
           {bundles && (
             <Field
               label="Bundled with"
-              help="How many other wires that carry current (positive or negative, not grounding or signal) run with this one in the same bundle, loom, sheath or conduit. Packed wires run hotter, so each is rated for less current: see Ampacity below. 0 means it runs on its own."
+              help="How many other wires that carry current run in the same bundle, loom, sheath or conduit as this one. Count this circuit's own negative if it is in the same cable: a duplex cable is bundled with 1. Leave out grounding and signal wires, wires carrying less than half their rating in a bundle (most lighting and electronics), and wires used only in short bursts, such as a starter or bow thruster. 0 means it runs on its own."
             >
               <NumInput
                 value={wire.bundledWith ?? 0}

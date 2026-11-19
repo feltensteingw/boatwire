@@ -9,7 +9,7 @@ import type { Design, Wire } from '../src/model/types';
 import { parseProject } from '../src/model/validate';
 import { exampleProject } from '../src/model/examples';
 import { describeChange } from '../src/state/changes';
-import { SAMPLE_BOATS } from './sampleBoats';
+import { FINGERPRINT_BOATS, SAMPLE_BOATS } from './sampleBoats';
 
 // Bundled conductors, from Blue Sea Systems' 2023 Catalog p.164, read 2026-11-19: E-11 Table VI-B
 // ("up to three conductors in a sheath, conduit or bundle"), outside and inside the engine space.
@@ -212,12 +212,19 @@ describe('the "Bundled with" field', () => {
 });
 
 describe('the ideal design assumes cables run on their own', () => {
-  it('says so in one design note on every sample boat, and no wire is marked bundled', () => {
-    for (const b of SAMPLE_BOATS) {
+  it('says so in one design note on every recorded boat with cables, and no wire is marked bundled', () => {
+    for (const b of [...SAMPLE_BOATS, ...FINGERPRINT_BOATS]) {
       const d = generateIdeal(b.project, b.scenario);
-      if (d.wires.length === 0) continue;
-      expect(d.findings.filter((f) => f.rule === 'bundling').map((f) => f.severity), b.name).toEqual(['info']);
+      // A boat with no house bank gets no design, so no cables and no note.
+      expect(d.findings.filter((f) => f.rule === 'bundling').map((f) => f.severity), b.name).toEqual(d.wires.length ? ['info'] : []);
       expect(d.wires.filter((w) => w.bundledWith !== undefined), b.name).toEqual([]);
     }
+  });
+
+  it('the note says how to check bundled cables, starting from the ideal design', () => {
+    const note = generateIdeal(exampleProject()).findings.find((f) => f.rule === 'bundling');
+    expect(note?.fix).toMatch(/out of looms/);
+    expect(note?.fix).toMatch(/30% to 60% less current/);
+    expect(note?.fix).toMatch(/set "Bundled with" on those wires in Existing boat; for a new installation, choose "Start from the ideal design" there first\./);
   });
 });

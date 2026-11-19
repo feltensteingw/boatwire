@@ -84,7 +84,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'bundling': {
     title: 'Wires in a bundle',
-    why: 'Wires packed together in a bundle, loom, sheath or conduit cannot shed heat as well as a wire on its own, so each is rated for less current, and less again in a bigger bundle. Only wires that carry current count: positive and negative, not grounding or signal wires. BoatWire uses the ABYC E-11 figures as published by Blue Sea Systems. The ideal design sizes every cable as if it ran on its own. In Existing boat, set "Bundled with" on a wire to check it as bundled.',
+    why: 'Wires packed together in a bundle, loom, sheath or conduit cannot shed heat as well as a wire on its own, so each is rated for less current, and less again in a bigger bundle. Only wires that carry current count: positive and negative, including a circuit\'s own negative in the same cable, but not grounding or signal wires. Blue Sea Systems also says you need not count wires that carry less than half their rating in a bundle, or that carry current only in short bursts. BoatWire uses the ABYC E-11 figures as Blue Sea publishes them (2023 catalog, p.164). The ideal design sizes every cable as if it ran on its own. In Existing boat, set "Bundled with" on a wire to check it as bundled.',
     ref: REFS.E11,
   },
   'unsized-wire': {
