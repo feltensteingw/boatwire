@@ -22,6 +22,16 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: react-dom
         update-types: [version-update:semver-major]
+      # These majors broke the build in November 2026 and were rolled back. Each needs
+      # companion upgrades first: TypeScript 7 needs a typescript-eslint that accepts it,
+      # Vite 8 needs @vitejs/plugin-react 5+ and a matching vitest, and react-hooks 7 adds
+      # new lint rules the code does not pass yet. Take them deliberately in their own PR.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: vite
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint-plugin-react-hooks
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:
