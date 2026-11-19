@@ -283,7 +283,8 @@ const SECTIONS: Section[] = [
         <p>
           Lithium needs its own charge profile and must never be paralleled with lead-acid. If its BMS disconnects while the alternator is charging, the voltage spike can destroy the alternator. So for a lithium house bank, BoatWire either charges the lead-acid start battery
           from the alternator and feeds the house bank through a <b>DC-DC charger</b>, or, with an <b>external regulator</b>, charges lithium directly with an <b>alternator protection device</b>. A lithium start battery with a lead-acid house bank works the other
-          way round: the alternator charges the house bank, and a DC-DC charger set to a lithium profile keeps the start battery charged. Whenever either battery is lithium, relay and isolator options are ignored, with a note explaining why.
+          way round: the alternator charges the house bank, and a DC-DC charger set to a lithium profile keeps the start battery charged. If both are lithium, the alternator needs an external regulator. Whenever either battery is lithium, relay and isolator options are
+          ignored, with a note explaining why.
         </p>
       </>
     ),

@@ -184,6 +184,15 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
     the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
     Object.assign(the(p, 'engine').props, { chargeSplit: 'relay-run', regulator: 'external' });
   }),
+  boat('lithium house and lithium start battery, stock regulator (an error the design reports)', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+  }),
+  boat('lithium house and lithium start battery, external regulator', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.regulator = 'external';
+  }),
   boat('lithium start battery with an ACR chosen, 24 V', (p) => {
     the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
     the(p, 'engine').props.chargeSplit = 'acr';

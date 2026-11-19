@@ -108,7 +108,8 @@ function buildAlternator(b: Builder, p: Plan, core: Core, e: EngineInfo) {
   const split = String(engine.props.chargeSplit ?? 'auto');
   const needsDcdc = lfp || startChem === 'lifepo4';
   // Lithium house, stock regulator: the alternator charges the lead-acid start battery instead.
-  const toStart = lfp && !extReg && !!startBus;
+  // (A lithium start battery is no better, so then the design asks for an external regulator.)
+  const toStart = lfp && !extReg && !!startBus && startChem !== 'lifepo4';
   const wantsIso = split === 'isolator-fet' || split === 'isolator-diode';
   const useIso = wantsIso && !needsDcdc && !!startBus;
   const wantsRunRelay = split === 'relay-run';
@@ -141,7 +142,7 @@ function buildAlternator(b: Builder, p: Plan, core: Core, e: EngineInfo) {
   if (startBus && !useIso) chargeStartFromHouse(b, p, core, a, startBus);
 }
 
-/** Lithium house with a stock regulator: the alternator charges the start battery, and a DC-DC charger carries the charge on to the house bank. */
+/** Lithium house, lead-acid start battery, stock regulator: the alternator charges the start battery, and a DC-DC charger carries the charge on to the house bank. */
 function alternatorToStartBattery(b: Builder, p: Plan, core: Core, a: Alt, startBus: DNode) {
   const { V, BZ } = p;
   const { posBus, negBus } = core;
@@ -217,7 +218,7 @@ function alternatorToHouse(b: Builder, p: Plan, core: Core, a: Alt) {
 function alternatorRegulation(b: Builder, p: Plan, core: Core, a: Alt) {
   const { lfp } = p;
   const { posBus, bms } = core;
-  const { alt, altLen, engineNode, extReg, EZ } = a;
+  const { alt, altLen, engineNode, extReg, EZ, startBus } = a;
 
   if (lfp) {
     const reg = b.add('regulator', 'alt-reg', 'Smart alternator regulator', { zone: EZ, sublabel: 'Lithium profile, belt/temperature limiting', data: { part: 'External regulator (e.g. Wakespeed WS500 / Balmar MC-618)' }, notes: ['alternator-lfp'] });
@@ -227,7 +228,8 @@ function alternatorRegulation(b: Builder, p: Plan, core: Core, a: Alt) {
     b.wire('pos', [alt, 'b'], [apd, 'b'], { amps: 5, protect: 10, len: 1, gauge: '10', engine: true });
     b.wire('neg', [apd, 'neg'], [engineNode, 'neg'], { amps: 5, len: 1, gauge: '10', engine: true });
     if (bms) b.wire('sig', [bms, 'atc'], [reg, 'atc'], { amps: 0, len: altLen });
-    if (!extReg) b.find('error', 'alternator-lfp', 'Lithium house bank with the alternator wired to it but no start battery and a stock regulator.', 'Add a lead-acid start battery (alternator → start, DC-DC → house) or fit an external regulator.');
+    if (!extReg && startBus) b.find('error', 'alternator-lfp', 'Lithium house bank and lithium start battery with a stock regulator: there is no lead-acid battery the alternator can charge directly.', 'Make the start battery lead-acid (alternator → start, DC-DC → house) or fit an external regulator.');
+    else if (!extReg) b.find('error', 'alternator-lfp', 'Lithium house bank with the alternator wired to it but no start battery and a stock regulator.', 'Add a lead-acid start battery (alternator → start, DC-DC → house) or fit an external regulator.');
   } else if (extReg) {
     const reg = b.add('regulator', 'alt-reg', 'Smart alternator regulator', { zone: EZ, sublabel: 'Multi-stage', data: { part: 'External regulator' } });
     b.wire('sig', [reg, 'field'], [alt, 'field'], { amps: 0, len: 2 });

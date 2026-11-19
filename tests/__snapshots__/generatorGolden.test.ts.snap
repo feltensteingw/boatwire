@@ -1619,6 +1619,10 @@ exports[`more generated designs are unchanged (fingerprint only) > isolator chos
 
 exports[`more generated designs are unchanged (fingerprint only) > lead-acid with an external regulator 1`] = `"58 components, 86 wires, 1 findings, 583f6e66c20a8a5a"`;
 
+exports[`more generated designs are unchanged (fingerprint only) > lithium house and lithium start battery, external regulator 1`] = `"59 components, 89 wires, 2 findings, a73fc49dfa63da19"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > lithium house and lithium start battery, stock regulator (an error the design reports) 1`] = `"59 components, 89 wires, 3 findings, bf5e3d8e289551cc"`;
+
 exports[`more generated designs are unchanged (fingerprint only) > lithium house with a lead-acid windlass bank 1`] = `"65 components, 98 wires, 1 findings, 578af0cea0f38734"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > lithium house with an isolator chosen and an external regulator 1`] = `"59 components, 89 wires, 2 findings, d1b1f694947a3167"`;

@@ -331,8 +331,30 @@ describe('start battery and house bank of different chemistries', () => {
     expect(size(24, 20)).toBe('12 A + note'); // 10 A at 24 V
   });
 
-  it('no design joins lithium and lead-acid through a relay or isolator, and every one passes its own check', () => {
-    for (const [house, start] of [['agm', 'lifepo4'], ['lifepo4', 'agm']])
+  it('both batteries lithium, stock regulator: the alternator is not wired to the start battery, and the design asks for an external regulator', () => {
+    const p = boat('lifepo4', 'lifepo4');
+    const d = generateIdeal(p);
+    expect(d.nodes.some((n) => n.id === 'alt-dcdc')).toBe(false);
+    expect(wired(d, 'alt-fuse', 'pos-bus')).toBe(true);
+    expect(d.nodes.some((n) => n.type === 'regulator')).toBe(true);
+    expect(d.nodes.some((n) => n.type === 'apd')).toBe(true);
+    expect(d.nodes.find((n) => n.id === 'start-dcdc')!.sublabel).toBe('18 A lithium profile');
+    const err = d.findings.filter((f) => f.severity === 'error');
+    expect(err.map((f) => f.rule)).toEqual(['alternator-lfp']);
+    expect(err[0].message).toContain('lithium start battery');
+    expect(err[0].fix).toContain('Make the start battery lead-acid');
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+  });
+
+  it('both batteries lithium, external regulator: no error', () => {
+    const p = boat('lifepo4', 'lifepo4', { regulator: 'external' });
+    const d = generateIdeal(p);
+    expect(d.findings.filter((f) => f.severity === 'error')).toEqual([]);
+    expect(errorsOf(d, p).map((e) => e.message)).toEqual([]);
+  });
+
+  it('with a lithium battery on either side, no design uses a relay or isolator, and every one passes its own check', () => {
+    for (const [house, start] of [['agm', 'lifepo4'], ['lifepo4', 'agm'], ['lifepo4', 'lifepo4']])
       for (const chargeSplit of ['auto', 'acr', 'relay-run', 'isolator-fet', 'isolator-diode'])
         for (const regulator of ['internal', 'external'])
           for (const V of [12, 24] as const) {
@@ -340,7 +362,9 @@ describe('start battery and house bank of different chemistries', () => {
             const d = generateIdeal(p, { id: 'x', name: 'x', systemVoltage: V });
             const what = `${house} house, ${start} start, ${chargeSplit}, ${regulator}, ${V} V`;
             expect(relayOrIsolator(d), what).toEqual([]);
-            expect(d.findings.filter((f) => f.severity === 'error'), what).toEqual([]);
+            // only the all-lithium boat with a stock regulator cannot be built as asked, and says so
+            const own = d.findings.filter((f) => f.severity === 'error').map((f) => f.rule);
+            expect(own, what).toEqual(house === 'lifepo4' && start === 'lifepo4' && regulator === 'internal' ? ['alternator-lfp'] : []);
             expect(errorsOf(d, p).map((e) => e.message), what).toEqual([]);
           }
   });
