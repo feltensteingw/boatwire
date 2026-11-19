@@ -5,7 +5,7 @@ import { growTerminal, makeNode } from '../../model/nodeDefs';
 import { fmtSize, type Units } from '../../model/units';
 import { GAUGES, VDROP } from '../../model/standards';
 import type { Chemistry, DNode, Equipment, Finding, NodeType, Severity, Wire, WireKind } from '../../model/types';
-import { nextStandard, PROTECTION_SIZES, protectionNeeded, sizeConductor, type ProtectionKind } from '../calc';
+import { ampacity, nextStandard, PROTECTION_SIZES, protectionNeeded, sizeConductor, type ProtectionKind } from '../calc';
 import { num } from '../energy';
 
 /** One end of a wire: a component and the id of one of its terminals. */
@@ -110,7 +110,10 @@ export class Builder {
       w.vdropPct = Math.round(r.vdropPct * 100) / 100;
       if (r.overflow) {
         const big = GAUGES[GAUGES.length - 1];
-        const runs = Math.max(2, Math.ceil((o.protect ?? o.amps) / big.ampacity105));
+        // Enough cables for the fuse and for the current. The fuse is normally the larger, but it
+        // is smaller when no fuse is big enough for the current (rating() reports that).
+        const need = Math.max(o.protect ?? o.amps, o.amps);
+        const runs = Math.max(2, Math.ceil(need / ampacity(big.awg, o.engine, kind === 'ac')));
         w.cable = `${runs}× ${big.awg}`;
         w.vdropPct = Math.round((r.vdropPct / runs) * 100) / 100;
         this.find('warning', 'conductor-sizing', `${a[0].label} → ${b[0].label} needs ${runs} parallel ${fmtSize(big.awg, this.units)} cables.`, 'Consider a higher system voltage or moving the equipment closer to the batteries.', [a[0].id, b[0].id]);

@@ -62,16 +62,33 @@ describe('picking a standard size', () => {
     b24.protection(1000, { what: 'Fuse' });
     expect(b24.findings[0].fix).toBe('Split the load across two circuits, or use a larger dedicated circuit.');
   });
+
+  it('parallel cables are counted from the current when no fuse is big enough for it', () => {
+    const b = new Builder(12, 120, true);
+    const bat = b.add('battery', 'bat', 'Battery');
+    const fuse = b.add('fuse', 'fuse', 'Fuse');
+    // 915 A through an 800 A fuse: two 4/0 (890 A) would carry less than the current
+    expect(b.wire('pos', [bat, 'pos'], [fuse, 'in'], { amps: 915, protect: 800, len: 0.5 }).cable).toBe('3× 4/0');
+    // the usual case, a fuse above the current, is unchanged
+    expect(b.wire('pos', [bat, 'pos'], [fuse, 'in'], { amps: 480, protect: 600, len: 0.5 }).cable).toBe('2× 4/0');
+    // in the engine space a 4/0 is good for less, as the design check counts it
+    expect(b.wire('pos', [bat, 'pos'], [fuse, 'in'], { amps: 700, protect: 800, len: 0.5, engine: true }).cable).toBe('3× 4/0');
+  });
 });
 
 describe('every part of the generator reports a current beyond its largest size', () => {
-  it('house bank: the main fuse error', () => {
+  it('house bank: the main fuse error, and main cables sized for the real current', () => {
     const p = boat((q) => void (the(q, 'inverter-charger').props.watts = 8000));
     const d = generateIdeal(p);
     expect(about(d, 'Main DC current')).toEqual([
       expect.objectContaining({ severity: 'error', message: 'Main DC current (~915 A) is beyond practical fuse and switch sizes.', nodes: ['house0-fuse'] }),
     ]);
     expect(rating(d, 'house0-fuse')).toBe(800);
+    const mainCable = d.wires.find((w) => w.from.node === 'house0-bat' && w.to.node === 'house0-fuse')!;
+    expect(mainCable.amps).toBe(915.4);
+    expect(mainCable.cable).toBe('3× 4/0');
+    // the cables the generator draws now carry their current; what is left is the inverter's AC side
+    expect(audit(d).filter((f) => f.severity === 'error' && f.message.includes('2× 4/0'))).toEqual([]);
     // at 24 V the same boat fits the lists
     expect(beyond(generateIdeal(p, V24))).toEqual([]);
   });
