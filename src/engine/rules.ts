@@ -167,6 +167,10 @@ function build(units: Units): Record<string, RuleInfo> {
     title: 'Equipment left out of the design',
     why: 'The ideal design is built around one propulsion engine, one inverter or inverter/charger, one shore power inlet, one AC generator, one engine start battery and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',
   },
+  'beyond-sizes': {
+    title: 'Bigger than the largest part',
+    why: 'Fuses, breakers, switches, relays and controllers come in standard sizes, up to a largest one. When a circuit needs more, BoatWire still draws the largest so the diagram is complete, and reports it: an error when that part is smaller than the current through it, a warning when only its safety margin is short or when a controller simply cannot deliver everything. The cure is less current through one part: a higher system voltage (24 V halves the current), the load split across two circuits, banks or controllers, or a dedicated circuit with a larger part.',
+  },
   'voltage-choice': {
     title: 'System voltage',
     why: 'Doubling voltage halves current for the same power, so cables can be much smaller — very useful for big inverters, windlasses and thrusters. The cost is converters for 12 V-only equipment.',

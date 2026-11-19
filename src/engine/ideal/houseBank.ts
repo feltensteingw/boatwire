@@ -24,15 +24,20 @@ export interface Core {
   bms?: DNode;
 }
 
+/** Main battery fuse sizes, smallest first. The largest is the largest Class T fuse. */
+const MAIN_FUSE_SIZES = [100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 600, FUSE_CLASSES['Class T'].max];
+
 export function buildHouseBank(b: Builder, p: Plan): Core {
   const { project, scenario, V, BZ, lfp, extBms, house, mainAmps } = p;
 
-  const mainFuseRating = nextStandard(mainAmps * 1.25, [100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 600, 800]);
-  const mainFuseClass = fuseClassFor(mainFuseRating, { atBattery: true, lithium: lfp });
-  if (mainFuseRating > FUSE_CLASSES['Class T'].max) {
-    b.find('error', 'class-t', `Main DC current (~${Math.round(mainAmps)} A) is beyond practical fuse and switch sizes.`, 'Raise the system voltage or split loads across banks.');
+  const mainFuse = nextStandard(mainAmps * 1.25, MAIN_FUSE_SIZES);
+  if (mainFuse === undefined) {
+    // The largest fuse is drawn so the diagram is complete; the switch and buses are then too small as well.
+    b.find('error', 'beyond-sizes', `Main DC current (~${Math.round(mainAmps)} A) is beyond practical fuse and switch sizes.`, 'Raise the system voltage or split loads across banks.', house.map((_, i) => `house${i}-fuse`));
   }
-  const switchRating = nextStandard(mainFuseRating, SWITCH_SIZES);
+  const mainFuseRating = mainFuse ?? MAIN_FUSE_SIZES[MAIN_FUSE_SIZES.length - 1];
+  const mainFuseClass = fuseClassFor(mainFuseRating, { atBattery: true, lithium: lfp });
+  const switchRating = b.rating(mainFuseRating, SWITCH_SIZES, { what: 'House battery switch', nodes: ['house-switch'] });
   const houseSwitch = b.add('switch', 'house-switch', 'House battery switch', {
     zone: BZ,
     data: { rating: switchRating, part: `Battery switch, ${switchRating} A continuous` },

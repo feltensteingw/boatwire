@@ -168,7 +168,7 @@ const SECTIONS: Section[] = [
   {
     id: 'ideal',
     title: 'The ideal design',
-    keywords: 'generated automatic why wired inspector click component wire ratings part',
+    keywords: 'generated automatic why wired inspector click component wire ratings part largest size too big beyond current',
     body: (
       <>
         <p>
@@ -188,6 +188,9 @@ const SECTIONS: Section[] = [
         </ul>
         <p>
           <b>Click anything</b> on the diagram. The panel on the right shows its rating, the suggested part, its connections and a plain-English <b>Why it's wired this way</b>. Click a wire to see its size, length, current and voltage drop, and how the size was chosen.
+        </p>
+        <p>
+          <b>Too much current for one part.</b> Fuses, breakers, switches and controllers are chosen from standard sizes. If something needs more than the largest, for example an 8000 W inverter on 12 V, the design still shows the largest size so the diagram is complete, and the Design check names that part: an error when it is smaller than the current through it, a warning when only its safety margin is short. Each one says what to do, such as moving to 24 V or splitting the load.
         </p>
         <p className="hint">The ideal design can't be edited directly; change the equipment list instead. To draw your own wiring, use Existing boat.</p>
       </>

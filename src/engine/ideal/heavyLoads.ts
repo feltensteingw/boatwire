@@ -5,7 +5,7 @@ import { DEDICATED_BANK_ROLES, dedicatedRoleFor } from '../../model/catalog';
 import { GAUGES, STANDARD_BREAKERS_DC, VDROP } from '../../model/standards';
 import type { DNode, Equipment } from '../../model/types';
 import { fmtLen, fmtSize } from '../../model/units';
-import { fuseClassFor, nextStandard, protectionFor, runLength } from '../calc';
+import { fuseClassFor, runLength } from '../calc';
 import { bankSummary, fuseLabel, SWITCH_SIZES, type Builder, type WOpts } from './builder';
 import { loadNode } from './distribution';
 import type { Core } from './houseBank';
@@ -18,6 +18,13 @@ export interface DedicatedBank {
 }
 
 const DED_KEYS: Record<string, string> = { windlass: 'wl', thruster: 'th', winch: 'wn', fridge: 'fr' };
+
+/** Relay sizes for loads switched from a dedicated bank, and contactor sizes for motors. */
+const RELAY_SIZES = [30, 40, 70, 100];
+const CONTACTOR_SIZES = [100, 150, 250, 400, 600];
+
+/** What to do when a motor draws more than the largest fuse, switch or contactor. */
+const MOTOR_FIX = (b: Builder) => (b.V === 12 ? 'Use 24 V, which halves the current, or choose a smaller model.' : 'Choose a smaller model, or one built for a higher voltage.');
 
 /**
  * A dedicated bank sits beside its equipment and supplies the load current through short cables.
@@ -36,9 +43,10 @@ function dedicatedBank(b: Builder, p: Plan, core: Core, e: Equipment, role: stri
   const lfpBank = s.chem === 'lifepo4';
   const dcA = V === 12 ? 30 : 15;
   const loadAmps = Math.max(dcA, served.reduce((sum, l) => sum + l.amps, 0));
-  const rating = protectionFor(loadAmps);
+  const rating = b.protection(loadAmps, { what: `${label} battery fuse`, fix: MOTOR_FIX(b), nodes: [`${key}-fuse`] });
   const cls = fuseClassFor(rating, { atBattery: true, lithium: lfpBank });
-  const swRating = nextStandard(rating, SWITCH_SIZES);
+  // At least the fuse, and at least the current when no fuse is big enough for it.
+  const swRating = b.rating(Math.max(rating, loadAmps), SWITCH_SIZES, { what: `${label} battery switch`, fix: MOTOR_FIX(b), nodes: [`${key}-switch`] });
   const bat = b.add('battery', `${key}-bat`, e.name, { zone: e.zone, sublabel: s.text, equipmentId: e.id, data: { chemistry: s.chem, ah: s.ah, volts: V }, notes: ['dedicated-bank'] });
   const bus = b.add('bus-pos', `${key}-bus`, `${label} positive bus`, { zone: e.zone });
   const nbus = b.add('bus-neg', `${key}-nbus`, `${label} negative bus`, { zone: e.zone });
@@ -51,14 +59,16 @@ function dedicatedBank(b: Builder, p: Plan, core: Core, e: Equipment, role: stri
   b.wire('neg', [bat, 'neg'], [nbus, b.stud(nbus)], { ...o, len: 1.5, gauge: bw.gauge, notes: ['negative-same-size'] });
   // charge from house via DC-DC
   const dcdc = b.add('dcdc', `${key}-dcdc`, `DC-DC charger (house → ${label.toLowerCase()})`, { zone: BZ, sublabel: `${dcA} A`, data: { rating: dcA, part: `DC-DC charger ${V}/${V}-${dcA}` }, notes: ['dcdc', 'dedicated-bank'] });
-  const fIn = b.add('fuse', `${key}-dcdc-in`, 'DC-DC input fuse', { zone: BZ, col: 5, sublabel: fuseLabel(protectionFor(dcA * 1.1), 'MIDI'), data: { rating: protectionFor(dcA * 1.1), fuseClass: 'MIDI' }, notes: ['charging-source-fuse'] });
-  const fOut = b.add('fuse', `${key}-dcdc-out`, 'DC-DC output fuse', { zone: e.zone, sublabel: fuseLabel(protectionFor(dcA), 'MIDI'), data: { rating: protectionFor(dcA), fuseClass: 'MIDI' }, notes: ['charging-source-fuse'] });
+  const inR = b.protection(dcA * 1.1, { what: 'DC-DC input fuse', nodes: [`${key}-dcdc-in`] });
+  const outR = b.protection(dcA, { what: 'DC-DC output fuse', nodes: [`${key}-dcdc-out`] });
+  const fIn = b.add('fuse', `${key}-dcdc-in`, 'DC-DC input fuse', { zone: BZ, col: 5, sublabel: fuseLabel(inR, 'MIDI'), data: { rating: inR, fuseClass: 'MIDI' }, notes: ['charging-source-fuse'] });
+  const fOut = b.add('fuse', `${key}-dcdc-out`, 'DC-DC output fuse', { zone: e.zone, sublabel: fuseLabel(outR, 'MIDI'), data: { rating: outR, fuseClass: 'MIDI' }, notes: ['charging-source-fuse'] });
   const len = run(BZ, e.zone);
-  b.wire('pos', [posBus, b.stud(posBus)], [fIn, 'in'], { amps: dcA * 1.1, protect: protectionFor(dcA * 1.1), len: 0.5 });
-  b.wire('pos', [fIn, 'out'], [dcdc, 'in'], { amps: dcA * 1.1, protect: protectionFor(dcA * 1.1), len: 2, protectedBy: fIn.id });
+  b.wire('pos', [posBus, b.stud(posBus)], [fIn, 'in'], { amps: dcA * 1.1, protect: inR, len: 0.5 });
+  b.wire('pos', [fIn, 'out'], [dcdc, 'in'], { amps: dcA * 1.1, protect: inR, len: 2, protectedBy: fIn.id });
   b.wire('neg', [negBus, b.stud(negBus)], [dcdc, 'inneg'], { amps: dcA, len: 2 });
-  const ow = b.wire('pos', [dcdc, 'out'], [fOut, 'in'], { amps: dcA, protect: protectionFor(dcA), len, protectedBy: fOut.id });
-  b.wire('pos', [fOut, 'out'], [bus, b.stud(bus)], { amps: dcA, protect: protectionFor(dcA), len: 0.5 });
+  const ow = b.wire('pos', [dcdc, 'out'], [fOut, 'in'], { amps: dcA, protect: outR, len, protectedBy: fOut.id });
+  b.wire('pos', [fOut, 'out'], [bus, b.stud(bus)], { amps: dcA, protect: outR, len: 0.5 });
   b.wire('neg', [dcdc, 'outneg'], [nbus, b.stud(nbus)], { amps: dcA, len, gauge: ow.gauge });
   // common negative between banks (carries only DC-DC return current)
   b.wire('neg', [nbus, b.stud(nbus)], [negBus, b.stud(negBus)], { amps: dcA, len, gauge: ow.gauge, notes: ['common-negative'] });
@@ -88,20 +98,21 @@ export function buildHeavyLoads(b: Builder, p: Plan, core: Core, housePanel: { p
     let rating: number;
     if (l.heavy) {
       const useFuse = l.amps * 1.25 > STANDARD_BREAKERS_DC[STANDARD_BREAKERS_DC.length - 1];
-      rating = useFuse ? protectionFor(l.amps) : protectionFor(l.amps, 'breaker-dc');
+      rating = b.protection(l.amps, { what: `${l.e.name} ${useFuse ? 'fuse' : 'breaker'}`, fix: MOTOR_FIX(b), nodes: [`prot-${l.e.id}`] }, useFuse ? 'fuse' : 'breaker-dc');
       const cls = useFuse ? fuseClassFor(rating, { lithium: lfp, mainFeeder: true }) : undefined;
       prot = useFuse
         ? b.add('fuse', `prot-${l.e.id}`, `${l.e.name} fuse`, { zone: srcZone, col: 6, sublabel: fuseLabel(rating, cls!), data: { rating, fuseClass: cls }, notes: ['heavy-load'] })
         : b.add('breaker', `prot-${l.e.id}`, `${l.e.name} breaker`, { zone: srcZone, sublabel: `${rating} A (manual reset)`, data: { rating, part: `Surface-mount breaker ${rating} A` }, notes: ['heavy-load'] });
     } else {
-      rating = protectionFor(l.amps);
+      rating = b.protection(l.amps, { what: `${l.e.name} fuse`, nodes: [`prot-${l.e.id}`] });
       const cls = fuseClassFor(rating, {});
       prot = b.add('fuse', `prot-${l.e.id}`, `${l.e.name} fuse`, { zone: srcZone, col: 6, sublabel: fuseLabel(rating, cls), data: { rating, fuseClass: cls }, notes: ['dedicated-bank'] });
     }
-    const relayPart = l.e.kind === 'windlass' ? 'Reversing solenoid / control box' : l.heavy ? 'Solenoid' : `Relay ${nextStandard(l.amps * 1.25, [30, 40, 70, 100])} A`;
-    const cont = b.add('contactor', `cont-${l.e.id}`, `${l.e.name} ${l.heavy ? 'contactor' : 'relay'}`, {
+    const contOpts = { what: `${l.e.name} ${l.heavy ? 'contactor' : 'relay'}`, fix: MOTOR_FIX(b), nodes: [`cont-${l.e.id}`] };
+    const relayPart = l.e.kind === 'windlass' ? 'Reversing solenoid / control box' : l.heavy ? 'Solenoid' : `Relay ${b.rating(l.amps * 1.25, RELAY_SIZES, { ...contOpts, carries: l.amps })} A`;
+    const cont = b.add('contactor', `cont-${l.e.id}`, contOpts.what, {
       zone: l.e.zone,
-      data: { rating: nextStandard(l.amps, l.heavy ? [100, 150, 250, 400, 600] : [30, 40, 70, 100]), part: relayPart },
+      data: { rating: b.rating(l.amps, l.heavy ? CONTACTOR_SIZES : RELAY_SIZES, contOpts), part: relayPart },
       notes: l.ded ? ['dedicated-bank'] : ['heavy-load'],
     });
     const load = loadNode(b, p, l);

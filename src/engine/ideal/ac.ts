@@ -3,7 +3,7 @@
 
 import { CATALOG_BY_KIND } from '../../model/catalog';
 import type { DNode } from '../../model/types';
-import { fuseClassFor, protectionFor } from '../calc';
+import { fuseClassFor } from '../calc';
 import { num } from '../energy';
 import { fuseLabel, type Builder, type End } from './builder';
 import type { Core } from './houseBank';
@@ -20,7 +20,9 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
 
   const acV = acStd.volts;
   const minBrk = b.us ? 15 : 10;
-  const acBrk = (a: number) => Math.max(minBrk, protectionFor(a, 'breaker-ac'));
+  /** AC breaker for `a` amps. AC parts that are too big are split, not moved to a higher DC voltage. */
+  const acBrk = (a: number, what: string, nodes?: string[]) =>
+    Math.max(minBrk, b.protection(a, { what, fix: 'Split the load across two circuits, or use a larger dedicated circuit with its own breaker and cable.', nodes }, 'breaker-ac'));
   const acGnd = b.add('ac-ground-bus', 'ac-gnd', 'AC grounding bus', { zone: PZ, notes: ['ac-dc-bond'] });
   let sourceOut: End | undefined;
   let sourceAmps = 0;
@@ -47,7 +49,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
   if (genset) {
     const GW = num(genset, 'watts');
     const GA = GW / acV;
-    const gR = acBrk(GA);
+    const gR = acBrk(GA, 'Generator main breaker', ['gen-brk']);
     const g = b.add('generator', 'genset', genset.name, { zone: genset.zone, equipmentId: genset.id, sublabel: `${GW} W`, data: { watts: GW, amps: GA } });
     const gb = b.add('elci', 'gen-brk', 'Generator main breaker', { zone: genset.zone, sublabel: `${gR} A`, data: { rating: gR } });
     b.wire('ac', [g, 'l'], [gb, 'in'], { amps: GA, protect: gR, len: 2 });
@@ -74,7 +76,11 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
   let shorePanel: DNode | undefined;
 
   const dcInverter = (n: DNode, dcAmps: number) => {
-    const r = protectionFor(dcAmps);
+    const r = b.protection(dcAmps, {
+      what: `${n.label} DC fuse`,
+      fix: V === 12 ? 'Use 24 V, which halves the current, or a smaller inverter.' : 'Use a smaller inverter, or a higher system voltage.',
+      nodes: [`${n.id}-fuse`],
+    });
     const cls = fuseClassFor(r, { lithium: lfp, mainFeeder: true, atBattery: lfp });
     const f = b.add('fuse', `${n.id}-fuse`, `${n.label} DC fuse`, { zone: BZ, col: 4, sublabel: fuseLabel(r, cls), data: { rating: r, fuseClass: cls }, notes: ['inverter-fuse', ...(cls === 'Class T' ? ['class-t'] : [])] });
     b.wire('pos', [posBus, b.stud(posBus)], [f, 'in'], { amps: dcAmps, protect: r, len: 0.5 });
@@ -92,7 +98,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     if (sourceOut) {
       b.wire('ac', sourceOut, [node, 'acin'], { amps: sourceAmps, protect: sourceAmps, len: run(srcZone, node.zone) });
     }
-    const mainA = sourceOut ? sourceAmps : acBrk(outA);
+    const mainA = sourceOut ? sourceAmps : acBrk(outA, 'AC panel main breaker', ['ac-panel']);
     mainPanel = acPanel('ac-panel', 'AC panel', mainA, sourceOut ? 'Inverter-backed' : 'Inverter only');
     b.wire('ac', [node, 'acout'], [mainPanel, 'in'], { amps: Math.max(outA, sourceAmps), protect: mainA, len: run(node.zone, PZ) });
     if (sourceOut && (shoreOnlyLoads.length || chargers.length)) {
@@ -107,7 +113,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     if (sourceOut) {
       const ats = b.add('transfer-switch', 'ats', 'Automatic transfer switch', { zone: PZ, sublabel: 'Shore/gen priority', data: { rating: sourceAmps }, notes: ['source-selector'] });
       b.wire('ac', sourceOut, [ats, 'in1'], { amps: sourceAmps, protect: sourceAmps, len: run(srcZone, PZ) });
-      b.wire('ac', [node, 'acout'], [ats, 'in2'], { amps: outA, protect: acBrk(outA), len: run(node.zone, PZ) });
+      b.wire('ac', [node, 'acout'], [ats, 'in2'], { amps: outA, protect: acBrk(outA, `${node.label} AC output`, [node.id, 'ats']), len: run(node.zone, PZ) });
       mainPanel = acPanel('ac-panel', 'AC panel', sourceAmps, 'Inverter-backed');
       b.wire('ac', [ats, 'out'], [mainPanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: 2 });
       if (shoreOnlyLoads.length || chargers.length) {
@@ -115,8 +121,9 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
         b.wire('ac', sourceOut, [shorePanel, 'in'], { amps: sourceAmps, protect: sourceAmps, len: 2, notes: ['shore-only', 'charger-not-on-inverter'] });
       }
     } else {
-      mainPanel = acPanel('ac-panel', 'AC panel', acBrk(outA), 'Inverter only');
-      b.wire('ac', [node, 'acout'], [mainPanel, 'in'], { amps: outA, protect: acBrk(outA), len: run(node.zone, PZ) });
+      const mainA = acBrk(outA, 'AC panel main breaker', ['ac-panel']);
+      mainPanel = acPanel('ac-panel', 'AC panel', mainA, 'Inverter only');
+      b.wire('ac', [node, 'acout'], [mainPanel, 'in'], { amps: outA, protect: mainA, len: run(node.zone, PZ) });
     }
   } else if (sourceOut) {
     mainPanel = acPanel('ac-panel', 'AC panel', sourceAmps, 'Shore/gen');
@@ -124,7 +131,7 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
   }
 
   const acCircuit = (panel: DNode, label: string, amps: number, target: End, zone: string, notes: string[] = []) => {
-    const r = acBrk(amps);
+    const r = acBrk(amps, `${label} breaker`, [panel.id]);
     const t = b.stud(panel, { pol: 'ac', rating: r, label: `${r} A · ${label}` });
     b.wire('ac', [panel, t], target, { amps, protect: r, len: run(PZ, zone), protectedBy: panel.id, notes: ['branch-protection', ...notes] });
   };
@@ -153,14 +160,14 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
       b.find('warning', 'charger-not-on-inverter', `${c.name} has no shore/generator-only AC circuit to feed it.`);
     }
     groundTo([node, 'g'], run(node.zone, PZ));
-    const fr = protectionFor(A);
+    const fr = b.protection(A, { what: `${c.name} output fuse`, nodes: [`chgfuse-${c.id}`] });
     const f = b.add('fuse', `chgfuse-${c.id}`, 'Charger output fuse', { zone: BZ, sublabel: fuseLabel(fr, fuseClassFor(fr, {})), data: { rating: fr, fuseClass: fuseClassFor(fr, {}) }, notes: ['charging-source-fuse'] });
     b.pair([[node, 'out1'], [f, 'in']], [[node, 'neg'], [negBus, b.stud(negBus)]], { amps: A, protect: fr, len: run(node.zone, BZ) + 1, protectedBy: f.id });
     b.wire('pos', [f, 'out'], [posBus, b.stud(posBus)], { amps: A, protect: fr, len: 0.5 });
     if (startBus && outputs >= 2) {
       node.terminals.push({ id: 'out2', pol: 'pos', side: 'E', label: 'OUT2+' });
       const sA = Math.min(A, 10);
-      const fr2 = protectionFor(sA);
+      const fr2 = b.protection(sA, { what: `${c.name} start output fuse`, nodes: [`chgfuse2-${c.id}`] });
       const f2 = b.add('fuse', `chgfuse2-${c.id}`, 'Charger start output fuse', { zone: startBus.zone, sublabel: fuseLabel(fr2, fuseClassFor(fr2, {})), data: { rating: fr2, fuseClass: fuseClassFor(fr2, {}) }, notes: ['charging-source-fuse'] });
       b.wire('pos', [node, 'out2'], [f2, 'in'], { amps: sA, protect: fr2, len: run(node.zone, startBus.zone) + 1, protectedBy: f2.id });
       b.wire('pos', [f2, 'out'], [startBus, b.stud(startBus)], { amps: sA, protect: fr2, len: 0.5 });

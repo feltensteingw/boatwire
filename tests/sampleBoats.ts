@@ -189,6 +189,12 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   boat('an engine with no alternator', (p) => {
     the(p, 'engine').props.alternatorAmps = 0;
   }),
+  boat('a 200 A starter (twice that is beyond the largest start fuse)', (p) => {
+    the(p, 'engine').props.starterAmps = 200;
+  }),
+  boat('a 1500 W solar array on 12 V (beyond the largest controller and PV breaker)', (p) => {
+    the(p, 'solar').props.watts = 1500;
+  }),
   boat('no engine', (p) => without(p, (e) => e.kind !== 'engine')),
 
   // --- heavy loads
