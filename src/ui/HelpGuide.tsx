@@ -270,7 +270,7 @@ const SECTIONS: Section[] = [
   {
     id: 'charging',
     title: 'Charging choices explained',
-    keywords: 'charge splitting acr isolator diode fet excitation sense compensation dc-dc charger relay engine run d+ alternator regulator lithium lifepo4 bms apd external regulator start battery',
+    keywords: 'charge splitting acr isolator diode fet excitation sense compensation dc-dc charger relay engine run d+ alternator regulator lithium lifepo4 bms apd external regulator start battery two engines twin engines second engine emergency parallel switch',
     body: (
       <>
         <p>
@@ -291,6 +291,14 @@ const SECTIONS: Section[] = [
           from the alternator and feeds the house bank through a <b>DC-DC charger</b>, or, with an <b>external regulator</b>, charges lithium directly with an <b>alternator protection device</b>. A lithium start battery with a lead-acid house bank works the other
           way round: the alternator charges the house bank, and a DC-DC charger set to a lithium profile keeps the start battery charged. The house battery switch is then the only thing between the alternator and a battery, so the design adds an alternator
           protection device: never switch the house bank off with the engine running. If both are lithium, the alternator needs an external regulator. Whenever either battery is lithium, relay and isolator options are ignored, with a note explaining why.
+        </p>
+        <h4>Two engines</h4>
+        <p>
+          List both engines and BoatWire draws both, each with its own starter cable and its own alternator. Each alternator gets its own cable and fuse, and where used its own isolator, regulator or DC-DC charger, set up as above from that engine's own choices; the
+          two are never joined onto one cable. The charging relay, or the DC-DC charger from the house bank, belongs to the start battery, so there is one per start battery. The main house fuse, switch and cables are sized for both alternators charging at once.
+          Start batteries follow the equipment list. With one for each engine, each engine starts from its own, and a normally-off <b>emergency parallel switch</b> between them lets either battery start either engine (left out if one is lithium and the other
+          lead-acid). With one start battery, both engines start from it: its fuse and cables are sized for one starter at a time, so start the engines one after the other, and it gets one voltage-sensing charging relay for both. With none, both start from the
+          house bank. The energy budget counts both alternators, taking both engines to run the hours you set. A third engine is not drawn yet; the design lists it.
         </p>
       </>
     ),

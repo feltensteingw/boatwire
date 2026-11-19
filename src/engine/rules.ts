@@ -31,7 +31,11 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'house-start-split': {
     title: 'Separate house and start banks',
-    why: 'Running the house bank flat must never stop you starting the engine. A dedicated start battery, charged automatically, keeps them independent.',
+    why: 'Running the house bank flat must never stop you starting the engine. A dedicated start battery, charged automatically, keeps them independent. With two engines, give each its own start battery, or let them share one.',
+  },
+  'twin-engines': {
+    title: 'Two engines',
+    why: 'Each engine has its own starter cable and its own alternator. Each alternator has its own cable and fuse, and where used its own isolator, regulator or DC-DC charger to the house bank: two alternators are never joined onto one cable. The charging relay, or the DC-DC charger from the house bank, belongs to the start battery: one for each engine when each has its own start battery, one for both when they share. The main house fuse, switch and cables are sized for both alternators charging at once. With a start battery for each engine, a normally-off emergency parallel switch between them lets either battery start either engine; it is left out when one battery is lithium and the other lead-acid, which must never be connected directly. When both engines share one start battery, its fuse and cables are sized for one starter at a time, so start the engines one after the other. Its charging relay is a voltage-sensing one, which closes when either engine is charging.',
   },
   'acr': {
     title: 'Automatic charging relay',
@@ -169,7 +173,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'not-drawn': {
     title: 'Equipment left out of the design',
-    why: 'The ideal design is built around one propulsion engine, one inverter or inverter/charger, up to two shore power inlets, one AC generator, one engine start battery and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',
+    why: 'The ideal design is built around up to two propulsion engines with one start battery per engine, one inverter or inverter/charger, up to two shore power inlets, one AC generator and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',
   },
   'beyond-sizes': {
     title: 'Bigger than the largest part',

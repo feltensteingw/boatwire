@@ -1587,6 +1587,497 @@ g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which sugges
 
 exports[`generated designs are unchanged > shore power and generator, separate inverter and two-output charger, shore-only loads > fingerprint 1`] = `"008e903eb612de9b"`;
 
+exports[`generated designs are unchanged > twin engines sharing one start battery > design 1`] = `
+"Ideal (ideal), 12 V: 60 components, 90 wires, 6 findings
+
+house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
+pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8
+neg-bus <bus-neg> "Main negative bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13
+house-shunt <shunt> "House battery monitor" · @battery · rating=500 · part "Shunt 500 A + monitor" · notes shunt · terms bat,sys
+house0-bat <battery> "House bank" · [4× 12 V 100 Ah AGM · 1S4P = 12 V 400 Ah] · @battery · eq:battery-bank · chemistry=agm ah=400 volts=12 · part "4× 12 V 100 Ah AGM · 1S4P = 12 V 400 Ah" · notes series-parallel · terms pos,neg
+house0-fuse <fuse> "House main fuse" · [500 A Class T] · @battery · rating=500 fuseClass=Class T · part "Class T fuse — high interrupt capacity, 500 A" · notes battery-fuse,class-t · terms in,out
+ao-fuse <fuse> "Always-on feed fuse" · [20 A ATC] · @battery · rating=20 fuseClass=ATC · notes unswitched · terms in,out
+ao-block <fuse-block> "Always-on fuse block" · @battery · part "Fuse block, 6 circuits (battery side of switch)" · notes unswitched · terms in,f1(7.5A),f2(10A)
+ld-bilge-pump <load> "Bilge pump (main)" · [60 W · 5.0 A] · @bilge · eq:bilge-pump · amps=5 watts=60 critical=true kind=bilge-pump v24ok=true volts=12 glyph=BP · notes unswitched · terms pos,neg
+bsw-bilge-pump <bilge-switch> "Bilge pump (main) switch" · [Auto / Off / Man] · @nav · notes bilge-switch · terms in,out
+ld-bilge-pump-2 <load> "Bilge pump (high water)" · [96 W · 8.0 A] · @bilge · eq:bilge-pump-2 · amps=8 watts=96 critical=true kind=bilge-pump v24ok=true volts=12 glyph=BP · notes unswitched · terms pos,neg
+bsw-bilge-pump-2 <bilge-switch> "Bilge pump (high water) switch" · [Auto / Off / Man] · @nav · notes bilge-switch · terms in,out
+dc-panel <dc-panel> "DC panel" · [Main 30 A] · @nav · rating=30 · part "DC panel, 13+ breaker positions, 30 A main" · notes branch-protection · terms in,b1(5A),b2(5A),b3(5A),b4(5A),b5(10A),b6(10A),b7(10A),b8(5A),b9(5A),b10(5A),b11(5A),b12(10A),b13(5A)
+dc-panel-neg <bus-neg> "DC panel negative bus" · @nav · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14
+dc-panel-feed <fuse> "DC panel feeder fuse" · [30 A ATC] · @battery · rating=30 fuseClass=ATC · notes conductor-sizing · terms in,out
+ld-cabin-lights <load> "Cabin lights (LED)" · [30 W · 2.5 A] · @saloon · eq:cabin-lights · amps=2.5 watts=30 critical=false kind=cabin-lights v24ok=true volts=12 glyph=💡 · notes branch-protection · terms pos,neg
+ld-nav-lights <load> "Navigation lights" · [6 W · 0.5 A] · @bow · eq:nav-lights · amps=0.5 watts=6 critical=true kind=nav-lights v24ok=true volts=12 glyph=NAV · notes branch-protection · terms pos,neg
+ld-anchor-light <load> "Anchor light" · [3 W · 0.3 A] · @masthead · eq:anchor-light · amps=0.25 watts=3 critical=true kind=anchor-light v24ok=true volts=12 glyph=ANC · notes branch-protection · terms pos,neg
+ld-steaming-deck-light <load> "Steaming / deck light" · [25 W · 2.1 A] · @mast · eq:steaming-deck-light · amps=2.08 watts=25 critical=true kind=steaming-deck-light v24ok=true volts=12 glyph=DECK · notes branch-protection · terms pos,neg
+ld-fridge <load> "Refrigerator" · [60 W · 5.0 A] · @galley · eq:fridge · amps=5 watts=60 critical=false kind=fridge v24ok=true volts=12 glyph=FRG · notes branch-protection · terms pos,neg
+ld-water-pump <load> "Fresh water pump" · [84 W · 7.0 A] · @galley · eq:water-pump · amps=7 watts=84 critical=false kind=water-pump v24ok=true volts=12 glyph=WP · notes branch-protection · terms pos,neg
+ld-autopilot <load> "Autopilot" · [60 W · 5.0 A] · @aft · eq:autopilot · amps=5 watts=60 critical=true kind=autopilot v24ok=true volts=12 glyph=AP · notes branch-protection · terms pos,neg
+ld-chartplotter <load> "Chartplotter / MFD" · [25 W · 2.1 A] · @cockpit · eq:chartplotter · amps=2.08 watts=25 critical=true kind=chartplotter v24ok=true volts=12 glyph=MFD · notes branch-protection · terms pos,neg
+ld-vhf <load> "VHF radio" · [6 W · 0.5 A] · @nav · eq:vhf · amps=0.5 watts=6 critical=true kind=vhf v24ok=true volts=12 glyph=VHF · notes branch-protection · terms pos,neg
+ld-ais <load> "AIS transponder" · [4 W · 0.3 A] · @nav · eq:ais · amps=0.33 watts=4 critical=true kind=ais v24ok=true volts=12 glyph=AIS · notes branch-protection · terms pos,neg
+ld-instruments <load> "Instruments / NMEA 2000" · [12 W · 1.0 A] · @nav · eq:instruments · amps=1 watts=12 critical=true kind=instruments v24ok=true volts=12 glyph=N2K · notes branch-protection · terms pos,neg
+ld-usb-outlets <load> "12 V / USB outlets" · [60 W · 5.0 A] · @saloon · eq:usb-outlets · amps=5 watts=60 critical=false kind=usb-outlets v24ok=true volts=12 glyph=USB · notes branch-protection · terms pos,neg
+ld-fans <load> "Cabin fans" · [12 W · 1.0 A] · @vberth · eq:fans · amps=1 watts=12 critical=false kind=fans v24ok=true volts=12 glyph=FAN · notes branch-protection · terms pos,neg
+prot-windlass <breaker> "Anchor windlass (1000 W) breaker" · [120 A (manual reset)] · @battery · rating=120 · part "Surface-mount breaker 120 A" · notes heavy-load · terms in,out
+cont-windlass <contactor> "Anchor windlass (1000 W) contactor" · @bow · rating=100 · part "Reversing solenoid / control box" · notes heavy-load · terms in,out,coil
+ld-windlass <load> "Anchor windlass (1000 W)" · [1000 W · 83.3 A] · @bow · eq:windlass · amps=83.33 watts=1000 critical=false kind=windlass v24ok=true volts=12 glyph=WL · notes heavy-load · terms pos,neg
+helm-windlass <helm-switch> "Anchor windlass (1000 W) control" · @cockpit · notes heavy-load · terms out
+engine <engine> "Starboard engine" · [Engine 1 · Starter ~150 A] · @engine · eq:engine · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
+start-bat <battery> "Start battery" · [1× 12 V 90 Ah AGM · 1S1P = 12 V 90 Ah] · @battery · eq:battery-bank-2 · chemistry=agm ah=90 volts=12 · notes house-start-split,twin-engines · terms pos,neg
+start-fuse <fuse> "Start battery fuse" · [300 A MRBF] · @battery · rating=300 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
+start-switch <switch> "Start battery switch" · @battery · rating=300 · notes battery-switch · terms in,out
+start-bus <bus-pos> "Start positive bus" · @battery · terms s1,s2,s3,s4
+alternator <alternator> "Alternator 1" · [Starboard engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alt-fuse <fuse> "Alternator 1 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+acr <acr> "Automatic charging relay" · [500 A] · @battery · rating=500 · part "ACR / VSR 500 A" · notes acr,twin-engines · terms a,b,neg
+acr-fuse-house <fuse> "ACR fuse (house side)" · [200 A MIDI] · @battery · rating=200 fuseClass=MIDI · notes battery-fuse · terms in,out
+acr-fuse-start <fuse> "ACR fuse (start side)" · [200 A MIDI] · @battery · rating=200 fuseClass=MIDI · notes battery-fuse · terms in,out
+engine-2 <engine> "Port engine" · [Engine 2 · Starter ~150 A] · @engine · eq:engine-2 · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
+alternator-2 <alternator> "Alternator 2" · [Port engine · 150 A] · @engine · amps=150 · part "150 A alternator" · terms b,neg,field
+alt-fuse-2 <fuse> "Alternator 2 output fuse" · [200 A MIDI] · @battery · rating=200 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+pv-solar <solar-panel> "Solar arch (2 × 200 W)" · [400 W · Vmp 36 V] · @arch · eq:solar · watts=400 amps=11.11 · terms pos,neg
+pvbrk-solar <breaker> "PV disconnect" · [20 A DC breaker] · @battery · rating=20 · part "PV DC breaker 20 A" · notes mppt · terms in,out
+mppt-solar <mppt> "MPPT controller" · [100/30] · @battery · eq:solar · rating=30 amps=28.25 · part "MPPT 30 A" · notes mppt · terms pvpos,pvneg,bat,batneg,atc
+pvfuse-solar <fuse> "MPPT output fuse" · [40 A MIDI] · @battery · rating=40 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+ac-gnd <ac-ground-bus> "AC grounding bus" · @nav · notes ac-dc-bond · terms s1,s2,s3,s4,s5,s6
+shore-inlet <shore-inlet> "Shore power 30 A" · [30 A 120 V] · @cockpit · eq:shore-power · amps=30 volts=120 · terms l,g
+shore-elci <elci> "Shore main breaker + ELCI" · [30 A · 30 mA ELCI] · @cockpit · rating=30 · part "30 A double-pole main breaker with ELCI" · notes shore-main · terms in,out
+galv-iso <galvanic-isolator> "Galvanic isolator" · @cockpit · rating=30 · part "Galvanic isolator, 30 A, fail-safe" · notes galvanic-isolator · terms a,b
+ic <inverter-charger> "Inverter/charger" · [2000 W · 80 A charger] · @battery · eq:inverter-charger · watts=2000 amps=80 · part "Inverter/charger 12 V 2000 W" · notes source-selector,inverter-fuse · terms acin,acout,g,dcpos,dcneg,atc
+ic-fuse <fuse> "Inverter/charger DC fuse" · [300 A ANL] · @battery · rating=300 fuseClass=ANL · notes inverter-fuse · terms in,out
+ac-panel <ac-panel> "AC panel" · [Inverter-backed · main 30 A] · @nav · rating=30 · part "AC panel, 30 A main" · terms in,b1(15A),b2(15A)
+ac-panel-shore <ac-panel> "AC panel — shore/gen only" · [Not powered by inverter · main 30 A] · @nav · rating=30 · part "AC panel, 30 A main" · terms in,b1(20A)
+ac-ac-outlets <ac-load> "AC outlets" · [300 W · 2.5 A] · @saloon · eq:ac-outlets · watts=300 amps=2.5 kind=ac-outlets shoreOnly=false glyph=⏚ · terms l,g
+ac-microwave <ac-load> "Microwave" · [1000 W · 8.3 A] · @galley · eq:microwave · watts=1000 amps=8.33 kind=microwave shoreOnly=false glyph=MW · terms l,g
+ac-water-heater <ac-load> "Water heater" · [1500 W · 12.5 A] · @engine · eq:water-heater · watts=1500 amps=12.5 kind=water-heater shoreOnly=true glyph=WH · notes shore-only · terms l,g
+
+w1 pos house0-bat.pos → house0-fuse.in · 2× 4/0 · 0.5 ft · 353.3 A · drop 0.9% of 3% · notes battery-fuse
+w2 pos house0-fuse.out → house-switch.in · 2× 4/0 · 1.5 ft · 353.3 A · drop 0.9% of 3% · by house0-fuse · notes conductor-sizing
+w3 neg house0-bat.neg → house-shunt.bat · 2× 4/0 · 1.5 ft · 353.3 A · drop 0.9% of 3% · notes shunt,negative-same-size
+w4 pos house-switch.out → pos-bus.s1 · 2× 4/0 · 2 ft · 353.3 A · drop 0.9% of 3% · by house0-fuse
+w5 neg house-shunt.sys → neg-bus.s1 · 2× 4/0 · 2 ft · 353.3 A
+w6 pos house0-fuse.out → ao-fuse.in · 2× 4/0 · 0.5 ft · 353.3 A · by house0-fuse · notes unswitched
+w7 pos ao-fuse.out → ao-block.in · 16 · 1.5 ft · 13 A · drop 1.35% of 3% · by ao-fuse
+w8 pos ao-block.f1 → bsw-bilge-pump.in · 14 · 4.2 ft · 5 A · drop 2.35% of 3% · by ao-block
+w9 pos bsw-bilge-pump.out → ld-bilge-pump.pos · 14 · 6.6 ft · 5 A · drop 2.35% of 3% · by ao-block
+w10 neg neg-bus.s2 → ld-bilge-pump.neg · 14 · 6.8 ft · 5 A · notes negative-same-size
+w11 pos ao-block.f2 → bsw-bilge-pump-2.in · 12 · 4.2 ft · 8 A · drop 2.37% of 3% · by ao-block
+w12 pos bsw-bilge-pump-2.out → ld-bilge-pump-2.pos · 12 · 6.6 ft · 8 A · drop 2.37% of 3% · by ao-block
+w13 neg neg-bus.s3 → ld-bilge-pump-2.neg · 12 · 6.8 ft · 8 A · notes negative-same-size
+w14 pos pos-bus.s2 → dc-panel-feed.in · 14 · 0.5 ft · 22.6 A · drop 0.49% of 3%
+w15 pos dc-panel-feed.out → dc-panel.in · 12 · 4.2 ft · 22.6 A · drop 2.6% of 3% · by dc-panel-feed · notes conductor-sizing
+w16 neg neg-bus.s4 → dc-panel-neg.s1 · 12 · 4.2 ft · 22.6 A · notes negative-same-size
+w17 pos dc-panel.b1 → ld-cabin-lights.pos · 16 · 8.8 ft · 2.5 A · drop 1.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w18 neg dc-panel-neg.s2 → ld-cabin-lights.neg · 16 · 8.8 ft · 2.5 A · drop 1.53% of 10% · notes negative-same-size
+w19 pos dc-panel.b2 → ld-nav-lights.pos · 16 · 30.2 ft · 0.5 A · drop 1.05% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w20 neg dc-panel-neg.s3 → ld-nav-lights.neg · 16 · 30.2 ft · 0.5 A · drop 1.05% of 3% · notes negative-same-size
+w21 pos dc-panel.b3 → ld-anchor-light.pos · 16 · 62.6 ft · 0.3 A · drop 1.09% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w22 neg dc-panel-neg.s4 → ld-anchor-light.neg · 16 · 62.6 ft · 0.3 A · drop 1.09% of 3% · notes negative-same-size
+w23 pos dc-panel.b4 → ld-steaming-deck-light.pos · 12 · 37.6 ft · 2.1 A · drop 2.15% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w24 neg dc-panel-neg.s5 → ld-steaming-deck-light.neg · 12 · 37.6 ft · 2.1 A · drop 2.15% of 3% · notes negative-same-size
+w25 pos dc-panel.b5 → ld-fridge.pos · 16 · 5.2 ft · 5 A · drop 1.81% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w26 neg dc-panel-neg.s6 → ld-fridge.neg · 16 · 5.2 ft · 5 A · drop 1.81% of 10% · notes negative-same-size
+w27 pos dc-panel.b6 → ld-water-pump.pos · 16 · 5.2 ft · 7 A · drop 2.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w28 neg dc-panel-neg.s7 → ld-water-pump.neg · 16 · 5.2 ft · 7 A · drop 2.53% of 10% · notes negative-same-size
+w29 pos dc-panel.b7 → ld-autopilot.pos · 12 · 16 ft · 5 A · drop 2.19% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w30 neg dc-panel-neg.s8 → ld-autopilot.neg · 12 · 16 ft · 5 A · drop 2.19% of 3% · notes negative-same-size
+w31 pos dc-panel.b8 → ld-chartplotter.pos · 16 · 16.8 ft · 2.1 A · drop 2.43% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w32 neg dc-panel-neg.s9 → ld-chartplotter.neg · 16 · 16.8 ft · 2.1 A · drop 2.43% of 3% · notes negative-same-size
+w33 pos dc-panel.b9 → ld-vhf.pos · 16 · 3 ft · 0.5 A · drop 0.1% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w34 neg dc-panel-neg.s10 → ld-vhf.neg · 16 · 3 ft · 0.5 A · drop 0.1% of 3% · notes negative-same-size
+w35 pos dc-panel.b10 → ld-ais.pos · 16 · 3 ft · 0.3 A · drop 0.07% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w36 neg dc-panel-neg.s11 → ld-ais.neg · 16 · 3 ft · 0.3 A · drop 0.07% of 3% · notes negative-same-size
+w37 pos dc-panel.b11 → ld-instruments.pos · 16 · 3 ft · 1 A · drop 0.21% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w38 neg dc-panel-neg.s12 → ld-instruments.neg · 16 · 3 ft · 1 A · drop 0.21% of 3% · notes negative-same-size
+w39 pos dc-panel.b12 → ld-usb-outlets.pos · 16 · 8.8 ft · 5 A · drop 3.06% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w40 neg dc-panel-neg.s13 → ld-usb-outlets.neg · 16 · 8.8 ft · 5 A · drop 3.06% of 10% · notes negative-same-size
+w41 pos dc-panel.b13 → ld-fans.pos · 16 · 22 ft · 1 A · drop 1.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w42 neg dc-panel-neg.s14 → ld-fans.neg · 16 · 22 ft · 1 A · drop 1.53% of 10% · notes negative-same-size
+w43 pos prot-windlass.out → cont-windlass.in · 2 · 30.4 ft · 83.3 A · drop 7.06% of 10% · by prot-windlass · notes heavy-load,conductor-sizing
+w44 pos pos-bus.s3 → prot-windlass.in · 2 · 0.5 ft · 83.3 A · by prot-windlass · notes heavy-load,conductor-sizing
+w45 pos cont-windlass.out → ld-windlass.pos · 2 · 1 ft · 83.3 A · by prot-windlass · notes heavy-load,conductor-sizing
+w46 neg neg-bus.s5 → ld-windlass.neg · 2 · 30.4 ft · 83.3 A · notes negative-same-size
+w47 sig helm-windlass.out → cont-windlass.coil · 18 · 43 ft
+w48 pos start-bat.pos → start-fuse.in · 1/0 · 0.5 ft · 150 A · drop 2.44% of 3% · notes starter-exempt
+w49 pos start-fuse.out → start-switch.in · 1/0 · 1 ft · 150 A · by start-fuse · notes starter-exempt
+w50 pos start-switch.out → start-bus.s1 · 1/0 · 1.5 ft · 150 A · by start-fuse · notes starter-exempt
+w51 pos start-bus.s2 → engine.pos · 1/0 · 6.6 ft · 150 A · by start-fuse · engine space · notes starter-exempt
+w52 neg start-bat.neg → engine.neg · 1/0 · 6.6 ft · 150 A · notes common-negative
+w53 neg engine.neg → neg-bus.s6 · 1/0 · 6.6 ft · 150 A · engine space · notes common-negative
+w54 pos alternator.b → alt-fuse.in · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · by alt-fuse · engine space · notes charging-source-fuse
+w55 neg alternator.neg → neg-bus.s7 · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · engine space · notes negative-same-size
+w56 pos alt-fuse.out → pos-bus.s4 · 4 · 0.5 ft · 90 A
+w57 pos pos-bus.s5 → acr-fuse-house.in · 2 · 0.5 ft · 150 A · drop 0.2% of 3%
+w58 pos acr-fuse-house.out → acr.a · 2 · 1.5 ft · 150 A · drop 0.61% of 3% · by acr-fuse-house
+w59 pos acr.b → acr-fuse-start.in · 2 · 1.5 ft · 150 A · drop 0.61% of 3% · by acr-fuse-start
+w60 pos acr-fuse-start.out → start-bus.s3 · 2 · 0.5 ft · 150 A · drop 0.2% of 3%
+w61 neg acr.neg → neg-bus.s8 · 16 · 1.5 ft · 1 A
+w62 pos start-bus.s4 → engine-2.pos · 1/0 · 6.6 ft · 150 A · by start-fuse · engine space · notes starter-exempt
+w63 neg start-bat.neg → engine-2.neg · 1/0 · 6.6 ft · 150 A · notes common-negative
+w64 neg engine-2.neg → neg-bus.s9 · 1/0 · 6.6 ft · 150 A · engine space · notes common-negative
+w65 pos alternator-2.b → alt-fuse-2.in · 1 · 6.6 ft · 150 A · drop 2.12% of 3% · by alt-fuse-2 · engine space · notes charging-source-fuse
+w66 neg alternator-2.neg → neg-bus.s10 · 1 · 6.6 ft · 150 A · drop 2.12% of 3% · engine space · notes negative-same-size
+w67 pos alt-fuse-2.out → pos-bus.s6 · 1 · 0.5 ft · 150 A
+w68 pos pv-solar.pos → pvbrk-solar.in · 12 · 25.8 ft · 11.1 A · drop 2.62% of 3% · notes conductor-sizing
+w69 neg pv-solar.neg → mppt-solar.pvneg · 12 · 25.8 ft · 11.1 A · drop 2.62% of 3% · notes negative-same-size
+w70 pos pvbrk-solar.out → mppt-solar.pvpos · 12 · 1 ft · 11.1 A · by pvbrk-solar
+w71 pos mppt-solar.bat → pvfuse-solar.in · 12 · 2 ft · 30 A · drop 1.65% of 3% · by pvfuse-solar · notes charging-source-fuse
+w72 neg mppt-solar.batneg → neg-bus.s11 · 12 · 2 ft · 30 A · drop 1.65% of 3% · notes negative-same-size
+w73 pos pvfuse-solar.out → pos-bus.s7 · 12 · 0.5 ft · 30 A · drop 0.41% of 3%
+w74 ac shore-inlet.l → shore-elci.in · 10/3 · 3 ft · 30 A · drop 0.16% of 3% · notes shore-main
+w75 gnd shore-inlet.g → galv-iso.a · 10 · 1 ft · 0 A · notes galvanic-isolator
+w76 gnd galv-iso.b → ac-gnd.s1 · 10 · 16.8 ft · 0 A · notes galvanic-isolator
+w77 gnd ac-gnd.s2 → neg-bus.s12 · 10 · 4.2 ft · 0 A · notes ac-dc-bond
+w78 pos pos-bus.s8 → ic-fuse.in · 2/0 · 0.5 ft · 211.6 A · drop 0.14% of 3%
+w79 pos ic-fuse.out → ic.dcpos · 2/0 · 4 ft · 211.6 A · drop 1.14% of 3% · by ic-fuse · notes inverter-fuse,conductor-sizing
+w80 neg neg-bus.s13 → ic.dcneg · 2/0 · 4 ft · 211.6 A · drop 1.14% of 3% · notes negative-same-size
+w81 gnd ic.g → ac-gnd.s3 · 10 · 4.2 ft · 0 A · equipment ground
+w82 ac shore-elci.out → ic.acin · 10/3 · 14.6 ft · 30 A · drop 0.76% of 3%
+w83 ac ic.acout → ac-panel.in · 10/3 · 4.2 ft · 30 A · drop 0.22% of 3%
+w84 ac shore-elci.out → ac-panel-shore.in · 10/3 · 2 ft · 30 A · drop 0.1% of 3% · notes shore-only
+w85 ac ac-panel.b1 → ac-ac-outlets.l · 14/3 · 8.8 ft · 2.5 A · drop 0.1% of 3% · by ac-panel · notes branch-protection
+w86 gnd ac-ac-outlets.g → ac-gnd.s4 · 10 · 8.8 ft · 0 A · equipment ground
+w87 ac ac-panel.b2 → ac-microwave.l · 14/3 · 5.2 ft · 8.3 A · drop 0.19% of 3% · by ac-panel · notes branch-protection
+w88 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
+w89 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · drop 0.3% of 3% · by ac-panel-shore · notes branch-protection,shore-only
+w90 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
+
+g1 warning conductor-sizing: House bank → House main fuse needs 2 parallel 4/0 AWG cables. → Consider a higher system voltage or moving the equipment closer to the batteries. [house0-bat,house0-fuse]
+g2 warning conductor-sizing: House main fuse → House battery switch needs 2 parallel 4/0 AWG cables. → Consider a higher system voltage or moving the equipment closer to the batteries. [house0-fuse,house-switch]
+g3 warning conductor-sizing: House bank → House battery monitor needs 2 parallel 4/0 AWG cables. → Consider a higher system voltage or moving the equipment closer to the batteries. [house0-bat,house-shunt]
+g4 warning conductor-sizing: House battery switch → Main positive bus needs 2 parallel 4/0 AWG cables. → Consider a higher system voltage or moving the equipment closer to the batteries. [house-switch,pos-bus]
+g5 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g6 info twin-engines: Both engines start from Start battery. Its fuse and cables are sized for one starter at a time, so start the engines one after the other. [start-bat]"
+`;
+
+exports[`generated designs are unchanged > twin engines sharing one start battery > fingerprint 1`] = `"4b2518f71eba8387"`;
+
+exports[`generated designs are unchanged > twin engines with no start battery > design 1`] = `
+"Ideal (ideal), 12 V: 55 components, 82 wires, 2 findings
+
+house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
+pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9
+neg-bus <bus-neg> "Main negative bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12
+house-shunt <shunt> "House battery monitor" · @battery · rating=500 · part "Shunt 500 A + monitor" · notes shunt · terms bat,sys
+house0-bat <battery> "House bank" · [4× 12 V 100 Ah AGM · 1S4P = 12 V 400 Ah] · @battery · eq:battery-bank · chemistry=agm ah=400 volts=12 · part "4× 12 V 100 Ah AGM · 1S4P = 12 V 400 Ah" · notes series-parallel · terms pos,neg
+house0-fuse <fuse> "House main fuse" · [400 A Class T] · @battery · rating=400 fuseClass=Class T · part "Class T fuse — high interrupt capacity, 400 A" · notes battery-fuse,class-t · terms in,out
+ao-fuse <fuse> "Always-on feed fuse" · [20 A ATC] · @battery · rating=20 fuseClass=ATC · notes unswitched · terms in,out
+ao-block <fuse-block> "Always-on fuse block" · @battery · part "Fuse block, 6 circuits (battery side of switch)" · notes unswitched · terms in,f1(7.5A),f2(10A)
+ld-bilge-pump <load> "Bilge pump (main)" · [60 W · 5.0 A] · @bilge · eq:bilge-pump · amps=5 watts=60 critical=true kind=bilge-pump v24ok=true volts=12 glyph=BP · notes unswitched · terms pos,neg
+bsw-bilge-pump <bilge-switch> "Bilge pump (main) switch" · [Auto / Off / Man] · @nav · notes bilge-switch · terms in,out
+ld-bilge-pump-2 <load> "Bilge pump (high water)" · [96 W · 8.0 A] · @bilge · eq:bilge-pump-2 · amps=8 watts=96 critical=true kind=bilge-pump v24ok=true volts=12 glyph=BP · notes unswitched · terms pos,neg
+bsw-bilge-pump-2 <bilge-switch> "Bilge pump (high water) switch" · [Auto / Off / Man] · @nav · notes bilge-switch · terms in,out
+dc-panel <dc-panel> "DC panel" · [Main 30 A] · @nav · rating=30 · part "DC panel, 13+ breaker positions, 30 A main" · notes branch-protection · terms in,b1(5A),b2(5A),b3(5A),b4(5A),b5(10A),b6(10A),b7(10A),b8(5A),b9(5A),b10(5A),b11(5A),b12(10A),b13(5A)
+dc-panel-neg <bus-neg> "DC panel negative bus" · @nav · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14
+dc-panel-feed <fuse> "DC panel feeder fuse" · [30 A ATC] · @battery · rating=30 fuseClass=ATC · notes conductor-sizing · terms in,out
+ld-cabin-lights <load> "Cabin lights (LED)" · [30 W · 2.5 A] · @saloon · eq:cabin-lights · amps=2.5 watts=30 critical=false kind=cabin-lights v24ok=true volts=12 glyph=💡 · notes branch-protection · terms pos,neg
+ld-nav-lights <load> "Navigation lights" · [6 W · 0.5 A] · @bow · eq:nav-lights · amps=0.5 watts=6 critical=true kind=nav-lights v24ok=true volts=12 glyph=NAV · notes branch-protection · terms pos,neg
+ld-anchor-light <load> "Anchor light" · [3 W · 0.3 A] · @masthead · eq:anchor-light · amps=0.25 watts=3 critical=true kind=anchor-light v24ok=true volts=12 glyph=ANC · notes branch-protection · terms pos,neg
+ld-steaming-deck-light <load> "Steaming / deck light" · [25 W · 2.1 A] · @mast · eq:steaming-deck-light · amps=2.08 watts=25 critical=true kind=steaming-deck-light v24ok=true volts=12 glyph=DECK · notes branch-protection · terms pos,neg
+ld-fridge <load> "Refrigerator" · [60 W · 5.0 A] · @galley · eq:fridge · amps=5 watts=60 critical=false kind=fridge v24ok=true volts=12 glyph=FRG · notes branch-protection · terms pos,neg
+ld-water-pump <load> "Fresh water pump" · [84 W · 7.0 A] · @galley · eq:water-pump · amps=7 watts=84 critical=false kind=water-pump v24ok=true volts=12 glyph=WP · notes branch-protection · terms pos,neg
+ld-autopilot <load> "Autopilot" · [60 W · 5.0 A] · @aft · eq:autopilot · amps=5 watts=60 critical=true kind=autopilot v24ok=true volts=12 glyph=AP · notes branch-protection · terms pos,neg
+ld-chartplotter <load> "Chartplotter / MFD" · [25 W · 2.1 A] · @cockpit · eq:chartplotter · amps=2.08 watts=25 critical=true kind=chartplotter v24ok=true volts=12 glyph=MFD · notes branch-protection · terms pos,neg
+ld-vhf <load> "VHF radio" · [6 W · 0.5 A] · @nav · eq:vhf · amps=0.5 watts=6 critical=true kind=vhf v24ok=true volts=12 glyph=VHF · notes branch-protection · terms pos,neg
+ld-ais <load> "AIS transponder" · [4 W · 0.3 A] · @nav · eq:ais · amps=0.33 watts=4 critical=true kind=ais v24ok=true volts=12 glyph=AIS · notes branch-protection · terms pos,neg
+ld-instruments <load> "Instruments / NMEA 2000" · [12 W · 1.0 A] · @nav · eq:instruments · amps=1 watts=12 critical=true kind=instruments v24ok=true volts=12 glyph=N2K · notes branch-protection · terms pos,neg
+ld-usb-outlets <load> "12 V / USB outlets" · [60 W · 5.0 A] · @saloon · eq:usb-outlets · amps=5 watts=60 critical=false kind=usb-outlets v24ok=true volts=12 glyph=USB · notes branch-protection · terms pos,neg
+ld-fans <load> "Cabin fans" · [12 W · 1.0 A] · @vberth · eq:fans · amps=1 watts=12 critical=false kind=fans v24ok=true volts=12 glyph=FAN · notes branch-protection · terms pos,neg
+prot-windlass <breaker> "Anchor windlass (1000 W) breaker" · [120 A (manual reset)] · @battery · rating=120 · part "Surface-mount breaker 120 A" · notes heavy-load · terms in,out
+cont-windlass <contactor> "Anchor windlass (1000 W) contactor" · @bow · rating=100 · part "Reversing solenoid / control box" · notes heavy-load · terms in,out,coil
+ld-windlass <load> "Anchor windlass (1000 W)" · [1000 W · 83.3 A] · @bow · eq:windlass · amps=83.33 watts=1000 critical=false kind=windlass v24ok=true volts=12 glyph=WL · notes heavy-load · terms pos,neg
+helm-windlass <helm-switch> "Anchor windlass (1000 W) control" · @cockpit · notes heavy-load · terms out
+engine <engine> "Starboard engine" · [Engine 1 · Starter ~150 A] · @engine · eq:engine · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
+engine-switch <switch> "Engine 1 start switch" · @battery · rating=300 · notes battery-switch · terms in,out
+alternator <alternator> "Alternator 1" · [Starboard engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alt-fuse <fuse> "Alternator 1 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+engine-2 <engine> "Port engine" · [Engine 2 · Starter ~150 A] · @engine · eq:engine-2 · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
+engine-switch-2 <switch> "Engine 2 start switch" · @battery · rating=300 · notes battery-switch · terms in,out
+alternator-2 <alternator> "Alternator 2" · [Port engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alt-fuse-2 <fuse> "Alternator 2 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+pv-solar <solar-panel> "Solar arch (2 × 200 W)" · [400 W · Vmp 36 V] · @arch · eq:solar · watts=400 amps=11.11 · terms pos,neg
+pvbrk-solar <breaker> "PV disconnect" · [20 A DC breaker] · @battery · rating=20 · part "PV DC breaker 20 A" · notes mppt · terms in,out
+mppt-solar <mppt> "MPPT controller" · [100/30] · @battery · eq:solar · rating=30 amps=28.25 · part "MPPT 30 A" · notes mppt · terms pvpos,pvneg,bat,batneg,atc
+pvfuse-solar <fuse> "MPPT output fuse" · [40 A MIDI] · @battery · rating=40 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+ac-gnd <ac-ground-bus> "AC grounding bus" · @nav · notes ac-dc-bond · terms s1,s2,s3,s4,s5,s6
+shore-inlet <shore-inlet> "Shore power 30 A" · [30 A 120 V] · @cockpit · eq:shore-power · amps=30 volts=120 · terms l,g
+shore-elci <elci> "Shore main breaker + ELCI" · [30 A · 30 mA ELCI] · @cockpit · rating=30 · part "30 A double-pole main breaker with ELCI" · notes shore-main · terms in,out
+galv-iso <galvanic-isolator> "Galvanic isolator" · @cockpit · rating=30 · part "Galvanic isolator, 30 A, fail-safe" · notes galvanic-isolator · terms a,b
+ic <inverter-charger> "Inverter/charger" · [2000 W · 80 A charger] · @battery · eq:inverter-charger · watts=2000 amps=80 · part "Inverter/charger 12 V 2000 W" · notes source-selector,inverter-fuse · terms acin,acout,g,dcpos,dcneg,atc
+ic-fuse <fuse> "Inverter/charger DC fuse" · [300 A ANL] · @battery · rating=300 fuseClass=ANL · notes inverter-fuse · terms in,out
+ac-panel <ac-panel> "AC panel" · [Inverter-backed · main 30 A] · @nav · rating=30 · part "AC panel, 30 A main" · terms in,b1(15A),b2(15A)
+ac-panel-shore <ac-panel> "AC panel — shore/gen only" · [Not powered by inverter · main 30 A] · @nav · rating=30 · part "AC panel, 30 A main" · terms in,b1(20A)
+ac-ac-outlets <ac-load> "AC outlets" · [300 W · 2.5 A] · @saloon · eq:ac-outlets · watts=300 amps=2.5 kind=ac-outlets shoreOnly=false glyph=⏚ · terms l,g
+ac-microwave <ac-load> "Microwave" · [1000 W · 8.3 A] · @galley · eq:microwave · watts=1000 amps=8.33 kind=microwave shoreOnly=false glyph=MW · terms l,g
+ac-water-heater <ac-load> "Water heater" · [1500 W · 12.5 A] · @engine · eq:water-heater · watts=1500 amps=12.5 kind=water-heater shoreOnly=true glyph=WH · notes shore-only · terms l,g
+
+w1 pos house0-bat.pos → house0-fuse.in · 4/0 · 0.5 ft · 293.3 A · drop 1.49% of 3% · notes battery-fuse
+w2 pos house0-fuse.out → house-switch.in · 4/0 · 1.5 ft · 293.3 A · drop 1.49% of 3% · by house0-fuse · notes conductor-sizing
+w3 neg house0-bat.neg → house-shunt.bat · 4/0 · 1.5 ft · 293.3 A · drop 1.49% of 3% · notes shunt,negative-same-size
+w4 pos house-switch.out → pos-bus.s1 · 4/0 · 2 ft · 293.3 A · drop 1.49% of 3% · by house0-fuse
+w5 neg house-shunt.sys → neg-bus.s1 · 4/0 · 2 ft · 293.3 A
+w6 pos house0-fuse.out → ao-fuse.in · 4/0 · 0.5 ft · 293.3 A · by house0-fuse · notes unswitched
+w7 pos ao-fuse.out → ao-block.in · 16 · 1.5 ft · 13 A · drop 1.35% of 3% · by ao-fuse
+w8 pos ao-block.f1 → bsw-bilge-pump.in · 14 · 4.2 ft · 5 A · drop 2.35% of 3% · by ao-block
+w9 pos bsw-bilge-pump.out → ld-bilge-pump.pos · 14 · 6.6 ft · 5 A · drop 2.35% of 3% · by ao-block
+w10 neg neg-bus.s2 → ld-bilge-pump.neg · 14 · 6.8 ft · 5 A · notes negative-same-size
+w11 pos ao-block.f2 → bsw-bilge-pump-2.in · 12 · 4.2 ft · 8 A · drop 2.37% of 3% · by ao-block
+w12 pos bsw-bilge-pump-2.out → ld-bilge-pump-2.pos · 12 · 6.6 ft · 8 A · drop 2.37% of 3% · by ao-block
+w13 neg neg-bus.s3 → ld-bilge-pump-2.neg · 12 · 6.8 ft · 8 A · notes negative-same-size
+w14 pos pos-bus.s2 → dc-panel-feed.in · 14 · 0.5 ft · 22.6 A · drop 0.49% of 3%
+w15 pos dc-panel-feed.out → dc-panel.in · 12 · 4.2 ft · 22.6 A · drop 2.6% of 3% · by dc-panel-feed · notes conductor-sizing
+w16 neg neg-bus.s4 → dc-panel-neg.s1 · 12 · 4.2 ft · 22.6 A · notes negative-same-size
+w17 pos dc-panel.b1 → ld-cabin-lights.pos · 16 · 8.8 ft · 2.5 A · drop 1.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w18 neg dc-panel-neg.s2 → ld-cabin-lights.neg · 16 · 8.8 ft · 2.5 A · drop 1.53% of 10% · notes negative-same-size
+w19 pos dc-panel.b2 → ld-nav-lights.pos · 16 · 30.2 ft · 0.5 A · drop 1.05% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w20 neg dc-panel-neg.s3 → ld-nav-lights.neg · 16 · 30.2 ft · 0.5 A · drop 1.05% of 3% · notes negative-same-size
+w21 pos dc-panel.b3 → ld-anchor-light.pos · 16 · 62.6 ft · 0.3 A · drop 1.09% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w22 neg dc-panel-neg.s4 → ld-anchor-light.neg · 16 · 62.6 ft · 0.3 A · drop 1.09% of 3% · notes negative-same-size
+w23 pos dc-panel.b4 → ld-steaming-deck-light.pos · 12 · 37.6 ft · 2.1 A · drop 2.15% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w24 neg dc-panel-neg.s5 → ld-steaming-deck-light.neg · 12 · 37.6 ft · 2.1 A · drop 2.15% of 3% · notes negative-same-size
+w25 pos dc-panel.b5 → ld-fridge.pos · 16 · 5.2 ft · 5 A · drop 1.81% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w26 neg dc-panel-neg.s6 → ld-fridge.neg · 16 · 5.2 ft · 5 A · drop 1.81% of 10% · notes negative-same-size
+w27 pos dc-panel.b6 → ld-water-pump.pos · 16 · 5.2 ft · 7 A · drop 2.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w28 neg dc-panel-neg.s7 → ld-water-pump.neg · 16 · 5.2 ft · 7 A · drop 2.53% of 10% · notes negative-same-size
+w29 pos dc-panel.b7 → ld-autopilot.pos · 12 · 16 ft · 5 A · drop 2.19% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w30 neg dc-panel-neg.s8 → ld-autopilot.neg · 12 · 16 ft · 5 A · drop 2.19% of 3% · notes negative-same-size
+w31 pos dc-panel.b8 → ld-chartplotter.pos · 16 · 16.8 ft · 2.1 A · drop 2.43% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w32 neg dc-panel-neg.s9 → ld-chartplotter.neg · 16 · 16.8 ft · 2.1 A · drop 2.43% of 3% · notes negative-same-size
+w33 pos dc-panel.b9 → ld-vhf.pos · 16 · 3 ft · 0.5 A · drop 0.1% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w34 neg dc-panel-neg.s10 → ld-vhf.neg · 16 · 3 ft · 0.5 A · drop 0.1% of 3% · notes negative-same-size
+w35 pos dc-panel.b10 → ld-ais.pos · 16 · 3 ft · 0.3 A · drop 0.07% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w36 neg dc-panel-neg.s11 → ld-ais.neg · 16 · 3 ft · 0.3 A · drop 0.07% of 3% · notes negative-same-size
+w37 pos dc-panel.b11 → ld-instruments.pos · 16 · 3 ft · 1 A · drop 0.21% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w38 neg dc-panel-neg.s12 → ld-instruments.neg · 16 · 3 ft · 1 A · drop 0.21% of 3% · notes negative-same-size
+w39 pos dc-panel.b12 → ld-usb-outlets.pos · 16 · 8.8 ft · 5 A · drop 3.06% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w40 neg dc-panel-neg.s13 → ld-usb-outlets.neg · 16 · 8.8 ft · 5 A · drop 3.06% of 10% · notes negative-same-size
+w41 pos dc-panel.b13 → ld-fans.pos · 16 · 22 ft · 1 A · drop 1.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w42 neg dc-panel-neg.s14 → ld-fans.neg · 16 · 22 ft · 1 A · drop 1.53% of 10% · notes negative-same-size
+w43 pos prot-windlass.out → cont-windlass.in · 2 · 30.4 ft · 83.3 A · drop 7.06% of 10% · by prot-windlass · notes heavy-load,conductor-sizing
+w44 pos pos-bus.s3 → prot-windlass.in · 2 · 0.5 ft · 83.3 A · by prot-windlass · notes heavy-load,conductor-sizing
+w45 pos cont-windlass.out → ld-windlass.pos · 2 · 1 ft · 83.3 A · by prot-windlass · notes heavy-load,conductor-sizing
+w46 neg neg-bus.s5 → ld-windlass.neg · 2 · 30.4 ft · 83.3 A · notes negative-same-size
+w47 sig helm-windlass.out → cont-windlass.coil · 18 · 43 ft
+w48 pos pos-bus.s4 → engine-switch.in · 1/0 · 0.5 ft · 150 A · drop 2.44% of 3% · notes starter-exempt
+w49 pos engine-switch.out → engine.pos · 1/0 · 6.6 ft · 150 A · engine space · notes starter-exempt
+w50 neg engine.neg → neg-bus.s6 · 1/0 · 6.6 ft · 150 A · engine space · notes common-negative
+w51 pos alternator.b → alt-fuse.in · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · by alt-fuse · engine space · notes charging-source-fuse
+w52 neg alternator.neg → neg-bus.s7 · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · engine space · notes negative-same-size
+w53 pos alt-fuse.out → pos-bus.s5 · 4 · 0.5 ft · 90 A
+w54 pos pos-bus.s6 → engine-switch-2.in · 1/0 · 0.5 ft · 150 A · drop 2.44% of 3% · notes starter-exempt
+w55 pos engine-switch-2.out → engine-2.pos · 1/0 · 6.6 ft · 150 A · engine space · notes starter-exempt
+w56 neg engine-2.neg → neg-bus.s8 · 1/0 · 6.6 ft · 150 A · engine space · notes common-negative
+w57 pos alternator-2.b → alt-fuse-2.in · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · by alt-fuse-2 · engine space · notes charging-source-fuse
+w58 neg alternator-2.neg → neg-bus.s9 · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · engine space · notes negative-same-size
+w59 pos alt-fuse-2.out → pos-bus.s7 · 4 · 0.5 ft · 90 A
+w60 pos pv-solar.pos → pvbrk-solar.in · 12 · 25.8 ft · 11.1 A · drop 2.62% of 3% · notes conductor-sizing
+w61 neg pv-solar.neg → mppt-solar.pvneg · 12 · 25.8 ft · 11.1 A · drop 2.62% of 3% · notes negative-same-size
+w62 pos pvbrk-solar.out → mppt-solar.pvpos · 12 · 1 ft · 11.1 A · by pvbrk-solar
+w63 pos mppt-solar.bat → pvfuse-solar.in · 12 · 2 ft · 30 A · drop 1.65% of 3% · by pvfuse-solar · notes charging-source-fuse
+w64 neg mppt-solar.batneg → neg-bus.s10 · 12 · 2 ft · 30 A · drop 1.65% of 3% · notes negative-same-size
+w65 pos pvfuse-solar.out → pos-bus.s8 · 12 · 0.5 ft · 30 A · drop 0.41% of 3%
+w66 ac shore-inlet.l → shore-elci.in · 10/3 · 3 ft · 30 A · drop 0.16% of 3% · notes shore-main
+w67 gnd shore-inlet.g → galv-iso.a · 10 · 1 ft · 0 A · notes galvanic-isolator
+w68 gnd galv-iso.b → ac-gnd.s1 · 10 · 16.8 ft · 0 A · notes galvanic-isolator
+w69 gnd ac-gnd.s2 → neg-bus.s11 · 10 · 4.2 ft · 0 A · notes ac-dc-bond
+w70 pos pos-bus.s9 → ic-fuse.in · 2/0 · 0.5 ft · 211.6 A · drop 0.14% of 3%
+w71 pos ic-fuse.out → ic.dcpos · 2/0 · 4 ft · 211.6 A · drop 1.14% of 3% · by ic-fuse · notes inverter-fuse,conductor-sizing
+w72 neg neg-bus.s12 → ic.dcneg · 2/0 · 4 ft · 211.6 A · drop 1.14% of 3% · notes negative-same-size
+w73 gnd ic.g → ac-gnd.s3 · 10 · 4.2 ft · 0 A · equipment ground
+w74 ac shore-elci.out → ic.acin · 10/3 · 14.6 ft · 30 A · drop 0.76% of 3%
+w75 ac ic.acout → ac-panel.in · 10/3 · 4.2 ft · 30 A · drop 0.22% of 3%
+w76 ac shore-elci.out → ac-panel-shore.in · 10/3 · 2 ft · 30 A · drop 0.1% of 3% · notes shore-only
+w77 ac ac-panel.b1 → ac-ac-outlets.l · 14/3 · 8.8 ft · 2.5 A · drop 0.1% of 3% · by ac-panel · notes branch-protection
+w78 gnd ac-ac-outlets.g → ac-gnd.s4 · 10 · 8.8 ft · 0 A · equipment ground
+w79 ac ac-panel.b2 → ac-microwave.l · 14/3 · 5.2 ft · 8.3 A · drop 0.19% of 3% · by ac-panel · notes branch-protection
+w80 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
+w81 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · drop 0.3% of 3% · by ac-panel-shore · notes branch-protection,shore-only
+w82 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
+
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info house-start-split: No dedicated start battery: both engines start from the house bank. → Add a start battery (role "Engine start") for each engine, or one they share, so a flat house bank can never stop you starting them."
+`;
+
+exports[`generated designs are unchanged > twin engines with no start battery > fingerprint 1`] = `"41b02020491007e1"`;
+
+exports[`generated designs are unchanged > twin engines, a start battery each (emergency parallel switch) > design 1`] = `
+"Ideal (ideal), 12 V: 68 components, 100 wires, 1 findings
+
+house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
+pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9
+neg-bus <bus-neg> "Main negative bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14
+house-shunt <shunt> "House battery monitor" · @battery · rating=500 · part "Shunt 500 A + monitor" · notes shunt · terms bat,sys
+house0-bat <battery> "House bank" · [4× 12 V 100 Ah AGM · 1S4P = 12 V 400 Ah] · @battery · eq:battery-bank · chemistry=agm ah=400 volts=12 · part "4× 12 V 100 Ah AGM · 1S4P = 12 V 400 Ah" · notes series-parallel · terms pos,neg
+house0-fuse <fuse> "House main fuse" · [400 A Class T] · @battery · rating=400 fuseClass=Class T · part "Class T fuse — high interrupt capacity, 400 A" · notes battery-fuse,class-t · terms in,out
+ao-fuse <fuse> "Always-on feed fuse" · [20 A ATC] · @battery · rating=20 fuseClass=ATC · notes unswitched · terms in,out
+ao-block <fuse-block> "Always-on fuse block" · @battery · part "Fuse block, 6 circuits (battery side of switch)" · notes unswitched · terms in,f1(7.5A),f2(10A)
+ld-bilge-pump <load> "Bilge pump (main)" · [60 W · 5.0 A] · @bilge · eq:bilge-pump · amps=5 watts=60 critical=true kind=bilge-pump v24ok=true volts=12 glyph=BP · notes unswitched · terms pos,neg
+bsw-bilge-pump <bilge-switch> "Bilge pump (main) switch" · [Auto / Off / Man] · @nav · notes bilge-switch · terms in,out
+ld-bilge-pump-2 <load> "Bilge pump (high water)" · [96 W · 8.0 A] · @bilge · eq:bilge-pump-2 · amps=8 watts=96 critical=true kind=bilge-pump v24ok=true volts=12 glyph=BP · notes unswitched · terms pos,neg
+bsw-bilge-pump-2 <bilge-switch> "Bilge pump (high water) switch" · [Auto / Off / Man] · @nav · notes bilge-switch · terms in,out
+dc-panel <dc-panel> "DC panel" · [Main 30 A] · @nav · rating=30 · part "DC panel, 13+ breaker positions, 30 A main" · notes branch-protection · terms in,b1(5A),b2(5A),b3(5A),b4(5A),b5(10A),b6(10A),b7(10A),b8(5A),b9(5A),b10(5A),b11(5A),b12(10A),b13(5A)
+dc-panel-neg <bus-neg> "DC panel negative bus" · @nav · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12,s13,s14
+dc-panel-feed <fuse> "DC panel feeder fuse" · [30 A ATC] · @battery · rating=30 fuseClass=ATC · notes conductor-sizing · terms in,out
+ld-cabin-lights <load> "Cabin lights (LED)" · [30 W · 2.5 A] · @saloon · eq:cabin-lights · amps=2.5 watts=30 critical=false kind=cabin-lights v24ok=true volts=12 glyph=💡 · notes branch-protection · terms pos,neg
+ld-nav-lights <load> "Navigation lights" · [6 W · 0.5 A] · @bow · eq:nav-lights · amps=0.5 watts=6 critical=true kind=nav-lights v24ok=true volts=12 glyph=NAV · notes branch-protection · terms pos,neg
+ld-anchor-light <load> "Anchor light" · [3 W · 0.3 A] · @masthead · eq:anchor-light · amps=0.25 watts=3 critical=true kind=anchor-light v24ok=true volts=12 glyph=ANC · notes branch-protection · terms pos,neg
+ld-steaming-deck-light <load> "Steaming / deck light" · [25 W · 2.1 A] · @mast · eq:steaming-deck-light · amps=2.08 watts=25 critical=true kind=steaming-deck-light v24ok=true volts=12 glyph=DECK · notes branch-protection · terms pos,neg
+ld-fridge <load> "Refrigerator" · [60 W · 5.0 A] · @galley · eq:fridge · amps=5 watts=60 critical=false kind=fridge v24ok=true volts=12 glyph=FRG · notes branch-protection · terms pos,neg
+ld-water-pump <load> "Fresh water pump" · [84 W · 7.0 A] · @galley · eq:water-pump · amps=7 watts=84 critical=false kind=water-pump v24ok=true volts=12 glyph=WP · notes branch-protection · terms pos,neg
+ld-autopilot <load> "Autopilot" · [60 W · 5.0 A] · @aft · eq:autopilot · amps=5 watts=60 critical=true kind=autopilot v24ok=true volts=12 glyph=AP · notes branch-protection · terms pos,neg
+ld-chartplotter <load> "Chartplotter / MFD" · [25 W · 2.1 A] · @cockpit · eq:chartplotter · amps=2.08 watts=25 critical=true kind=chartplotter v24ok=true volts=12 glyph=MFD · notes branch-protection · terms pos,neg
+ld-vhf <load> "VHF radio" · [6 W · 0.5 A] · @nav · eq:vhf · amps=0.5 watts=6 critical=true kind=vhf v24ok=true volts=12 glyph=VHF · notes branch-protection · terms pos,neg
+ld-ais <load> "AIS transponder" · [4 W · 0.3 A] · @nav · eq:ais · amps=0.33 watts=4 critical=true kind=ais v24ok=true volts=12 glyph=AIS · notes branch-protection · terms pos,neg
+ld-instruments <load> "Instruments / NMEA 2000" · [12 W · 1.0 A] · @nav · eq:instruments · amps=1 watts=12 critical=true kind=instruments v24ok=true volts=12 glyph=N2K · notes branch-protection · terms pos,neg
+ld-usb-outlets <load> "12 V / USB outlets" · [60 W · 5.0 A] · @saloon · eq:usb-outlets · amps=5 watts=60 critical=false kind=usb-outlets v24ok=true volts=12 glyph=USB · notes branch-protection · terms pos,neg
+ld-fans <load> "Cabin fans" · [12 W · 1.0 A] · @vberth · eq:fans · amps=1 watts=12 critical=false kind=fans v24ok=true volts=12 glyph=FAN · notes branch-protection · terms pos,neg
+prot-windlass <breaker> "Anchor windlass (1000 W) breaker" · [120 A (manual reset)] · @battery · rating=120 · part "Surface-mount breaker 120 A" · notes heavy-load · terms in,out
+cont-windlass <contactor> "Anchor windlass (1000 W) contactor" · @bow · rating=100 · part "Reversing solenoid / control box" · notes heavy-load · terms in,out,coil
+ld-windlass <load> "Anchor windlass (1000 W)" · [1000 W · 83.3 A] · @bow · eq:windlass · amps=83.33 watts=1000 critical=false kind=windlass v24ok=true volts=12 glyph=WL · notes heavy-load · terms pos,neg
+helm-windlass <helm-switch> "Anchor windlass (1000 W) control" · @cockpit · notes heavy-load · terms out
+engine <engine> "Starboard engine" · [Engine 1 · Starter ~150 A] · @engine · eq:engine · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
+start-bat <battery> "Starboard start battery" · [1× 12 V 90 Ah AGM · 1S1P = 12 V 90 Ah] · @battery · eq:battery-bank-2 · chemistry=agm ah=90 volts=12 · notes house-start-split · terms pos,neg
+start-fuse <fuse> "Start battery 1 fuse" · [300 A MRBF] · @battery · rating=300 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
+start-switch <switch> "Start battery 1 switch" · @battery · rating=300 · notes battery-switch · terms in,out
+start-bus <bus-pos> "Start positive bus 1" · @battery · terms s1,s2,s3,s4
+alternator <alternator> "Alternator 1" · [Starboard engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alt-fuse <fuse> "Alternator 1 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+acr <acr> "Automatic charging relay 1" · [120 A] · @battery · rating=120 · part "ACR / VSR 120 A" · notes acr · terms a,b,neg
+acr-fuse-house <fuse> "ACR 1 fuse (house side)" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes battery-fuse · terms in,out
+acr-fuse-start <fuse> "ACR 1 fuse (start side)" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes battery-fuse · terms in,out
+engine-2 <engine> "Port engine" · [Engine 2 · Starter ~150 A] · @engine · eq:engine-2 · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
+start-bat-2 <battery> "Port start battery" · [1× 12 V 90 Ah AGM · 1S1P = 12 V 90 Ah] · @battery · eq:battery-bank-3 · chemistry=agm ah=90 volts=12 · notes house-start-split · terms pos,neg
+start-fuse-2 <fuse> "Start battery 2 fuse" · [300 A MRBF] · @battery · rating=300 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
+start-switch-2 <switch> "Start battery 2 switch" · @battery · rating=300 · notes battery-switch · terms in,out
+start-bus-2 <bus-pos> "Start positive bus 2" · @battery · terms s1,s2,s3,s4
+alternator-2 <alternator> "Alternator 2" · [Port engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alt-fuse-2 <fuse> "Alternator 2 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+acr-2 <acr> "Automatic charging relay 2" · [120 A] · @battery · rating=120 · part "ACR / VSR 120 A" · notes acr · terms a,b,neg
+acr-fuse-house-2 <fuse> "ACR 2 fuse (house side)" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes battery-fuse · terms in,out
+acr-fuse-start-2 <fuse> "ACR 2 fuse (start side)" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes battery-fuse · terms in,out
+start-parallel <switch> "Emergency parallel switch" · [Normally off] · @battery · rating=300 · part "300 A, emergency parallel (normally off)" · notes twin-engines · terms in,out
+pv-solar <solar-panel> "Solar arch (2 × 200 W)" · [400 W · Vmp 36 V] · @arch · eq:solar · watts=400 amps=11.11 · terms pos,neg
+pvbrk-solar <breaker> "PV disconnect" · [20 A DC breaker] · @battery · rating=20 · part "PV DC breaker 20 A" · notes mppt · terms in,out
+mppt-solar <mppt> "MPPT controller" · [100/30] · @battery · eq:solar · rating=30 amps=28.25 · part "MPPT 30 A" · notes mppt · terms pvpos,pvneg,bat,batneg,atc
+pvfuse-solar <fuse> "MPPT output fuse" · [40 A MIDI] · @battery · rating=40 fuseClass=MIDI · notes charging-source-fuse · terms in,out
+ac-gnd <ac-ground-bus> "AC grounding bus" · @nav · notes ac-dc-bond · terms s1,s2,s3,s4,s5,s6
+shore-inlet <shore-inlet> "Shore power 30 A" · [30 A 120 V] · @cockpit · eq:shore-power · amps=30 volts=120 · terms l,g
+shore-elci <elci> "Shore main breaker + ELCI" · [30 A · 30 mA ELCI] · @cockpit · rating=30 · part "30 A double-pole main breaker with ELCI" · notes shore-main · terms in,out
+galv-iso <galvanic-isolator> "Galvanic isolator" · @cockpit · rating=30 · part "Galvanic isolator, 30 A, fail-safe" · notes galvanic-isolator · terms a,b
+ic <inverter-charger> "Inverter/charger" · [2000 W · 80 A charger] · @battery · eq:inverter-charger · watts=2000 amps=80 · part "Inverter/charger 12 V 2000 W" · notes source-selector,inverter-fuse · terms acin,acout,g,dcpos,dcneg,atc
+ic-fuse <fuse> "Inverter/charger DC fuse" · [300 A ANL] · @battery · rating=300 fuseClass=ANL · notes inverter-fuse · terms in,out
+ac-panel <ac-panel> "AC panel" · [Inverter-backed · main 30 A] · @nav · rating=30 · part "AC panel, 30 A main" · terms in,b1(15A),b2(15A)
+ac-panel-shore <ac-panel> "AC panel — shore/gen only" · [Not powered by inverter · main 30 A] · @nav · rating=30 · part "AC panel, 30 A main" · terms in,b1(20A)
+ac-ac-outlets <ac-load> "AC outlets" · [300 W · 2.5 A] · @saloon · eq:ac-outlets · watts=300 amps=2.5 kind=ac-outlets shoreOnly=false glyph=⏚ · terms l,g
+ac-microwave <ac-load> "Microwave" · [1000 W · 8.3 A] · @galley · eq:microwave · watts=1000 amps=8.33 kind=microwave shoreOnly=false glyph=MW · terms l,g
+ac-water-heater <ac-load> "Water heater" · [1500 W · 12.5 A] · @engine · eq:water-heater · watts=1500 amps=12.5 kind=water-heater shoreOnly=true glyph=WH · notes shore-only · terms l,g
+
+w1 pos house0-bat.pos → house0-fuse.in · 4/0 · 0.5 ft · 293.3 A · drop 1.49% of 3% · notes battery-fuse
+w2 pos house0-fuse.out → house-switch.in · 4/0 · 1.5 ft · 293.3 A · drop 1.49% of 3% · by house0-fuse · notes conductor-sizing
+w3 neg house0-bat.neg → house-shunt.bat · 4/0 · 1.5 ft · 293.3 A · drop 1.49% of 3% · notes shunt,negative-same-size
+w4 pos house-switch.out → pos-bus.s1 · 4/0 · 2 ft · 293.3 A · drop 1.49% of 3% · by house0-fuse
+w5 neg house-shunt.sys → neg-bus.s1 · 4/0 · 2 ft · 293.3 A
+w6 pos house0-fuse.out → ao-fuse.in · 4/0 · 0.5 ft · 293.3 A · by house0-fuse · notes unswitched
+w7 pos ao-fuse.out → ao-block.in · 16 · 1.5 ft · 13 A · drop 1.35% of 3% · by ao-fuse
+w8 pos ao-block.f1 → bsw-bilge-pump.in · 14 · 4.2 ft · 5 A · drop 2.35% of 3% · by ao-block
+w9 pos bsw-bilge-pump.out → ld-bilge-pump.pos · 14 · 6.6 ft · 5 A · drop 2.35% of 3% · by ao-block
+w10 neg neg-bus.s2 → ld-bilge-pump.neg · 14 · 6.8 ft · 5 A · notes negative-same-size
+w11 pos ao-block.f2 → bsw-bilge-pump-2.in · 12 · 4.2 ft · 8 A · drop 2.37% of 3% · by ao-block
+w12 pos bsw-bilge-pump-2.out → ld-bilge-pump-2.pos · 12 · 6.6 ft · 8 A · drop 2.37% of 3% · by ao-block
+w13 neg neg-bus.s3 → ld-bilge-pump-2.neg · 12 · 6.8 ft · 8 A · notes negative-same-size
+w14 pos pos-bus.s2 → dc-panel-feed.in · 14 · 0.5 ft · 22.6 A · drop 0.49% of 3%
+w15 pos dc-panel-feed.out → dc-panel.in · 12 · 4.2 ft · 22.6 A · drop 2.6% of 3% · by dc-panel-feed · notes conductor-sizing
+w16 neg neg-bus.s4 → dc-panel-neg.s1 · 12 · 4.2 ft · 22.6 A · notes negative-same-size
+w17 pos dc-panel.b1 → ld-cabin-lights.pos · 16 · 8.8 ft · 2.5 A · drop 1.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w18 neg dc-panel-neg.s2 → ld-cabin-lights.neg · 16 · 8.8 ft · 2.5 A · drop 1.53% of 10% · notes negative-same-size
+w19 pos dc-panel.b2 → ld-nav-lights.pos · 16 · 30.2 ft · 0.5 A · drop 1.05% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w20 neg dc-panel-neg.s3 → ld-nav-lights.neg · 16 · 30.2 ft · 0.5 A · drop 1.05% of 3% · notes negative-same-size
+w21 pos dc-panel.b3 → ld-anchor-light.pos · 16 · 62.6 ft · 0.3 A · drop 1.09% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w22 neg dc-panel-neg.s4 → ld-anchor-light.neg · 16 · 62.6 ft · 0.3 A · drop 1.09% of 3% · notes negative-same-size
+w23 pos dc-panel.b4 → ld-steaming-deck-light.pos · 12 · 37.6 ft · 2.1 A · drop 2.15% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w24 neg dc-panel-neg.s5 → ld-steaming-deck-light.neg · 12 · 37.6 ft · 2.1 A · drop 2.15% of 3% · notes negative-same-size
+w25 pos dc-panel.b5 → ld-fridge.pos · 16 · 5.2 ft · 5 A · drop 1.81% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w26 neg dc-panel-neg.s6 → ld-fridge.neg · 16 · 5.2 ft · 5 A · drop 1.81% of 10% · notes negative-same-size
+w27 pos dc-panel.b6 → ld-water-pump.pos · 16 · 5.2 ft · 7 A · drop 2.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w28 neg dc-panel-neg.s7 → ld-water-pump.neg · 16 · 5.2 ft · 7 A · drop 2.53% of 10% · notes negative-same-size
+w29 pos dc-panel.b7 → ld-autopilot.pos · 12 · 16 ft · 5 A · drop 2.19% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w30 neg dc-panel-neg.s8 → ld-autopilot.neg · 12 · 16 ft · 5 A · drop 2.19% of 3% · notes negative-same-size
+w31 pos dc-panel.b8 → ld-chartplotter.pos · 16 · 16.8 ft · 2.1 A · drop 2.43% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w32 neg dc-panel-neg.s9 → ld-chartplotter.neg · 16 · 16.8 ft · 2.1 A · drop 2.43% of 3% · notes negative-same-size
+w33 pos dc-panel.b9 → ld-vhf.pos · 16 · 3 ft · 0.5 A · drop 0.1% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w34 neg dc-panel-neg.s10 → ld-vhf.neg · 16 · 3 ft · 0.5 A · drop 0.1% of 3% · notes negative-same-size
+w35 pos dc-panel.b10 → ld-ais.pos · 16 · 3 ft · 0.3 A · drop 0.07% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w36 neg dc-panel-neg.s11 → ld-ais.neg · 16 · 3 ft · 0.3 A · drop 0.07% of 3% · notes negative-same-size
+w37 pos dc-panel.b11 → ld-instruments.pos · 16 · 3 ft · 1 A · drop 0.21% of 3% · by dc-panel · notes branch-protection,conductor-sizing
+w38 neg dc-panel-neg.s12 → ld-instruments.neg · 16 · 3 ft · 1 A · drop 0.21% of 3% · notes negative-same-size
+w39 pos dc-panel.b12 → ld-usb-outlets.pos · 16 · 8.8 ft · 5 A · drop 3.06% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w40 neg dc-panel-neg.s13 → ld-usb-outlets.neg · 16 · 8.8 ft · 5 A · drop 3.06% of 10% · notes negative-same-size
+w41 pos dc-panel.b13 → ld-fans.pos · 16 · 22 ft · 1 A · drop 1.53% of 10% · by dc-panel · notes branch-protection,conductor-sizing
+w42 neg dc-panel-neg.s14 → ld-fans.neg · 16 · 22 ft · 1 A · drop 1.53% of 10% · notes negative-same-size
+w43 pos prot-windlass.out → cont-windlass.in · 2 · 30.4 ft · 83.3 A · drop 7.06% of 10% · by prot-windlass · notes heavy-load,conductor-sizing
+w44 pos pos-bus.s3 → prot-windlass.in · 2 · 0.5 ft · 83.3 A · by prot-windlass · notes heavy-load,conductor-sizing
+w45 pos cont-windlass.out → ld-windlass.pos · 2 · 1 ft · 83.3 A · by prot-windlass · notes heavy-load,conductor-sizing
+w46 neg neg-bus.s5 → ld-windlass.neg · 2 · 30.4 ft · 83.3 A · notes negative-same-size
+w47 sig helm-windlass.out → cont-windlass.coil · 18 · 43 ft
+w48 pos start-bat.pos → start-fuse.in · 1/0 · 0.5 ft · 150 A · drop 2.44% of 3% · notes starter-exempt
+w49 pos start-fuse.out → start-switch.in · 1/0 · 1 ft · 150 A · by start-fuse · notes starter-exempt
+w50 pos start-switch.out → start-bus.s1 · 1/0 · 1.5 ft · 150 A · by start-fuse · notes starter-exempt
+w51 pos start-bus.s2 → engine.pos · 1/0 · 6.6 ft · 150 A · by start-fuse · engine space · notes starter-exempt
+w52 neg start-bat.neg → engine.neg · 1/0 · 6.6 ft · 150 A · notes common-negative
+w53 neg engine.neg → neg-bus.s6 · 1/0 · 6.6 ft · 150 A · engine space · notes common-negative
+w54 pos alternator.b → alt-fuse.in · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · by alt-fuse · engine space · notes charging-source-fuse
+w55 neg alternator.neg → neg-bus.s7 · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · engine space · notes negative-same-size
+w56 pos alt-fuse.out → pos-bus.s4 · 4 · 0.5 ft · 90 A
+w57 pos pos-bus.s5 → acr-fuse-house.in · 4 · 0.5 ft · 90 A · drop 0.19% of 3%
+w58 pos acr-fuse-house.out → acr.a · 4 · 1.5 ft · 90 A · drop 0.58% of 3% · by acr-fuse-house
+w59 pos acr.b → acr-fuse-start.in · 4 · 1.5 ft · 90 A · drop 0.58% of 3% · by acr-fuse-start
+w60 pos acr-fuse-start.out → start-bus.s3 · 4 · 0.5 ft · 90 A · drop 0.19% of 3%
+w61 neg acr.neg → neg-bus.s8 · 16 · 1.5 ft · 1 A
+w62 pos start-bat-2.pos → start-fuse-2.in · 1/0 · 0.5 ft · 150 A · drop 2.44% of 3% · notes starter-exempt
+w63 pos start-fuse-2.out → start-switch-2.in · 1/0 · 1 ft · 150 A · by start-fuse-2 · notes starter-exempt
+w64 pos start-switch-2.out → start-bus-2.s1 · 1/0 · 1.5 ft · 150 A · by start-fuse-2 · notes starter-exempt
+w65 pos start-bus-2.s2 → engine-2.pos · 1/0 · 6.6 ft · 150 A · by start-fuse-2 · engine space · notes starter-exempt
+w66 neg start-bat-2.neg → engine-2.neg · 1/0 · 6.6 ft · 150 A · notes common-negative
+w67 neg engine-2.neg → neg-bus.s9 · 1/0 · 6.6 ft · 150 A · engine space · notes common-negative
+w68 pos alternator-2.b → alt-fuse-2.in · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · by alt-fuse-2 · engine space · notes charging-source-fuse
+w69 neg alternator-2.neg → neg-bus.s10 · 4 · 6.6 ft · 90 A · drop 2.55% of 3% · engine space · notes negative-same-size
+w70 pos alt-fuse-2.out → pos-bus.s6 · 4 · 0.5 ft · 90 A
+w71 pos pos-bus.s7 → acr-fuse-house-2.in · 4 · 0.5 ft · 90 A · drop 0.19% of 3%
+w72 pos acr-fuse-house-2.out → acr-2.a · 4 · 1.5 ft · 90 A · drop 0.58% of 3% · by acr-fuse-house-2
+w73 pos acr-2.b → acr-fuse-start-2.in · 4 · 1.5 ft · 90 A · drop 0.58% of 3% · by acr-fuse-start-2
+w74 pos acr-fuse-start-2.out → start-bus-2.s3 · 4 · 0.5 ft · 90 A · drop 0.19% of 3%
+w75 neg acr-2.neg → neg-bus.s11 · 16 · 1.5 ft · 1 A
+w76 pos start-bus.s4 → start-parallel.in · 1/0 · 1 ft · 150 A · by start-fuse · notes starter-exempt
+w77 pos start-parallel.out → start-bus-2.s4 · 1/0 · 4 ft · 150 A · by start-fuse-2 · notes starter-exempt
+w78 pos pv-solar.pos → pvbrk-solar.in · 12 · 25.8 ft · 11.1 A · drop 2.62% of 3% · notes conductor-sizing
+w79 neg pv-solar.neg → mppt-solar.pvneg · 12 · 25.8 ft · 11.1 A · drop 2.62% of 3% · notes negative-same-size
+w80 pos pvbrk-solar.out → mppt-solar.pvpos · 12 · 1 ft · 11.1 A · by pvbrk-solar
+w81 pos mppt-solar.bat → pvfuse-solar.in · 12 · 2 ft · 30 A · drop 1.65% of 3% · by pvfuse-solar · notes charging-source-fuse
+w82 neg mppt-solar.batneg → neg-bus.s12 · 12 · 2 ft · 30 A · drop 1.65% of 3% · notes negative-same-size
+w83 pos pvfuse-solar.out → pos-bus.s8 · 12 · 0.5 ft · 30 A · drop 0.41% of 3%
+w84 ac shore-inlet.l → shore-elci.in · 10/3 · 3 ft · 30 A · drop 0.16% of 3% · notes shore-main
+w85 gnd shore-inlet.g → galv-iso.a · 10 · 1 ft · 0 A · notes galvanic-isolator
+w86 gnd galv-iso.b → ac-gnd.s1 · 10 · 16.8 ft · 0 A · notes galvanic-isolator
+w87 gnd ac-gnd.s2 → neg-bus.s13 · 10 · 4.2 ft · 0 A · notes ac-dc-bond
+w88 pos pos-bus.s9 → ic-fuse.in · 2/0 · 0.5 ft · 211.6 A · drop 0.14% of 3%
+w89 pos ic-fuse.out → ic.dcpos · 2/0 · 4 ft · 211.6 A · drop 1.14% of 3% · by ic-fuse · notes inverter-fuse,conductor-sizing
+w90 neg neg-bus.s14 → ic.dcneg · 2/0 · 4 ft · 211.6 A · drop 1.14% of 3% · notes negative-same-size
+w91 gnd ic.g → ac-gnd.s3 · 10 · 4.2 ft · 0 A · equipment ground
+w92 ac shore-elci.out → ic.acin · 10/3 · 14.6 ft · 30 A · drop 0.76% of 3%
+w93 ac ic.acout → ac-panel.in · 10/3 · 4.2 ft · 30 A · drop 0.22% of 3%
+w94 ac shore-elci.out → ac-panel-shore.in · 10/3 · 2 ft · 30 A · drop 0.1% of 3% · notes shore-only
+w95 ac ac-panel.b1 → ac-ac-outlets.l · 14/3 · 8.8 ft · 2.5 A · drop 0.1% of 3% · by ac-panel · notes branch-protection
+w96 gnd ac-ac-outlets.g → ac-gnd.s4 · 10 · 8.8 ft · 0 A · equipment ground
+w97 ac ac-panel.b2 → ac-microwave.l · 14/3 · 5.2 ft · 8.3 A · drop 0.19% of 3% · by ac-panel · notes branch-protection
+w98 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
+w99 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · drop 0.3% of 3% · by ac-panel-shore · notes branch-protection,shore-only
+w100 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
+
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+`;
+
+exports[`generated designs are unchanged > twin engines, a start battery each (emergency parallel switch) > fingerprint 1`] = `"f07b0656d639a3f3"`;
+
 exports[`generated designs are unchanged > two shore inlets (30 A and 50 A), inverter/charger > design 1`] = `
 "Ideal (ideal), 12 V: 61 components, 89 wires, 1 findings
 
@@ -2012,8 +2503,20 @@ exports[`more generated designs are unchanged (fingerprint only) > three 12 V ba
 
 exports[`more generated designs are unchanged (fingerprint only) > thruster and winch on their own banks 1`] = `"81 components, 118 wires, 1 findings, f92e991f1907ec43"`;
 
+exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, engine-run relay chosen 1`] = `"60 components, 90 wires, 3 findings, e0be13237bb096fd"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, lithium house, one external regulator 1`] = `"62 components, 96 wires, 3 findings, 8dcf2d7ac0e9bcde"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, one with a battery isolator 1`] = `"62 components, 94 wires, 3 findings, 61de77609a654c0b"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > twin engines, a start battery each, 24 V what-if 1`] = `"73 components, 106 wires, 4 findings, 0e7e283149ff71c3"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > twin engines, lithium house, a lead-acid start battery each 1`] = `"68 components, 104 wires, 1 findings, 0dc1468cdf3b9e10"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > twin engines, start batteries of different chemistry 1`] = `"68 components, 101 wires, 4 findings, df5386b90369be44"`;
+
 exports[`more generated designs are unchanged (fingerprint only) > two 230 V shore inlets (16 A and 32 A), metric 1`] = `"61 components, 89 wires, 1 findings, d0ec8a5f93b0b5ca"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > two house banks of different chemistry 1`] = `"59 components, 87 wires, 1 findings, 42891e4662eccf7f"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"63 components, 92 wires, 3 findings, 7af59fe5b04cacbf"`;
+exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"66 components, 98 wires, 3 findings, bb20f3ee80d1790a"`;

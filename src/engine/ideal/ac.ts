@@ -9,7 +9,7 @@ import { fuseLabel, type Builder, type End } from './builder';
 import type { Core } from './houseBank';
 import type { Plan } from './plan';
 
-export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undefined) {
+export function buildAc(b: Builder, p: Plan, core: Core, startBuses: DNode[]) {
   const { V, acStd, BZ, PZ, run, kinds, lfp, ic, inv, acLoads, chargers, invDcAmps } = p;
   const { posBus, negBus, bms } = core;
 
@@ -193,14 +193,17 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     const f = b.add('fuse', `chgfuse-${c.id}`, 'Charger output fuse', { zone: BZ, sublabel: fuseLabel(fr, fuseClassFor(fr, {})), data: { rating: fr, fuseClass: fuseClassFor(fr, {}) }, notes: ['charging-source-fuse'] });
     b.pair([[node, 'out1'], [f, 'in']], [[node, 'neg'], [negBus, b.stud(negBus)]], { amps: A, protect: fr, len: run(node.zone, BZ) + 1, protectedBy: f.id });
     b.wire('pos', [f, 'out'], [posBus, b.stud(posBus)], { amps: A, protect: fr, len: 0.5 });
-    if (startBus && outputs >= 2) {
-      node.terminals.push({ id: 'out2', pol: 'pos', side: 'E', label: 'OUT2+' });
+    // Further outputs keep the start batteries topped up: OUT2 the first, OUT3 a twin-engine boat's second.
+    startBuses.slice(0, outputs - 1).forEach((startBus, i) => {
+      const out = `out${i + 2}`;
+      const n = startBuses.length > 1 ? ` ${i + 1}` : '';
+      node.terminals.push({ id: out, pol: 'pos', side: 'E', label: `OUT${i + 2}+` });
       const sA = Math.min(A, 10);
-      const fr2 = b.protection(sA, { what: `${c.name} start output fuse`, nodes: [`chgfuse2-${c.id}`] });
-      const f2 = b.add('fuse', `chgfuse2-${c.id}`, 'Charger start output fuse', { zone: startBus.zone, sublabel: fuseLabel(fr2, fuseClassFor(fr2, {})), data: { rating: fr2, fuseClass: fuseClassFor(fr2, {}) }, notes: ['charging-source-fuse'] });
-      b.wire('pos', [node, 'out2'], [f2, 'in'], { amps: sA, protect: fr2, len: run(node.zone, startBus.zone) + 1, protectedBy: f2.id });
+      const fr2 = b.protection(sA, { what: `${c.name} start${n} output fuse`, nodes: [`chgfuse${i + 2}-${c.id}`] });
+      const f2 = b.add('fuse', `chgfuse${i + 2}-${c.id}`, `Charger start${n} output fuse`, { zone: startBus.zone, sublabel: fuseLabel(fr2, fuseClassFor(fr2, {})), data: { rating: fr2, fuseClass: fuseClassFor(fr2, {}) }, notes: ['charging-source-fuse'] });
+      b.wire('pos', [node, out], [f2, 'in'], { amps: sA, protect: fr2, len: run(node.zone, startBus.zone) + 1, protectedBy: f2.id });
       b.wire('pos', [f2, 'out'], [startBus, b.stud(startBus)], { amps: sA, protect: fr2, len: 0.5 });
-    }
+    });
   }
   if (!shores.length && !genset && (chargers.length || shoreOnlyLoads.length)) {
     b.find('info', 'shore-main', 'There are AC chargers or shore-only loads but no shore power inlet or generator.');
