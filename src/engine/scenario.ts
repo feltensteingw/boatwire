@@ -12,8 +12,11 @@ export function scenarioVoltage(project: Project, scenario?: Scenario): SystemVo
 export interface BankChange {
   listed: Equipment;
   assumed: Equipment;
-  /** What set the number of batteries: whole series strings at the scenario's voltage, or the scenario's house capacity. */
-  why: 'voltage' | 'capacity';
+  /**
+   * What set the number of batteries: whole series strings at the scenario's voltage, the
+   * scenario's house capacity, or (when the battery voltage changes) the energy the listed bank stores.
+   */
+  why: 'voltage' | 'capacity' | 'energy';
 }
 
 /**
@@ -49,6 +52,10 @@ function assumeBank(project: Project, scenario: Scenario, V: SystemVoltage, e: E
   if (cap) {
     props.units = Math.max(series, Math.ceil(cap / unitAh) * series);
     why = 'capacity';
+  } else if (unitV !== listedUnitV) {
+    // Keep the energy the bank stores: four 6 V 225 Ah batteries become two 12 V 225 Ah.
+    props.units = Math.max(1, Math.ceil((listedUnits * listedUnitV) / V)) * series;
+    why = 'energy';
   } else {
     props.units = Math.ceil(listedUnits / series) * series;
     why = 'voltage';

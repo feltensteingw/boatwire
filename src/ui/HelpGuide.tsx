@@ -309,7 +309,7 @@ const SECTIONS: Section[] = [
             <b>+ New scenario</b> adds one; edit its settings in the column header. <b>View diagram →</b> opens it.
           </li>
           <li>
-            A scenario keeps every battery bank buildable at its voltage. When that takes a different number of batteries from your equipment list, a design note says what it assumed: for example two 12 V start batteries in series for 24 V. Your equipment list is not changed.
+            A scenario keeps every battery bank buildable at its voltage. When that takes a different number of batteries from your equipment list, a design note says what it assumed: for example two 12 V start batteries in series for 24 V, or 12 V lithium batteries in place of 6 V ones, storing the same energy. Your equipment list is not changed.
           </li>
         </ul>
       </>

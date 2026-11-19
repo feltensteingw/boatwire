@@ -222,6 +222,8 @@ export function reportBank(b: Builder, p: Plan, e: Equipment, s: BankSummary, no
   const [reason, why] =
     c.why === 'capacity'
       ? [`to make ${s.ah} Ah at ${V} V`, 'This scenario sets the house bank capacity.']
-      : [`for ${V} V`, `${s.unitV} V batteries make ${V} V in strings of ${s.series}.`];
+      : c.why === 'energy'
+        ? ['to store the same energy', `Lithium batteries are taken as ${s.unitV} V each.`]
+        : [`for ${V} V`, `${s.unitV} V batteries make ${V} V in strings of ${s.series}.`];
   b.find('info', 'series-parallel', `${e.name}: ${assumed} assumed ${reason}; your list has ${listed}.`, `${why} If you make this change, list ${batteries(s.units)}${sameV ? '' : ` of ${s.unitV} V`}.`, [node.id]);
 }

@@ -170,3 +170,60 @@ describe('every difference between the equipment list and the drawing is stated'
     expect(problems).toEqual([]);
   });
 });
+
+describe('a lithium what-if keeps the energy of a bank of 6 V, 2 V or 24 V batteries', () => {
+  const lithium: Scenario = { id: 'l', name: 'Lithium', houseChemistry: 'lifepo4' };
+  /** The example boat with its house bank changed. */
+  function house(props: Record<string, string | number>, volts: SystemVoltage = 12): Project {
+    const p = exampleProject();
+    p.profile.systemVoltage = volts;
+    if (volts === 24) bank(p, 'start').props.units = 2;
+    Object.assign(bank(p, 'house').props, props);
+    return p;
+  }
+  const golfCart = { chemistry: 'flooded', unitVolts: 6, unitAh: 225, units: 4 };
+
+  it('four 6 V 225 Ah golf-cart batteries become two 12 V 225 Ah: the same 450 Ah, with a note', () => {
+    const p = house(golfCart);
+    expect(energyBudget(p).houseAh).toBe(450);
+    const e = effectiveEquipment(p, lithium).find((x) => x.props.role === 'house')!;
+    expect(e.props).toMatchObject({ chemistry: 'lifepo4', unitVolts: 12, unitAh: 225, units: 2 });
+    expect(energyBudget(p, lithium).houseAh).toBe(450);
+    const d = generateIdeal(p, lithium);
+    const n = node(d, bank(p, 'house'));
+    expect(n.sublabel).toBe('2× 12 V 225 Ah LiFePO4 · 1S2P = 12 V 450 Ah');
+    expect(about(d, n.id)).toEqual(['info: House bank: 2× 12 V 225 Ah assumed to store the same energy; your list has 4× 6 V 225 Ah.']);
+    expect(d.findings.find((f) => f.nodes?.includes(n.id))!.fix).toBe('Lithium batteries are taken as 12 V each. If you make this change, list 2 batteries of 12 V.');
+    // priced as 5.4 kWh of lithium, as the list holds 5.4 kWh of lead-acid
+    const bat = designCost(d).rows.find((r) => r.category === 'Batteries' && r.spec.includes('LiFePO4'))!;
+    expect(bat.cost).toBeCloseTo(5.4 * priceFor('battery:lifepo4')!, 6);
+  });
+
+  it('in a 24 V lithium what-if the same bank is two 12 V batteries in series: 225 Ah at 24 V', () => {
+    const p = house(golfCart);
+    const s: Scenario = { ...lithium, systemVoltage: 24 };
+    expect(node(generateIdeal(p, s), bank(p, 'house')).sublabel).toBe('2× 12 V 225 Ah LiFePO4 · 2S1P = 24 V 225 Ah');
+    expect(energyBudget(p, s).houseAh).toBe(225);
+  });
+
+  it('six 2 V 600 Ah cells become one 12 V 600 Ah battery', () => {
+    const p = house({ chemistry: 'flooded', unitVolts: 2, unitAh: 600, units: 6 });
+    expect(node(generateIdeal(p, lithium), bank(p, 'house')).sublabel).toBe('1× 12 V 600 Ah LiFePO4 · 1S1P = 12 V 600 Ah');
+  });
+
+  it('two 24 V 100 Ah batteries on a 24 V boat become four 12 V 100 Ah: 200 Ah at 24 V', () => {
+    const p = house({ chemistry: 'agm', unitVolts: 24, unitAh: 100, units: 2 }, 24);
+    const d = generateIdeal(p, lithium);
+    const n = node(d, bank(p, 'house'));
+    expect(n.sublabel).toBe('4× 12 V 100 Ah LiFePO4 · 2S2P = 24 V 200 Ah');
+    expect(about(d, n.id)).toEqual(['info: House bank: 4× 12 V 100 Ah assumed to store the same energy; your list has 2× 24 V 100 Ah.']);
+  });
+
+  it("a capacity typed for the scenario still sets the bank's size", () => {
+    const p = house(golfCart);
+    const d = generateIdeal(p, { ...lithium, houseCapacityAh: 900 });
+    const n = node(d, bank(p, 'house'));
+    expect(n.sublabel).toBe('4× 12 V 225 Ah LiFePO4 · 1S4P = 12 V 900 Ah');
+    expect(about(d, n.id)).toEqual(['info: House bank: 4× 12 V 225 Ah assumed to make 900 Ah at 12 V; your list has 4× 6 V 225 Ah.']);
+  });
+});
