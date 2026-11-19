@@ -1,7 +1,7 @@
 // What the boat has and what it draws: the facts every part of the generator works from.
 // Nothing here adds to the design; see reportPlanProblems for the findings these facts lead to.
 
-import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A } from '../../model/catalog';
+import { CATALOG_BY_KIND, DEDICATED_BANK_ROLES, dedicatedRoleFor, HEAVY_DC_THRESHOLD_A, MAX_ENGINES, MAX_SHORE_INLETS } from '../../model/catalog';
 import { AC_STANDARDS } from '../../model/standards';
 import type { BoatProfile, Chemistry, DNode, Equipment, Project, Scenario, SystemVoltage } from '../../model/types';
 import { fmtLen } from '../../model/units';
@@ -48,9 +48,15 @@ export interface Plan {
 
   banks: Equipment[];
   house: Equipment[];
+  /** The engine start batteries drawn: one, or one for each engine on a twin-engine boat. */
+  startBanks: Equipment[];
+  /** The first start battery. Per-engine code reads `startBanks` instead. */
   startBank?: Equipment;
   /** Dedicated banks (windlass, thruster, winch, refrigeration): role → bank equipment. */
   dedBanks: Map<string, Equipment>;
+  /** The engines drawn, up to MAX_ENGINES. */
+  engines: Equipment[];
+  /** The first engine. Per-engine code reads `engines` instead. */
   engine?: Equipment;
   houseChem: Chemistry;
   /** The house bank is lithium. */
@@ -93,14 +99,17 @@ export function makePlan(project: Project, scenario?: Scenario): Plan {
   const kinds = (k: string) => eq.filter((e) => e.kind === k);
   const banks = kinds('battery-bank');
   const house = banks.filter((e) => (e.props.role ?? 'house') === 'house');
-  const startBank = banks.find((e) => e.props.role === 'start');
+  const engines = kinds('engine').slice(0, MAX_ENGINES);
+  // twin engines: a start battery each, or one they share
+  const startBanks = banks.filter((e) => e.props.role === 'start').slice(0, engines.length >= 2 ? 2 : 1);
+  const startBank = startBanks[0];
   // Dedicated banks (windlass, thruster, winch, refrigeration): role → bank equipment
   const dedBanks = new Map<string, Equipment>();
   for (const r of Object.keys(DEDICATED_BANK_ROLES)) {
     const e = banks.find((x) => x.props.role === r);
     if (e) dedBanks.set(r, e);
   }
-  const engine = kinds('engine')[0];
+  const engine = engines[0];
 
   // (With no house bank there is no design; the caller stops before using any of this.)
   const houseChem = (house[0]?.props.chemistry as Chemistry) ?? 'agm';
@@ -138,11 +147,12 @@ export function makePlan(project: Project, scenario?: Scenario): Plan {
     chargers.reduce((s, c) => s + num(c, 'amps'), 0) +
     (ic ? num(ic, 'chargeAmps') : 0) +
     solars.reduce((s, e) => s + num(e, 'watts') / V, 0) +
-    (engine ? num(engine, 'alternatorAmps') * scale : 0);
+    // every alternator drawn: the main fuse, switch and cables carry them all at once
+    engines.reduce((s, e) => s + num(e, 'alternatorAmps') * scale, 0);
   // Inverter at full output plus typical loads, with half the largest motor load (they rarely coincide).
   const mainAmps = Math.max(invDcAmps + continuous + 0.5 * maxHeavyFromHouse, maxHeavyFromHouse + continuous, chargeTotal);
 
-  return { project, scenario, profile, V, acStd, eq, bankChanges: changed, BZ, PZ, HZ, run, scale, kinds, banks, house, startBank, dedBanks, engine, houseChem, lfp, extBms, dcLoads, panelLoads, v12Loads, heavyLoads, dedLoads, aoLoads, acLoads, ic, inv, chargers, solars, winds, invWatts, invDcAmps, mainAmps };
+  return { project, scenario, profile, V, acStd, eq, bankChanges: changed, BZ, PZ, HZ, run, scale, kinds, banks, house, startBanks, startBank, dedBanks, engines, engine, houseChem, lfp, extBms, dcLoads, panelLoads, v12Loads, heavyLoads, dedLoads, aoLoads, acLoads, ic, inv, chargers, solars, winds, invWatts, invDcAmps, mainAmps };
 }
 
 /** Things about the boat as a whole that the user should know before reading the design. */
@@ -164,23 +174,24 @@ export function reportPlanProblems(b: Builder, p: Plan) {
     b.find('warning', 'missing-zone', `The ${lost.roles.join(' and the ')} ${lost.roles.length === 1 ? 'is' : 'are'} not in the zone list, so cable lengths measured from there are guesses.`, 'Choose the location again under Boat & zones.');
   }
 
-  // The design has one of each of these. Every extra is reported, never left out silently.
-  const drawnOnce: [Equipment[], string][] = [
-    [kinds('engine'), 'engine'],
-    [kinds('inverter-charger'), 'inverter/charger'],
+  // The design has at most this many of each of these. Every extra is reported, never left out silently.
+  const drawnAtMost: [list: Equipment[], max: number, what: string][] = [
+    [kinds('engine'), MAX_ENGINES, 'up to two engines per boat'],
+    [kinds('inverter-charger'), 1, 'one inverter/charger per boat'],
     // a separate inverter is not drawn when there is an inverter/charger
-    [[...kinds('inverter-charger').slice(0, 1), ...kinds('inverter')], 'inverter'],
-    [kinds('shore-power'), 'shore power inlet'],
-    [kinds('generator'), 'AC generator'],
-    [banks.filter((e) => e.props.role === 'start'), 'engine start battery'],
-    ...Object.entries(DEDICATED_BANK_ROLES).map(([r, def]): [Equipment[], string] => [banks.filter((e) => e.props.role === r), `${def.label.toLowerCase()} battery`]),
+    [[...kinds('inverter-charger').slice(0, 1), ...kinds('inverter')], 1, 'one inverter per boat'],
+    [kinds('shore-power'), MAX_SHORE_INLETS, 'up to two shore power inlets per boat'],
+    [kinds('generator'), 1, 'one AC generator per boat'],
+    // (with no engine, one start battery still counts as drawn)
+    [banks.filter((e) => e.props.role === 'start'), Math.min(MAX_ENGINES, Math.max(1, kinds('engine').length)), 'one engine start battery per engine'],
+    ...Object.entries(DEDICATED_BANK_ROLES).map(([r, def]): [Equipment[], number, string] => [banks.filter((e) => e.props.role === r), 1, `one ${def.label.toLowerCase()} battery per boat`]),
   ];
-  for (const [list, what] of drawnOnce) {
-    for (const e of list.slice(1)) {
+  for (const [list, max, what] of drawnAtMost) {
+    for (const e of list.slice(max)) {
       b.find(
         'warning',
         'not-drawn',
-        `${e.name} is not in this design. BoatWire draws one ${what} per boat and used ${list[0].name}.`,
+        `${e.name} is not in this design. BoatWire draws ${what} and used ${list.slice(0, max).map((x) => x.name).join(' and ')}.`,
         'Its wiring, fuses and cables are missing from the diagram, wire schedule and bill of materials. Work those out separately, or remove it from the equipment list.',
       );
     }

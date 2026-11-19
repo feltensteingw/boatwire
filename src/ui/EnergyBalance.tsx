@@ -10,6 +10,8 @@ const hours = (n: number) => `${n < 10 ? Math.round(n * 10) / 10 : Math.round(n)
 const share = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—');
 /** A charger or alternator that could give more than is needed: say so, since only what is needed is counted. */
 const spare = (canGive: number, gives: number) => (canGive > gives + 1 ? ` (could give ${Math.round(canGive)} Ah; only what is needed is counted)` : '');
+/** "90 A alternator", or on a twin-engine boat "2 alternators, 180 A together". */
+const alternators = (b: EnergyBudget) => (b.alternators > 1 ? `${b.alternators} alternators, ${Math.round(b.alternatorAmps)} A together` : `${Math.round(b.alternatorAmps)} A alternator`);
 
 /**
  * A typical day: what the boat uses against what each source puts back, on one scale, with the
@@ -21,7 +23,7 @@ export function DailyBalance({ b }: { b: EnergyBudget }) {
     { id: 's1', name: 'Solar', how: `${hours(a.solarPeakHours)} of full sun at ${Math.round(a.solarDerate * 100)}% of the panels' rating`, value: b.solarAhPerDay },
     { id: 's2', name: 'Wind and hydro', how: `${Math.round(a.windHydroCapacityFactor * 100)}% of rating, day and night`, value: b.windHydroAhPerDay },
     { id: 's3', name: 'Shore charger', how: b.chargerAmps > 0 ? `${Math.round(b.chargerAmps)} A charger, ${hours(a.shoreHoursPerDay)} a day plugged in${spare(b.shoreCanGiveAhPerDay, b.shoreAhPerDay)}` : 'no shore power and charger aboard', value: b.shoreAhPerDay },
-    { id: 's4', name: 'Engine', how: b.alternatorAmps > 0 ? `${Math.round(b.alternatorAmps)} A alternator, ${hours(a.engineHoursPerDay)} a day running anyway${spare(b.engineCanGiveAhPerDay, b.engineAhPerDay)}` : 'no alternator aboard', value: b.engineAhPerDay },
+    { id: 's4', name: 'Engine', how: b.alternatorAmps > 0 ? `${alternators(b)}, ${hours(a.engineHoursPerDay)} a day running anyway${spare(b.engineCanGiveAhPerDay, b.engineAhPerDay)}` : 'no alternator aboard', value: b.engineAhPerDay },
   ];
   const used = b.totalAhPerDay;
   const charging = b.chargingAhPerDay;
@@ -34,7 +36,7 @@ export function DailyBalance({ b }: { b: EnergyBudget }) {
   else if (short === 0) verdict = `Charging covers the day's use${b.surplusAhPerDay >= 1 ? `, with about ${ah(b.surplusAhPerDay)} of sun and wind to spare` : ''}.`;
   else {
     const lasts = b.usableAh > 0 ? ` Left alone, the usable part of the house bank (${ah(b.usableAh)}) would last about ${Math.max(0.1, Math.round((b.usableAh / short) * 10) / 10)} days.` : '';
-    const engine = isFinite(b.extraEngineHours) ? ` Running the engine about ${hours(b.extraEngineHours)} ${a.engineHoursPerDay > 0 ? 'more ' : ''}a day would make it up.` : ' There is no alternator to make it up.';
+    const engine = isFinite(b.extraEngineHours) ? ` Running ${b.alternators > 1 ? 'both engines' : 'the engine'} about ${hours(b.extraEngineHours)} ${a.engineHoursPerDay > 0 ? 'more ' : ''}a day would make it up.` : ' There is no alternator to make it up.';
     verdict = `Charging covers ${ah(charging)} of the ${ah(used)} used, leaving ${ah(short)} a day to find.${engine}${lasts}`;
   }
 
@@ -113,7 +115,7 @@ const FIELDS: { key: Key; label: string; unit: string; percent?: boolean; step: 
   { key: 'daysAutonomy', label: 'Days of autonomy', unit: 'days', step: 0.5, help: 'How many days the house bank should carry the boat. The recommended bank size is this many days of use at a safe depth of discharge.' },
   { key: 'chargingDuringAutonomy', label: 'Solar and wind counted in those days', unit: '%', percent: true, step: 10, help: 'How much of the normal solar, wind and hydro charge you count on during the days of autonomy. 0% is the cautious rule: the bank must carry the boat with no charging at all. Raise it if you sail where the sun is dependable.' },
   { key: 'shoreHoursPerDay', label: 'Hours a day on shore power', unit: 'h', step: 1, help: 'Hours a day plugged in with the battery charger running. 0 at anchor, 24 in a marina.' },
-  { key: 'engineHoursPerDay', label: 'Hours a day the engine runs anyway', unit: 'h', step: 0.5, help: 'Hours a day you expect to motor whatever the batteries need. The alternator charges for that long.' },
+  { key: 'engineHoursPerDay', label: 'Hours a day the engine runs anyway', unit: 'h', step: 0.5, help: 'Hours a day you expect to motor whatever the batteries need. The alternator charges for that long. With two engines, both are taken to run this long.' },
 ];
 
 /** The conditions the energy budget assumes: presets and the values behind them, for the boat or for one scenario. */

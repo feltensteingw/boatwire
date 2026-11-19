@@ -6,7 +6,7 @@
 //   houseBank     batteries, main fuses, switch, buses, shunt, BMS
 //   distribution  always-on circuits, DC panel, 24→12 V converter and sub-panel
 //   heavyLoads    windlass, thruster, winches, and dedicated battery banks
-//   engine        starter circuit, alternator and charge splitting
+//   engine        starter circuit, alternator and charge splitting, for one or two engines
 //   renewables    solar, wind and hydro
 //   ac            shore power, generator, inverter, AC panels, chargers
 //
@@ -47,10 +47,10 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   const { housePanel } = buildPanels(b, plan, core);
   const dedicated = buildDedicatedBanks(b, plan, core);
   buildHeavyLoads(b, plan, core, housePanel, dedicated);
-  const { startBus } = buildEngine(b, plan, core);
+  const { startBuses } = buildEngine(b, plan, core);
   buildSolar(b, plan, core);
   buildWindHydro(b, plan, core);
-  buildAc(b, plan, core, startBus);
+  buildAc(b, plan, core, startBuses);
 
   // Every cable above is sized as a single conductor; bundling is checked only on hand-drawn wires.
   b.find(

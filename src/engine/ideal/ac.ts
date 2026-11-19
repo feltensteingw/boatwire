@@ -1,21 +1,21 @@
 // The AC side: shore power inlet and generator, the inverter or inverter/charger, AC panels and
 // their circuits, battery chargers, and the grounding that ties it to the DC negative.
 
-import { CATALOG_BY_KIND } from '../../model/catalog';
+import { CATALOG_BY_KIND, MAX_SHORE_INLETS } from '../../model/catalog';
 import type { DNode } from '../../model/types';
-import { fuseClassFor } from '../calc';
+import { fuseClassFor, gaugeIndex } from '../calc';
 import { num } from '../energy';
 import { fuseLabel, type Builder, type End } from './builder';
 import type { Core } from './houseBank';
 import type { Plan } from './plan';
 
-export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undefined) {
+export function buildAc(b: Builder, p: Plan, core: Core, startBuses: DNode[]) {
   const { V, acStd, BZ, PZ, run, kinds, lfp, ic, inv, acLoads, chargers, invDcAmps } = p;
   const { posBus, negBus, bms } = core;
 
-  const shore = kinds('shore-power')[0];
+  const shores = kinds('shore-power').slice(0, MAX_SHORE_INLETS);
   const genset = kinds('generator')[0];
-  const anyAc = !!(shore || genset || ic || inv || acLoads.length || chargers.length);
+  const anyAc = !!(shores.length || genset || ic || inv || acLoads.length || chargers.length);
   if (!anyAc) return;
 
   const acV = acStd.volts;
@@ -38,19 +38,28 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
   const groundTo = (from: End, len: number, equipmentGround = true) =>
     b.wire('gnd', from, [acGnd, b.stud(acGnd)], { amps: 0, len, gauge: shoreCableGauge, equipmentGround });
 
-  let elci: DNode | undefined;
-  if (shore) {
+  // Each AC source where it leaves its own main breaker: the current it brings, that breaker's
+  // rating, where it is, and its name on the source selector (`term` on the selector's input).
+  const sources: { out: End; amps: number; rating: number; zone: string; name: string; term: string }[] = [];
+  // The cable from each inlet, of which the largest sizes the AC/DC bond and the equipment grounds.
+  const inletGauges: string[] = [];
+  shores.forEach((shore, i) => {
+    // A second inlet gets its own parts, numbered. With one inlet, ids and labels are as they always were.
+    const sfx = i ? `-${i + 1}` : '';
+    const tag = shores.length > 1 ? ` ${i + 1}` : '';
     const A = num(shore, 'amps', 30);
-    sourceAmps = A;
-    const inlet = b.add('shore-inlet', 'shore-inlet', shore.name, { zone: shore.zone, equipmentId: shore.id, sublabel: `${A} A ${acV} V`, data: { amps: A, volts: acV } });
-    elci = b.add('elci', 'shore-elci', 'Shore main breaker + ELCI', { zone: shore.zone, sublabel: `${A} A · 30 mA ELCI`, data: { rating: A, part: `${A} A double-pole main breaker with ELCI` }, notes: ['shore-main'] });
-    const gi = b.add('galvanic-isolator', 'galv-iso', 'Galvanic isolator', { zone: shore.zone, data: { rating: A, part: `Galvanic isolator, ${A} A, fail-safe` }, notes: ['galvanic-isolator'] });
+    // with two, the sublabel names the selector position it feeds ("Shore 2 · 50 A 120 V")
+    const inlet = b.add('shore-inlet', `shore-inlet${sfx}`, shore.name, { zone: shore.zone, equipmentId: shore.id, sublabel: `${tag ? `Shore${tag} · ` : ''}${A} A ${acV} V`, data: { amps: A, volts: acV } });
+    const elci = b.add('elci', `shore-elci${sfx}`, `Shore${tag} main breaker + ELCI`, { zone: shore.zone, sublabel: `${A} A · 30 mA ELCI`, data: { rating: A, part: `${A} A double-pole main breaker with ELCI` }, notes: ['shore-main'] });
+    const gi = b.add('galvanic-isolator', `galv-iso${sfx}`, `Galvanic isolator${tag}`, { zone: shore.zone, data: { rating: A, part: `Galvanic isolator, ${A} A, fail-safe` }, notes: ['galvanic-isolator'] });
     const w = b.wire('ac', [inlet, 'l'], [elci, 'in'], { amps: A, protect: A, len: 3, notes: ['shore-main'] });
-    shoreCableGauge = w.gauge!;
-    b.wire('gnd', [inlet, 'g'], [gi, 'a'], { amps: 0, len: 1, gauge: shoreCableGauge, notes: ['galvanic-isolator'] });
-    b.wire('gnd', [gi, 'b'], [acGnd, b.stud(acGnd)], { amps: 0, len: run(shore.zone, PZ), gauge: shoreCableGauge, notes: ['galvanic-isolator'] });
-    sourceOut = [elci, 'out'];
-  }
+    // its green conductor is the size of its own cable
+    b.wire('gnd', [inlet, 'g'], [gi, 'a'], { amps: 0, len: 1, gauge: w.gauge, notes: ['galvanic-isolator'] });
+    b.wire('gnd', [gi, 'b'], [acGnd, b.stud(acGnd)], { amps: 0, len: run(shore.zone, PZ), gauge: w.gauge, notes: ['galvanic-isolator'] });
+    inletGauges.push(w.gauge!);
+    sources.push({ out: [elci, 'out'], amps: A, rating: A, zone: shore.zone, name: `Shore${tag}`, term: `Shore${tag}` });
+  });
+  if (inletGauges.length) shoreCableGauge = inletGauges.reduce((a, g) => (gaugeIndex(g) > gaugeIndex(a) ? g : a));
   // AC ground ↔ DC negative bond
   b.wire('gnd', [acGnd, b.stud(acGnd)], [negBus, b.stud(negBus)], { amps: 0, len: run(PZ, BZ), gauge: shoreCableGauge, notes: ['ac-dc-bond'] });
 
@@ -62,18 +71,30 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     const gb = b.add('elci', 'gen-brk', 'Generator main breaker', { zone: genset.zone, sublabel: `${gR} A`, data: { rating: gR } });
     b.wire('ac', [g, 'l'], [gb, 'in'], { amps: GA, protect: gR, len: 2 });
     groundTo([g, 'g'], run(genset.zone, PZ), false);
-    if (sourceOut) {
-      const sel = b.add('selector', 'ac-selector', 'AC source selector', { zone: PZ, sublabel: 'Off / Shore / Generator (break-before-make)', data: { rating: Math.max(sourceAmps, gR) }, notes: ['source-selector'] });
-      b.wire('ac', sourceOut, [sel, 'in1'], { amps: sourceAmps, protect: sourceAmps, len: run(shore!.zone, PZ) });
-      b.wire('ac', [gb, 'out'], [sel, 'in2'], { amps: GA, protect: gR, len: run(genset.zone, PZ) });
-      sourceOut = [sel, 'out'];
-      sourceAmps = Math.max(sourceAmps, gR);
-    } else {
-      sourceOut = [gb, 'out'];
-      sourceAmps = gR;
-    }
+    sources.push({ out: [gb, 'out'], amps: GA, rating: gR, zone: genset.zone, name: 'Generator', term: 'Gen' });
   }
-  const srcZone = shore && !genset ? shore.zone : PZ;
+  if (sources.length === 1) {
+    sourceOut = sources[0].out;
+    sourceAmps = sources[0].rating;
+  } else if (sources.length > 1) {
+    // One break-before-make selector lets a single source feed everything after it. Everything
+    // after it is sized for the largest source breaker, since any one of them may be selected.
+    const rating = Math.max(...sources.map((s) => s.rating));
+    const sel = b.add('selector', 'ac-selector', 'AC source selector', {
+      zone: PZ,
+      sublabel: `Off / ${sources.map((s) => s.name).join(' / ')} (break-before-make)`,
+      data: { rating },
+      notes: ['source-selector'],
+      ...(sources.length > 2 ? { extraTerminals: sources.slice(2).map((s, i): [string, 'ac', 'W', string] => [`in${i + 3}`, 'ac', 'W', s.term]) } : {}),
+    });
+    sources.forEach((s, i) => {
+      sel.terminals.find((t) => t.id === `in${i + 1}`)!.label = s.term;
+      b.wire('ac', s.out, [sel, `in${i + 1}`], { amps: s.amps, protect: s.rating, len: run(s.zone, PZ) });
+    });
+    sourceOut = [sel, 'out'];
+    sourceAmps = rating;
+  }
+  const srcZone = shores.length === 1 && !genset ? shores[0].zone : PZ;
 
   const shoreOnlyLoads = acLoads.filter((e) => !!e.props.shoreOnly);
 
@@ -172,16 +193,19 @@ export function buildAc(b: Builder, p: Plan, core: Core, startBus: DNode | undef
     const f = b.add('fuse', `chgfuse-${c.id}`, 'Charger output fuse', { zone: BZ, sublabel: fuseLabel(fr, fuseClassFor(fr, {})), data: { rating: fr, fuseClass: fuseClassFor(fr, {}) }, notes: ['charging-source-fuse'] });
     b.pair([[node, 'out1'], [f, 'in']], [[node, 'neg'], [negBus, b.stud(negBus)]], { amps: A, protect: fr, len: run(node.zone, BZ) + 1, protectedBy: f.id });
     b.wire('pos', [f, 'out'], [posBus, b.stud(posBus)], { amps: A, protect: fr, len: 0.5 });
-    if (startBus && outputs >= 2) {
-      node.terminals.push({ id: 'out2', pol: 'pos', side: 'E', label: 'OUT2+' });
+    // Further outputs keep the start batteries topped up: OUT2 the first, OUT3 a twin-engine boat's second.
+    startBuses.slice(0, outputs - 1).forEach((startBus, i) => {
+      const out = `out${i + 2}`;
+      const n = startBuses.length > 1 ? ` ${i + 1}` : '';
+      node.terminals.push({ id: out, pol: 'pos', side: 'E', label: `OUT${i + 2}+` });
       const sA = Math.min(A, 10);
-      const fr2 = b.protection(sA, { what: `${c.name} start output fuse`, nodes: [`chgfuse2-${c.id}`] });
-      const f2 = b.add('fuse', `chgfuse2-${c.id}`, 'Charger start output fuse', { zone: startBus.zone, sublabel: fuseLabel(fr2, fuseClassFor(fr2, {})), data: { rating: fr2, fuseClass: fuseClassFor(fr2, {}) }, notes: ['charging-source-fuse'] });
-      b.wire('pos', [node, 'out2'], [f2, 'in'], { amps: sA, protect: fr2, len: run(node.zone, startBus.zone) + 1, protectedBy: f2.id });
+      const fr2 = b.protection(sA, { what: `${c.name} start${n} output fuse`, nodes: [`chgfuse${i + 2}-${c.id}`] });
+      const f2 = b.add('fuse', `chgfuse${i + 2}-${c.id}`, `Charger start${n} output fuse`, { zone: startBus.zone, sublabel: fuseLabel(fr2, fuseClassFor(fr2, {})), data: { rating: fr2, fuseClass: fuseClassFor(fr2, {}) }, notes: ['charging-source-fuse'] });
+      b.wire('pos', [node, out], [f2, 'in'], { amps: sA, protect: fr2, len: run(node.zone, startBus.zone) + 1, protectedBy: f2.id });
       b.wire('pos', [f2, 'out'], [startBus, b.stud(startBus)], { amps: sA, protect: fr2, len: 0.5 });
-    }
+    });
   }
-  if (!shore && !genset && (chargers.length || shoreOnlyLoads.length)) {
+  if (!shores.length && !genset && (chargers.length || shoreOnlyLoads.length)) {
     b.find('info', 'shore-main', 'There are AC chargers or shore-only loads but no shore power inlet or generator.');
   }
 }

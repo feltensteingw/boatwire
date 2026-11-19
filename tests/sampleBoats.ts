@@ -4,7 +4,7 @@
 
 import { exampleProject, newEquipment } from '../src/model/examples';
 import { buildBoat, TEMPLATES } from '../src/model/templates';
-import type { Equipment, EquipmentKind, Project, Scenario } from '../src/model/types';
+import type { Equipment, EquipmentKind, Project, PropValue, Scenario } from '../src/model/types';
 
 export interface SampleBoat {
   name: string;
@@ -32,6 +32,20 @@ const the = (p: Project, kind: EquipmentKind, role?: string): Equipment => {
   return e;
 };
 const without = (p: Project, keep: (e: Equipment) => boolean) => void (p.equipment = p.equipment.filter(keep));
+
+/**
+ * A second engine, "Port engine", beside the example boat's, renamed "Starboard engine". With
+ * `startBattery`, it gets its own start battery too, and the example boat's is renamed to match.
+ * (Distinct names keep their findings apart.)
+ */
+function twinEngines(p: Project, o: { engine?: Record<string, PropValue>; startBattery?: Record<string, PropValue> } = {}) {
+  the(p, 'engine').name = 'Starboard engine';
+  p.equipment.push(newEquipment('engine', { name: 'Port engine', props: o.engine }));
+  if (o.startBattery) {
+    the(p, 'battery-bank', 'start').name = 'Starboard start battery';
+    p.equipment.push(newEquipment('battery-bank', { name: 'Port start battery', props: { role: 'start', chemistry: 'agm', unitVolts: 12, unitAh: 90, units: 1, ...o.startBattery } }));
+  }
+}
 
 function boat(name: string, change: (p: Project) => Scenario | void, base: Project = exampleProject()): SampleBoat {
   const scenario = change(base) ?? undefined;
@@ -91,6 +105,29 @@ export const SAMPLE_BOATS: SampleBoat[] = [
     p.profile.acStandard = 'eu230';
     p.profile.units = 'metric';
   }),
+
+  boat('two shore inlets (30 A and 50 A), inverter/charger', (p) => {
+    p.equipment.push(newEquipment('shore-power', { name: 'Bow shore inlet 50 A', zone: 'bow', props: { amps: 50 } }));
+  }),
+
+  boat('two shore inlets and a generator, separate inverter and charger', (p) => {
+    without(p, (e) => e.kind !== 'inverter-charger');
+    p.equipment.push(
+      newEquipment('shore-power', { name: 'Second shore inlet 30 A', zone: 'vberth', props: { amps: 30 } }),
+      newEquipment('inverter', { name: 'Inverter', props: { watts: 1500 } }),
+      newEquipment('battery-charger', { name: 'Battery charger', props: { amps: 40 } }),
+      newEquipment('generator', {}),
+    );
+  }),
+
+  boat('twin engines, a start battery each (emergency parallel switch)', (p) => twinEngines(p, { startBattery: {} })),
+
+  boat('twin engines sharing one start battery', (p) => twinEngines(p, { engine: { alternatorAmps: 150 } })),
+
+  boat('twin engines with no start battery', (p) => {
+    without(p, (e) => e.props.role !== 'start');
+    twinEngines(p);
+  }),
 ];
 
 /** More boats, locked by a fingerprint of the whole design rather than line by line. */
@@ -136,6 +173,14 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
     p.equipment.push(newEquipment('inverter', {}), newEquipment('battery-charger', {}), newEquipment('air-conditioner', {}));
   }),
   boat('no AC at all', (p) => without(p, (e) => !['shore-power', 'inverter-charger', 'ac-outlets', 'microwave', 'water-heater'].includes(e.kind))),
+  boat('two 230 V shore inlets (16 A and 32 A), metric', (p) => {
+    p.profile.acStandard = 'eu230';
+    p.profile.units = 'metric';
+    const aft = the(p, 'shore-power');
+    aft.name = 'Shore power 16 A';
+    aft.props.amps = 16;
+    p.equipment.push(newEquipment('shore-power', { name: 'Bow shore inlet 32 A', zone: 'bow', props: { amps: 32 } }));
+  }),
 
   // --- batteries
   boat('two house banks of different chemistry', (p) => {
@@ -228,6 +273,24 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
     the(p, 'solar').props.watts = 1500;
   }),
   boat('no engine', (p) => without(p, (e) => e.kind !== 'engine')),
+
+  // --- twin engines
+  boat('twin engines, lithium house, a lead-acid start battery each', (p) => {
+    twinEngines(p, { startBattery: {} });
+    return p.scenarios.find((s) => s.id === 'lfp12');
+  }),
+  boat('twin engines, start batteries of different chemistry', (p) => twinEngines(p, { startBattery: { chemistry: 'lifepo4' } })),
+  boat('twin engines, a start battery each, 24 V what-if', (p) => {
+    twinEngines(p, { startBattery: {} });
+    return { id: 'v24', name: '24 V', systemVoltage: 24 };
+  }),
+  boat('twin engines sharing one start battery, engine-run relay chosen', (p) => twinEngines(p, { engine: { chargeSplit: 'relay-run' } })),
+  // the stock-regulator engine charges the start battery; no DC-DC charger runs back to it from the house bank
+  boat('twin engines sharing one start battery, lithium house, one external regulator', (p) => {
+    twinEngines(p, { engine: { regulator: 'external' } });
+    return p.scenarios.find((s) => s.id === 'lfp12');
+  }),
+  boat('twin engines sharing one start battery, one with a battery isolator', (p) => twinEngines(p, { engine: { chargeSplit: 'isolator-fet' } })),
 
   // --- heavy loads
   boat('bow thruster and electric winch on 12 V, fed from the house bank', (p) => {

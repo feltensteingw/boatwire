@@ -274,6 +274,20 @@ const CASES: Case[] = [
     bad: (d) => void d.add('isolator', 'Battery isolator', { isolatorType: 'diode' }),
     good: (d) => void d.add('isolator', 'Battery isolator', { isolatorType: 'diode', compensation: 'excite' }),
   },
+  {
+    // Two engines: only a regulator on the alternator that feeds the isolator makes up for its drop.
+    rule: 'isolator', severity: 'warning', when: "the other engine's external regulator does not compensate a diode isolator", says: /is a diode isolator/,
+    bad: (d) => {
+      const [alt1, alt2] = [d.add('alternator', 'Alternator 1', { amps: 60 }), d.add('alternator', 'Alternator 2', { amps: 60 })];
+      d.wire([d.add('regulator', 'External regulator'), 'field'], [alt1, 'field']);
+      d.wire([alt2, 'b'], [d.add('isolator', 'Battery isolator', { isolatorType: 'diode' }), 'in'], { gauge: '4' });
+    },
+    good: (d) => {
+      const [, alt2] = [d.add('alternator', 'Alternator 1', { amps: 60 }), d.add('alternator', 'Alternator 2', { amps: 60 })];
+      d.wire([d.add('regulator', 'External regulator'), 'field'], [alt2, 'field']);
+      d.wire([alt2, 'b'], [d.add('isolator', 'Battery isolator', { isolatorType: 'diode' }), 'in'], { gauge: '4' });
+    },
+  },
 
   // ------------------------------------------------------------------ AC
   {
