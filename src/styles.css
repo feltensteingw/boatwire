@@ -281,6 +281,24 @@
   color-scheme: light;
 }
 
+/* The "?" help marks and the upgrade-plan counts sit on the border colour. In these schemes the
+   secondary or heading colour is too faint on it, so they take the full ink colour. High contrast
+   has black borders, so there they become a light pill with a black ring instead, and the energy
+   bar's empty track gets the same treatment so a part-filled bar does not look full. */
+:root[data-theme='chart'] .help-dot,
+:root[data-theme='chart'] .changes .count,
+:root[data-theme='blueprint'] .help-dot,
+:root[data-theme='blueprint'] .changes .count {
+  color: var(--text);
+}
+:root[data-theme='contrast'] .help-dot,
+:root[data-theme='contrast'] .changes .count,
+:root[data-theme='contrast'] .bal-track {
+  background: var(--panel-2);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text);
+}
+
 * {
   box-sizing: border-box;
 }
