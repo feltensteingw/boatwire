@@ -107,7 +107,17 @@ for (const theme of ['chart', 'blueprint', 'contrast']) {
     await blankDrawing(page, ['battery', 'fuse']);
     await page.getByRole('button', { name: 'Reports', exact: true }).click();
     await page.locator('.report-tabs button', { hasText: 'Upgrade plan' }).click();
-    seen.push(...(await textContrast(page, '.changes .count')));
+    await expect(page.locator('.changes .count').first()).toBeVisible();
+    const counts = await textContrast(page, '.changes .count');
+    expect(counts.length).toBeGreaterThan(0);
+    seen.push(...counts);
+    if (theme === 'contrast') {
+      // High contrast keeps the counts in their heading's colour (red for safety, orange for recommended)
+      const colours = await page
+        .locator('.changes h3')
+        .evaluateAll((hs) => hs.map((h) => [getComputedStyle(h).color, getComputedStyle(h.querySelector('.count')!).color]));
+      for (const [heading, count] of colours) expect(count).toBe(heading);
+    }
 
     expect(seen.length).toBeGreaterThan(5);
     const low = seen.filter((s) => Number(s.split(' ').pop()) < 4.5);
