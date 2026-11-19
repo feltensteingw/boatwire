@@ -52,9 +52,13 @@ thing, but it is not Firestore: check real cloud behaviour on a PR preview.
 **Security headers** are set in `firebase.json` for every response: no MIME sniffing, no framing
 (`X-Frame-Options: DENY`; Firebase's own `/__/auth/*` sign-in pages are not affected by custom
 headers), a strict referrer policy, and device features switched off. A Content-Security-Policy is
-sent in **report-only** mode: it blocks nothing yet, but the browser console lists anything it
-would block. The browser tests enforce the same policy locally (`E2E_CSP`). Once sign-in and cloud
-saving show no reports on the live site, rename the header to `Content-Security-Policy` to enforce it.
+enforced. Beyond the site itself it allows what Google sign-in and Firestore use: Google's sign-in
+loader script (`apis.google.com`), calls to Google APIs (`*.googleapis.com`: sign-in, token refresh,
+Firestore), the sign-in helper frame on `boatwire-1r3u0.firebaseapp.com`, and Google profile photos
+(`*.googleusercontent.com`). `'wasm-unsafe-eval'` lets PDF import decode JPEG 2000 scans (pdf.js
+does that with WebAssembly); running text as code stays blocked. The browser tests serve the same
+policy (`E2E_CSP`), and `tests/securityHeaders.test.ts` checks that `firebase.json` enforces it. A new
+outside host the app needs must be added to the policy, or the browser will refuse it.
 
 | Task | Command |
 |------|---------|

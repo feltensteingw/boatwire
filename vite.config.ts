@@ -20,8 +20,8 @@ function buildInfo() {
 
 /**
  * The Content-Security-Policy from firebase.json, where it is the single source of truth.
- * Hosting sends it in report-only mode for now; the browser tests enforce it (E2E_CSP), so a
- * change to the app that the policy would block fails a test before it reaches the site.
+ * Hosting enforces it, and so do the browser tests (E2E_CSP), so a change to the app that the
+ * policy would block fails a test before it reaches the site.
  */
 function hostingCsp(): string | undefined {
   const cfg = JSON.parse(readFileSync(new URL('./firebase.json', import.meta.url), 'utf8')) as { hosting: { headers: { source: string; headers: { key: string; value: string }[] }[] } };
