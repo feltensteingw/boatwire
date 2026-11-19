@@ -243,6 +243,56 @@ describe('twin engines: alternators', () => {
     expect(errorsOf(d)).toEqual([]);
   });
 
+  it('never draws DC-DC chargers both ways on a shared start battery (lithium house, one stock regulator)', () => {
+    for (const [starboard, port] of [['internal', 'external'], ['external', 'internal']]) {
+      const p = twin('shared', { starboard: { regulator: starboard }, port: { regulator: port } });
+      const d = generateIdeal(p, p.scenarios.find((s) => s.id === 'lfp12'));
+      const [stock, ext, sfx] = starboard === 'internal' ? ['Starboard engine', 'Port engine', ''] : ['Port engine', 'Starboard engine', '-2'];
+      // the stock-regulator alternator charges the start battery, and its DC-DC charger carries the charge on
+      expect(d.nodes.filter((n) => n.type === 'dcdc').map((n) => n.id), starboard).toEqual([`alt-dcdc${sfx}`]);
+      const f = d.findings.find((x) => x.rule === 'twin-engines' && x.message.includes('No DC-DC charger'));
+      expect(f?.message, starboard).toBe(
+        `Both engines share Start battery, and ${stock}'s alternator charges it directly. No DC-DC charger from the house bank is drawn to it: it would run against the DC-DC charger that carries ${stock}'s charge on to the house bank. While only ${ext} runs, Start battery is not charged.`,
+      );
+      expect(f?.nodes, starboard).toEqual(['start-bat', `alt-dcdc${sfx}`]);
+      expect(errorsOf(d), starboard).toEqual([]);
+    }
+  });
+
+  it('on a shared start battery, never a DC-DC charger to it and one from it at once, in any arrangement', () => {
+    for (const s1 of ['auto', 'relay-run', 'isolator-diode']) {
+      for (const s2 of ['auto', 'relay-run', 'isolator-diode']) {
+        for (const r1 of ['internal', 'external']) {
+          for (const r2 of ['internal', 'external']) {
+            for (const chem of ['agm', 'lifepo4']) {
+              const p = twin('shared', { starboard: { chargeSplit: s1, regulator: r1 }, port: { chargeSplit: s2, regulator: r2 } });
+              p.equipment.find((e) => e.props.role === 'start')!.props.chemistry = chem;
+              for (const s of p.scenarios) {
+                const dcdc = generateIdeal(p, s).nodes.filter((n) => n.type === 'dcdc').map((n) => n.id);
+                const label = `${s1}/${s2} ${r1}/${r2} ${chem} ${s.name}`;
+                expect(dcdc.some((id) => id.startsWith('alt-dcdc')) && dcdc.includes('start-dcdc'), label).toBe(false);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('says why a shared start battery has both a battery isolator and a charging relay', () => {
+    const d = generateIdeal(twin('shared', { starboard: { chargeSplit: 'isolator-fet' } }));
+    expect(d.nodes.filter((n) => n.type === 'isolator' || n.type === 'acr').map((n) => n.id)).toEqual(['alt-isolator', 'acr']);
+    const f = d.findings.find((x) => x.rule === 'twin-engines' && x.message.includes('battery isolator'));
+    expect(f?.message).toBe('Both engines share Start battery: Starboard engine charges it through a battery isolator and Port engine through a charging relay. While the relay is closed it joins the two banks, so the isolator does not keep them apart.');
+    expect(f?.fix).toBe('To keep the banks apart, set "Charge splitting" to a battery isolator on both engines.');
+    // with an isolator on both engines there is no relay, and no note
+    const both = generateIdeal(twin('shared', { starboard: { chargeSplit: 'isolator-fet' }, port: { chargeSplit: 'isolator-fet' } }));
+    expect(both.nodes.filter((n) => n.type === 'acr')).toEqual([]);
+    expect(both.findings.filter((x) => x.message.includes('battery isolator and'))).toEqual([]);
+    // a start battery each: each engine's own choice, no note
+    expect(generateIdeal(twin('each', { starboard: { chargeSplit: 'isolator-fet' } })).findings.filter((x) => x.rule === 'twin-engines')).toEqual([]);
+  });
+
   it('numbers two engines of the same name in their findings, so neither is dropped as a repeat', () => {
     const p = exampleProject();
     p.equipment = p.equipment.filter((e) => e.kind !== 'engine' && e.props.role !== 'start');

@@ -2168,6 +2168,10 @@ exports[`more generated designs are unchanged (fingerprint only) > thruster and 
 
 exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, engine-run relay chosen 1`] = `"60 components, 90 wires, 3 findings, e0be13237bb096fd"`;
 
+exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, lithium house, one external regulator 1`] = `"62 components, 96 wires, 3 findings, 8dcf2d7ac0e9bcde"`;
+
+exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, one with a battery isolator 1`] = `"62 components, 94 wires, 3 findings, 61de77609a654c0b"`;
+
 exports[`more generated designs are unchanged (fingerprint only) > twin engines, a start battery each, 24 V what-if 1`] = `"73 components, 106 wires, 4 findings, 0e7e283149ff71c3"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > twin engines, lithium house, a lead-acid start battery each 1`] = `"68 components, 104 wires, 1 findings, 0dc1468cdf3b9e10"`;

@@ -263,6 +263,12 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
     return { id: 'v24', name: '24 V', systemVoltage: 24 };
   }),
   boat('twin engines sharing one start battery, engine-run relay chosen', (p) => twinEngines(p, { engine: { chargeSplit: 'relay-run' } })),
+  // the stock-regulator engine charges the start battery; no DC-DC charger runs back to it from the house bank
+  boat('twin engines sharing one start battery, lithium house, one external regulator', (p) => {
+    twinEngines(p, { engine: { regulator: 'external' } });
+    return p.scenarios.find((s) => s.id === 'lfp12');
+  }),
+  boat('twin engines sharing one start battery, one with a battery isolator', (p) => twinEngines(p, { engine: { chargeSplit: 'isolator-fet' } })),
 
   // --- heavy loads
   boat('bow thruster and electric winch on 12 V, fed from the house bank', (p) => {

@@ -45,11 +45,15 @@ interface StartBattery {
   who: string;
   /** Both engines start from it. */
   shared: boolean;
+  /** The engines that start from it. */
+  users: Slot[];
   /** The largest starter and the longest cable run of the engines it starts. */
   starterA: number;
   crankLen: number;
   /** The engines whose alternator charges it through a charging relay. */
   relayFor: Slot[];
+  /** An engine whose alternator charges it directly (lithium house, stock regulator), which also carries the charge on to the house bank. */
+  chargedBy?: Slot;
   /** Drawn by the first engine that starts from it. */
   drawn?: { node: DNode; fuse: DNode; bus: DNode; cable: string };
   /** A charging relay or DC-DC charger from the house bank has been drawn to it. */
@@ -128,6 +132,7 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBuses: DNod
     tag: each ? ` ${i + 1}` : '',
     who: each ? `${engineNames[i]}: ` : '',
     shared: twin && !each,
+    users: [],
     starterA: 0,
     crankLen: 0,
     relayFor: [],
@@ -163,9 +168,11 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBuses: DNod
   });
   for (const st of starts) {
     const users = slots.filter((s) => s.start === st);
+    st.users = users;
     st.starterA = Math.max(...users.map((s) => s.starterA));
     st.crankLen = Math.max(...users.map((s) => s.crankLen));
     st.relayFor = users.filter((s) => s.altA > 0 && !s.useIso && !s.needsDcdc);
+    st.chargedBy = users.find((s) => s.toStart && s.altA > 0);
   }
 
   for (const s of slots) buildOneEngine(b, p, core, s);
@@ -440,11 +447,26 @@ function alternatorRegulation(b: Builder, p: Plan, core: Core, a: Alt) {
 function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus: DNode) {
   const { V, BZ } = p;
   const { posBus, negBus } = core;
-  const { engine, altA, engineNode, crankLen, needsDcdc, startChem, who } = a;
+  const { engine, name, altA, engineNode, crankLen, needsDcdc, startChem, who } = a;
   const st = a.start!;
   if (st.fedFromHouse) return;
   st.fedFromHouse = true;
   const { sfx, tag } = st;
+
+  if (st.chargedBy) {
+    // A start battery both engines share, which the other engine's alternator charges directly. A DC-DC
+    // charger from the house bank would run against the one carrying that charge on to the house bank,
+    // and the charge would go round in a loop while that engine runs.
+    const by = st.chargedBy;
+    b.find(
+      'info',
+      'twin-engines',
+      `Both engines share ${st.name}, and ${by.name}'s alternator charges it directly. No DC-DC charger from the house bank is drawn to it: it would run against the DC-DC charger that carries ${by.name}'s charge on to the house bank. While only ${name} runs, ${st.name} is not charged.`,
+      `Run ${by.name} from time to time, or charge ${st.name} from a shore charger output.`,
+      [st.drawn!.node.id, `alt-dcdc${by.sfx}`],
+    );
+    return;
+  }
 
   if (needsDcdc) {
     // A start battery needs little charge. Take the larger charger only if the alternator covers what it draws.
@@ -475,6 +497,17 @@ function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus:
     const runRelay = a.wantsRunRelay && !st.shared;
     if (st.shared && users.some((u) => u.wantsRunRelay)) {
       b.find('info', 'twin-engines', `Both engines share ${st.name}, so one voltage-sensing charging relay is used: it closes when either engine is charging.`, undefined, [`acr${sfx}`]);
+    }
+    // the other engine charges the shared start battery through its own battery isolator
+    const iso = st.users.find((u) => u.useIso && u.altA > 0);
+    if (iso) {
+      b.find(
+        'info',
+        'twin-engines',
+        `Both engines share ${st.name}: ${iso.name} charges it through a battery isolator and ${name} through a charging relay. While the relay is closed it joins the two banks, so the isolator does not keep them apart.`,
+        'To keep the banks apart, set "Charge splitting" to a battery isolator on both engines.',
+        [`alt-isolator${iso.sfx}`, `acr${sfx}`],
+      );
     }
     const acrR = relayA > 100 ? b.rating(relayA, [500], { what: `${st.who}${runRelay ? 'Charging relay' : 'Automatic charging relay'}${tag}`, fix: ALT_FIX, nodes: [`acr${sfx}`] }) : 120;
     const acr = runRelay
