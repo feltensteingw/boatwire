@@ -133,8 +133,8 @@ const SECTIONS: Section[] = [
         </ul>
         <h4>Energy budget box</h4>
         <p>
-          Shows your daily use in amp-hours, the house bank size and its usable part, and the recommended size. The recommendation covers about two days without charging at a safe depth of discharge: about 50% for lead-acid and 80% for lithium. It turns orange when the bank is too
-          small.
+          Shows your daily use in amp-hours, the house bank size and its usable part, and the recommended size. The recommendation covers two days without charging at a safe depth of discharge: about 50% for lead-acid and 80% for lithium. It turns orange when the bank is too
+          small. You can change the number of days, and the other figures behind the budget, under <b>Reports → Energy budget → Assumptions</b>.
         </p>
       </>
     ),
@@ -360,7 +360,7 @@ const SECTIONS: Section[] = [
   {
     id: 'reports',
     title: 'Reports',
-    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list full report electrician pdf cost price prices estimate money budget currency',
+    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list full report electrician pdf cost price prices estimate money budget currency assumptions sun hours solar season winter summer latitude tropics autonomy days marina anchor passage engine hours balance shortfall',
     body: (
       <>
         <table className="g-table">
@@ -374,6 +374,15 @@ const SECTIONS: Section[] = [
           </tbody>
         </table>
         <p>Switch between <b>Ideal</b> and <b>Existing</b> at the top. <b>Download CSV</b> opens in Excel or Google Sheets. <b>Print</b> gives a clean paper copy.</p>
+        <h4>Energy budget: a typical day and its assumptions</h4>
+        <ul>
+          <li><b>A typical day</b> sets what the boat uses against what each source puts back: solar, wind and hydro, the shore charger and the engine. The list beside the bars gives every figure. Below it, BoatWire says what is left to find and how long the engine would have to run to make it up.</li>
+          <li><b>Assumptions</b> holds the figures behind it. Pick the conditions from the two lists (where and when; how the boat is used), or type your own: peak sun hours, how much of the panels' rating arrives, wind and hydro output, hours on shore power, hours motoring.</li>
+          <li><b>Days of autonomy</b> sets the recommended house bank: that many days of use at a safe depth of discharge. By default no charging is counted in those days. If you sail where the sun is dependable you can count a share of the usual solar and wind charge, and the recommended bank then follows the sun hours too.</li>
+          <li>A charger or an alternator is only counted up to what the batteries need, since it cannot put back more than was taken out. Sun and wind can exceed the day's use, and the extra is shown as to spare.</li>
+          <li>Tick <b>Different for the scenario</b> to give one scenario its own conditions, for example winter beside summer. <b>Compare</b> then shows the recommended bank and the engine hours for each.</li>
+          <li>The starting figures are rough, typical values, not measurements for any place. They are saved with the boat.</li>
+        </ul>
         <h4>Cost estimates</h4>
         <ul>
           <li>The costs are <b>rough estimates of parts only</b>, not quotes. Labour, shipping and tax are not included.</li>

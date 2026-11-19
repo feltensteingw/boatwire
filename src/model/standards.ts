@@ -139,8 +139,49 @@ export const ENERGY_ASSUMPTIONS = {
   windHydroCapacityFactor: 0.2,
   /** Days the house bank should last without charging. */
   daysAutonomy: 2,
+  /**
+   * Share of the normal solar, wind and hydro output counted on during those days.
+   * 0 means the bank must carry the boat with no charging at all, the cautious rule of thumb.
+   */
+  chargingDuringAutonomy: 0,
+  /** Hours a day on shore power with the charger running. */
+  shoreHoursPerDay: 0,
+  /** Hours a day the engine runs whatever the batteries need (motoring). */
+  engineHoursPerDay: 0,
   /** Share of the alternator's rating that ends up in the bank: lead-acid tapers as it fills, lithium takes nearly all of it. */
   alternatorChargeEfficiency: { lead: 0.6, lifepo4: 0.85 },
+} as const;
+
+/** The assumptions a boat owner can change, with the range each is held to. */
+export const ENERGY_LIMITS = {
+  solarPeakHours: [0, 12],
+  solarDerate: [0.1, 1],
+  windHydroCapacityFactor: [0, 1],
+  daysAutonomy: [0.5, 14],
+  chargingDuringAutonomy: [0, 1],
+  shoreHoursPerDay: [0, 24],
+  engineHoursPerDay: [0, 24],
+} as const satisfies Record<string, readonly [number, number]>;
+
+/**
+ * Ready-made conditions for the energy budget. The sun figures are rough, typical values for
+ * peak sun hours, not measurements for any place: they have not been checked against a solar
+ * resource table. They are starting points for the owner to adjust.
+ */
+export const ENERGY_PRESETS = {
+  sun: [
+    { id: 'typical', label: 'Typical cruising season', set: { solarPeakHours: 4.5 } },
+    { id: 'tropics', label: 'Tropics', set: { solarPeakHours: 5.5 } },
+    { id: 'mid-summer', label: 'Mid-latitudes, summer', set: { solarPeakHours: 6 } },
+    { id: 'mid-winter', label: 'Mid-latitudes, winter', set: { solarPeakHours: 2.5 } },
+    { id: 'high-summer', label: 'High latitudes, summer', set: { solarPeakHours: 5 } },
+    { id: 'high-winter', label: 'High latitudes, winter', set: { solarPeakHours: 1 } },
+  ],
+  use: [
+    { id: 'anchor', label: 'At anchor', set: { shoreHoursPerDay: 0, engineHoursPerDay: 0 } },
+    { id: 'marina', label: 'In a marina, plugged in', set: { shoreHoursPerDay: 24, engineHoursPerDay: 0 } },
+    { id: 'passage', label: 'On passage, motoring 4 h a day', set: { shoreHoursPerDay: 0, engineHoursPerDay: 4 } },
+  ],
 } as const;
 
 /** Charge voltage per 12 V nominal (used to estimate charger output current). */

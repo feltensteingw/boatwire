@@ -107,6 +107,26 @@ export interface Scenario {
   systemVoltage?: SystemVoltage;
   houseChemistry?: Chemistry;
   houseCapacityAh?: number;
+  /** Energy-budget assumptions that differ for this scenario (a season, a cruising ground). */
+  energy?: Partial<EnergyAssumptions>;
+}
+
+/** The energy-budget assumptions an owner can change. Defaults and ranges are in model/standards.ts. */
+export interface EnergyAssumptions {
+  /** Hours a day of full-strength sun. */
+  solarPeakHours: number;
+  /** Share of a panel's rating actually delivered, 0 to 1. */
+  solarDerate: number;
+  /** Average output of a wind or hydro generator as a share of its rating, 0 to 1. */
+  windHydroCapacityFactor: number;
+  /** Days the house bank should last. */
+  daysAutonomy: number;
+  /** Share of normal solar, wind and hydro output counted on during those days, 0 to 1. */
+  chargingDuringAutonomy: number;
+  /** Hours a day on shore power with the charger running. */
+  shoreHoursPerDay: number;
+  /** Hours a day the engine runs whatever the batteries need. */
+  engineHoursPerDay: number;
 }
 
 export interface LayerSettings {
@@ -303,4 +323,6 @@ export interface Project {
   existing?: Design;
   /** Prices the owner has changed from the defaults (model/prices.ts), for the cost estimate. */
   prices?: PriceOverrides;
+  /** Energy-budget assumptions the owner has changed, for every scenario that does not set its own. */
+  energy?: Partial<EnergyAssumptions>;
 }

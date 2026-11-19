@@ -2,6 +2,7 @@ import { HelpLink } from './Help';
 import { useMemo } from 'react';
 import { generateIdeal } from '../engine/generate';
 import { designCost } from '../engine/cost';
+import { daysText, energyBudget } from '../engine/energy';
 import { designMetrics, type Metrics } from '../engine/reports';
 import { fmtMoney } from '../model/prices';
 import { lenUnit, toLen, toWeight, weightUnit } from '../model/units';
@@ -31,7 +32,7 @@ export function Compare() {
     () =>
       project.scenarios.map((s) => {
         const d = generateIdeal(project, s);
-        return { s, d, m: designMetrics(d, acV, units), cost: designCost(d, project.prices, units) };
+        return { s, d, m: designMetrics(d, acV, units), cost: designCost(d, project.prices, units), energy: energyBudget(project, s) };
       }),
     [project, acV, units],
   );
@@ -52,6 +53,14 @@ export function Compare() {
       </tr>
     );
   };
+  const energyRow = (label: string, f: (e: (typeof metrics)[number]['energy']) => string) => (
+    <tr key={label}>
+      <th>{label}</th>
+      {metrics.map((x) => (
+        <td key={x.s.id}>{f(x.energy)}</td>
+      ))}
+    </tr>
+  );
   // Estimated cost: the total, then each bill-of-materials category that any scenario spends on.
   const costCategories = [...new Set(metrics.flatMap((x) => x.cost.byCategory.map((c) => c.category)))];
   const costRow = (label: string, f: (c: (typeof metrics)[number]['cost']) => number, total = false) => {
@@ -122,6 +131,15 @@ export function Compare() {
             {row('Components', (m) => m.components, 'min')}
             {row('Errors', (m) => m.errors, 'min')}
             {row('Warnings', (m) => m.warnings, 'min')}
+            <tr className="cat">
+              <td colSpan={metrics.length + 1}>
+                Energy <span className="hint">(under each scenario's own assumptions; set them under Reports → Energy budget)</span>
+              </td>
+            </tr>
+            {energyRow('Used per day', (e) => `${Math.round(e.totalAhPerDay)} Ah`)}
+            {energyRow('Charging per day', (e) => `${Math.round(e.chargingAhPerDay)} Ah`)}
+            {energyRow('Recommended house bank', (e) => `${e.recommendedAh} Ah for ${daysText(e.daysAutonomy)}`)}
+            {energyRow('Engine hours a day to break even', (e) => (isFinite(e.engineHoursToBalance) ? `${e.engineHoursToBalance.toFixed(1)} h` : '—'))}
             <tr className="cat">
               <td colSpan={metrics.length + 1}>
                 Estimated parts cost <span className="hint">(rough figures from the price list; change them under Reports → Bill of materials → Prices…)</span>

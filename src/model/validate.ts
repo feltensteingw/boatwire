@@ -5,11 +5,12 @@
 // repaired and reported as notes; something that is not a project at all throws ProjectError
 // with a message a boat owner can act on.
 
+import { ENERGY_LIMITS } from './standards';
 import { DEFAULT_CURRENCY, priceDef, type PriceOverrides } from './prices';
 import { CATALOG_BY_KIND } from './catalog';
 import { blankProject, uid } from './examples';
 import { makeNode, NODE_DEFS } from './nodeDefs';
-import type { Design, DNode, Equipment, EquipmentKind, NodeType, Polarity, Project, PropValue, Scenario, Terminal, Underlay, Wire, WireKind, Zone } from './types';
+import type { Design, DNode, EnergyAssumptions, Equipment, EquipmentKind, NodeType, Polarity, Project, PropValue, Scenario, Terminal, Underlay, Wire, WireKind, Zone } from './types';
 
 /** Format of the project data. Raise it, and add a step to MIGRATIONS, when the shape changes. */
 export const PROJECT_VERSION = 1;
@@ -128,6 +129,8 @@ export function parseProject(raw: unknown, opts: ParseOptions = {}): Parsed {
     if (s.systemVoltage === 12 || s.systemVoltage === 24) out.systemVoltage = s.systemVoltage;
     if (typeof s.houseChemistry === 'string' && ['flooded', 'agm', 'gel', 'lifepo4'].includes(s.houseChemistry)) out.houseChemistry = s.houseChemistry as Scenario['houseChemistry'];
     if (typeof s.houseCapacityAh === 'number' && s.houseCapacityAh > 0) out.houseCapacityAh = s.houseCapacityAh;
+    const energy = parseEnergy(s.energy);
+    if (energy) out.energy = energy;
     scenarios.push(out);
   }
   if (!scenarios.length) scenarios.push(...blank.scenarios);
@@ -141,7 +144,22 @@ export function parseProject(raw: unknown, opts: ParseOptions = {}): Parsed {
   }
   const prices = parsePrices(data.prices);
   if (prices) project.prices = prices;
+  const energy = parseEnergy(data.energy);
+  if (energy) project.energy = energy;
   return { project, notes };
+}
+
+/** The owner's energy-budget assumptions: known ones only, each held to its range. */
+function parseEnergy(raw: unknown): Partial<EnergyAssumptions> | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: Partial<EnergyAssumptions> = {};
+  for (const k of Object.keys(ENERGY_LIMITS) as (keyof EnergyAssumptions)[]) {
+    const v = raw[k];
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const [lo, hi] = ENERGY_LIMITS[k];
+    out[k] = Math.min(hi, Math.max(lo, v));
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** The owner's own prices: only known price-list entries with a sensible number are kept. */

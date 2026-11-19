@@ -413,3 +413,53 @@ test('cost estimate: priced bill of materials, editable prices, and a difference
   await expect(page.locator('.toast-msg')).toContainText('Undid: Changed a price');
   expect(errors).toEqual([]);
 });
+
+test('energy budget: conditions change the balance, days of autonomy change the bank, a scenario can differ', async ({ page }) => {
+  const errors = await openFresh(page);
+  await page.getByRole('button', { name: 'Reports', exact: true }).click();
+  await page.locator('.report-tabs button', { hasText: 'Energy budget' }).click();
+  const tile = (text: string) => page.locator('.tile', { hasText: text }).locator('.tv');
+  const verdict = page.locator('.bal-verdict');
+
+  // the example boat at anchor in a typical season: solar covers part of the day, the engine the rest
+  await expect(tile('recommended for two days')).toHaveText('740 Ah');
+  await expect(tile('engine run per day')).toHaveText('1.3 h');
+  await expect(verdict).toContainText('leaving 71 Ah a day to find');
+  await expect(page.locator('.bal-seg')).toHaveCount(1);
+  await expect(page.locator('.bal-list tbody tr').first()).toContainText('Solar');
+
+  // less sun: more engine hours
+  await page.getByLabel('Where and when').selectOption({ label: 'High latitudes, winter' });
+  await expect(page.getByLabel('Peak sun hours a day')).toHaveValue('1');
+  await expect(tile('engine run per day')).toHaveText('2.9 h');
+  expect((await storedProject(page)).energy).toEqual({ solarPeakHours: 1 });
+
+  // days of autonomy set the recommended bank
+  await page.getByLabel('Days of autonomy').fill('3');
+  await expect(tile('recommended for 3 days')).toHaveText('1100 Ah');
+  // counting half the usual sun and wind in those days makes the bank follow the sun hours too
+  await page.getByLabel('Solar and wind counted in those days').fill('50');
+  const winterBank = await tile('recommended for 3 days').textContent();
+  await page.getByLabel('Peak sun hours a day').fill('6');
+  await expect(tile('recommended for 3 days')).not.toHaveText(winterBank!);
+
+  // plugged in: the charger covers what the sun does not, and no engine is needed
+  await page.getByLabel('How the boat is used').selectOption({ label: 'In a marina, plugged in' });
+  await expect(verdict).toContainText("Charging covers the day's use");
+  await expect(tile('engine run per day')).toHaveText('0.0 h');
+  await expect(page.locator('.bal-seg')).toHaveCount(2);
+
+  // one scenario with its own conditions; the others keep the boat's
+  await page.getByRole('button', { name: 'Reset', exact: true }).click();
+  await expect.poll(async () => (await storedProject(page)).energy).toBeUndefined();
+  await page.getByLabel(/Different for the scenario/).check();
+  await page.getByLabel('Where and when').selectOption({ label: 'Tropics' });
+  await expect.poll(async () => (await storedProject(page)).scenarios[0].energy).toEqual({ solarPeakHours: 5.5 });
+  expect((await storedProject(page)).energy).toBeUndefined();
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  const cells = page.locator('table.cmp tr', { hasText: 'Engine hours a day to break even' }).locator('td');
+  await expect(cells).toHaveCount(3);
+  const hours = await cells.allTextContents();
+  expect(parseFloat(hours[0])).toBeLessThan(1.3);
+  expect(errors).toEqual([]);
+});

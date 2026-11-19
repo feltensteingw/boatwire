@@ -2104,6 +2104,244 @@ table.prices-table tr.own td.r input {
   border-color: var(--accent);
 }
 
+/* ---- energy report: a typical day (balance bars) and the assumptions behind it ----
+   The four charging sources wear the first four slots of a categorical palette, in a fixed
+   order: solar, wind and hydro, shore charger, engine. The set was checked for colour-blind
+   separation against each theme's panel colour. Two of the light colours are below 3:1 against
+   white, which is allowed only because every name and figure is also in the list beside the
+   bars: colour is never the only way to tell the sources apart. */
+:root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+}
+:root[data-theme='dark'],
+:root[data-theme='blueprint'] {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+  }
+}
+/* night watch keeps to red: one hue in four steps, light to dark */
+:root[data-theme='night'] {
+  --viz-1: #ffa398;
+  --viz-2: #e2695d;
+  --viz-3: #b8463b;
+  --viz-4: #8c2f27;
+}
+.energy-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+@media (max-width: 1250px) {
+  .energy-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.balance,
+.assume {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.balance h3,
+.assume h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.bal-rows {
+  margin: 12px 0 14px;
+  display: grid;
+  gap: 10px;
+}
+.bal-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 62px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.bal-name {
+  color: var(--muted);
+}
+.bal-val {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bal-track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+}
+.bal-bar,
+.bal-stack {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+}
+.bal-bar.used {
+  background: var(--muted);
+  position: relative;
+}
+/* 2px of the panel colour between segments does the separating; no outlines */
+.bal-stack {
+  gap: 2px;
+  overflow: hidden;
+}
+.bal-seg {
+  position: relative;
+  min-width: 3px;
+  flex-basis: 0;
+}
+/* the bars are thin, so each gets a taller area to hover or press */
+.bal-seg::after,
+.bal-bar.used::after {
+  content: '';
+  position: absolute;
+  inset: -9px 0;
+}
+.bal-stack:has(.bal-seg:hover) {
+  overflow: visible;
+}
+.bal-seg:hover,
+.bal-bar.used:hover {
+  filter: brightness(1.15);
+}
+.bal-seg.s1,
+.bal-key.s1 {
+  background: var(--viz-1);
+}
+.bal-seg.s2,
+.bal-key.s2 {
+  background: var(--viz-2);
+}
+.bal-seg.s3,
+.bal-key.s3 {
+  background: var(--viz-3);
+}
+.bal-seg.s4,
+.bal-key.s4 {
+  background: var(--viz-4);
+}
+table.bal-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+table.bal-list th,
+table.bal-list td {
+  text-align: left;
+  padding: 5px 6px;
+  border-top: 1px solid var(--border);
+  font-weight: 400;
+  vertical-align: top;
+}
+table.bal-list thead th {
+  border-top: none;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+table.bal-list tbody th {
+  white-space: nowrap;
+  font-weight: 600;
+}
+table.bal-list td:nth-child(2) {
+  color: var(--muted);
+}
+table.bal-list .r {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+table.bal-list tr.none th,
+table.bal-list tr.none td {
+  color: var(--faint);
+}
+table.bal-list tfoot th,
+table.bal-list tfoot td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-2);
+}
+.bal-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 7px;
+}
+.bal-verdict {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.assume-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.assume-head h3 {
+  margin-right: auto;
+}
+.assume .hint {
+  margin: 8px 0;
+}
+.presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.preset {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.assume-grid {
+  display: grid;
+  gap: 2px;
+}
+.assume-grid .field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  align-items: center;
+  gap: 10px;
+}
+.assume-grid .field-label {
+  width: auto;
+}
+.assume-grid .own .field-label {
+  font-weight: 700;
+}
+.assume-grid .own input {
+  border-color: var(--accent);
+}
+@media print {
+  .assume-head .toggle,
+  .assume-head button,
+  .presets {
+    display: none;
+  }
+}
+
 /* ---------------------------------------------------------------- cloud */
 .cloud {
   position: relative;

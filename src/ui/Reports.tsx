@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { energyBudget } from '../engine/energy';
+import { daysText, energyBudget } from '../engine/energy';
 import { planCosts, priceBom } from '../engine/cost';
 import { billOfMaterials, changeList, findingCounts, wireSchedule } from '../engine/reports';
 import { ruleInfo, STANDARDS_NOTICE } from '../engine/rules';
@@ -12,6 +12,7 @@ import { downloadText, toCsv } from './download';
 import { FindingsList } from './Findings';
 import { currencyOf, fmtMoney } from '../model/prices';
 import { PriceList } from './PriceList';
+import { DailyBalance, EnergyAssumptionsPanel } from './EnergyBalance';
 
 const TABS: { id: ReportTab; label: string; tip: string }[] = [
   { id: 'findings', label: 'Design check', tip: 'Every error, warning and note for the chosen design, with suggested fixes.' },
@@ -218,11 +219,10 @@ function Bom() {
   );
 }
 
-const pct = (x: number) => `${Math.round(x * 100)}%`;
-
 function Energy() {
   const project = useStore((s) => s.project);
-  const b = energyBudget(project, activeScenario(project));
+  const scenario = activeScenario(project);
+  const b = energyBudget(project, scenario);
   const rows = [...b.rows].sort((x, y) => y.ahPerDay - x.ahPerDay);
   const max = Math.max(1, ...rows.map((r) => r.ahPerDay));
   return (
@@ -238,16 +238,20 @@ function Energy() {
         </div>
         <div className={`tile ${b.houseAh < b.recommendedAh * 0.9 ? 'warn' : 'ok'}`}>
           <div className="tv">{b.recommendedAh} Ah</div>
-          <div className="tl">recommended for {b.daysAutonomy} days</div>
+          <div className="tl">recommended for {daysText(b.daysAutonomy)}</div>
         </div>
         <div className="tile">
-          <div className="tv">{Math.round(b.solarAhPerDay + b.windHydroAhPerDay)} Ah</div>
-          <div className="tl">renewable charging / day (est.)</div>
+          <div className="tv">{Math.round(b.chargingAhPerDay)} Ah</div>
+          <div className="tl">charging / day (est.)</div>
         </div>
         <div className="tile">
           <div className="tv">{isFinite(b.engineHoursToBalance) ? `${b.engineHoursToBalance.toFixed(1)} h` : '—'}</div>
           <div className="tl">engine run per day to break even</div>
         </div>
+      </div>
+      <div className="energy-cols">
+        <DailyBalance b={b} />
+        <EnergyAssumptionsPanel b={b} scenario={scenario} boatValues={project.energy} />
       </div>
       <table className="grid">
         <thead>
@@ -277,10 +281,7 @@ function Energy() {
           ))}
         </tbody>
       </table>
-      <p className="hint">
-        Assumptions: solar {b.assumptions.solarPeakHours} peak sun hours at {pct(b.assumptions.solarDerate)} of rating; wind/hydro at {pct(b.assumptions.windHydroCapacityFactor)} capacity factor; inverter {pct(b.assumptions.inverterEfficiency)} efficient; {pct(b.assumptions.alternatorChargeEfficiency)} of the alternator's rating reaches the bank. Edit hours per day and duty cycle on each load in the
-        Equipment list.
-      </p>
+      <p className="hint">Edit hours per day for each load in the Equipment list. The figures behind the charging estimates are under Assumptions above.</p>
     </div>
   );
 }

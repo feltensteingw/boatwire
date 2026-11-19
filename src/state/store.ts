@@ -4,9 +4,11 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import { exampleProject, blankProject, newEquipment, uid } from '../model/examples';
 import { joinTerminals } from '../engine/connect';
 import { growTerminal, terminal } from '../model/nodeDefs';
-import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
+import type { Design, DNode, EnergyAssumptions, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
 import { draftRunLength } from '../engine/existing';
 import { DEFAULT_CURRENCY, priceDef, type PriceOverrides } from '../model/prices';
+import { clampAssumption } from '../engine/energy';
+import { ENERGY_ASSUMPTIONS } from '../model/standards';
 import type { ThemeId } from '../ui/themes';
 import { parseProject } from '../model/validate';
 import { removeZone } from '../model/zones';
@@ -66,6 +68,13 @@ interface State {
   setPrice(key: string, value: number | undefined): void;
   setCurrency(symbol: string): void;
   resetPrices(): void;
+  /**
+   * Change energy-budget assumptions: for the whole boat, or for one scenario only.
+   * A value of undefined, or one equal to what it would be anyway, removes the owner's setting.
+   */
+  setEnergy(patch: Partial<Record<keyof EnergyAssumptions, number | undefined>>, scenarioId?: string): void;
+  /** Back to the defaults (boat), or back to the boat's values (scenario). */
+  resetEnergy(scenarioId?: string): void;
   /** Remove a zone, first moving whatever is located in it to `moveTo`. */
   removeZone(id: string, moveTo?: string): void;
   addEquipment(kind: EquipmentKind): string;
@@ -189,6 +198,33 @@ export const useStore = create<State>()(
         set({
           project: mutate(get().project, (p) => {
             p.prices = tidyPrices({ ...p.prices, currency: symbol.trim().slice(0, 4) });
+          }),
+        }),
+      setEnergy: (patch, scenarioId) =>
+        set({
+          project: mutate(get().project, (p) => {
+            const scen = scenarioId ? p.scenarios.find((s) => s.id === scenarioId) : undefined;
+            if (scenarioId && !scen) return;
+            const next: Partial<EnergyAssumptions> = { ...((scen ? scen.energy : p.energy) ?? {}) };
+            for (const [k, v] of Object.entries(patch) as [keyof EnergyAssumptions, number | undefined][]) {
+              // what the value would be without this setting: the boat's value for a scenario, the default for the boat
+              const inherited = scen ? clampAssumption(k, p.energy?.[k]) : ENERGY_ASSUMPTIONS[k];
+              if (v === undefined || !Number.isFinite(v) || clampAssumption(k, v) === inherited) delete next[k];
+              else next[k] = clampAssumption(k, v);
+            }
+            const kept = Object.keys(next).length ? next : undefined;
+            if (scen) {
+              if (kept) scen.energy = kept;
+              else delete scen.energy;
+            } else if (kept) p.energy = kept;
+            else delete p.energy;
+          }),
+        }),
+      resetEnergy: (scenarioId) =>
+        set({
+          project: mutate(get().project, (p) => {
+            if (!scenarioId) delete p.energy;
+            else delete p.scenarios.find((s) => s.id === scenarioId)?.energy;
           }),
         }),
       resetPrices: () =>

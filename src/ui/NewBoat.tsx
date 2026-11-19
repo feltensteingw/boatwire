@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { create } from 'zustand';
-import { energyBudget } from '../engine/energy';
+import { daysText, energyBudget } from '../engine/energy';
 import { CATALOG_BY_KIND } from '../model/catalog';
 import { AC_STANDARDS } from '../model/standards';
 import { buildBoat, CUSTOM_ANSWERS, LOAD_GROUPS, TEMPLATES, type BoatAnswers } from '../model/templates';
@@ -219,7 +219,7 @@ function Wizard({ close, then }: { close: () => void; then?: () => void }) {
       {step > 0 && (
         <>
           <p className={`wiz-budget ${budget.houseAh < budget.recommendedAh * 0.9 ? 'warn' : ''}`} role="status">
-            These choices use about <b>{Math.round(budget.totalAhPerDay)} Ah a day</b>. For two days without charging that suggests a house bank of about <b>{budget.recommendedAh} Ah</b>; you have chosen <b>{Math.round(budget.houseAh)} Ah</b>.
+            These choices use about <b>{Math.round(budget.totalAhPerDay)} Ah a day</b>. For {daysText(budget.daysAutonomy)} without charging that suggests a house bank of about <b>{budget.recommendedAh} Ah</b>; you have chosen <b>{Math.round(budget.houseAh)} Ah</b>.
           </p>
           <div className="modal-foot wiz-foot">
             <button onClick={() => setStep(step - 1)}>Back</button>

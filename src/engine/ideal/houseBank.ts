@@ -4,7 +4,7 @@
 import { FUSE_CLASSES, VDROP } from '../../model/standards';
 import type { DNode } from '../../model/types';
 import { fuseClassFor, nextStandard } from '../calc';
-import { energyBudget } from '../energy';
+import { daysText, energyBudget } from '../energy';
 import { bankSummary, fuseLabel, SWITCH_SIZES, type Builder } from './builder';
 import type { Plan } from './plan';
 
@@ -103,7 +103,7 @@ export function buildHouseBank(b: Builder, p: Plan): Core {
   // Bank sizing check
   const budget = energyBudget(project, scenario);
   if (budget.totalAhPerDay > 0 && houseAhTotal < budget.recommendedAh * 0.9) {
-    b.find('warning', 'bank-sizing', `House bank is ${houseAhTotal} Ah; daily use is ~${Math.round(budget.totalAhPerDay)} Ah, which suggests ~${budget.recommendedAh} Ah for two days at safe depth of discharge.`, 'Increase house capacity or reduce loads.');
+    b.find('warning', 'bank-sizing', `House bank is ${houseAhTotal} Ah; daily use is ~${Math.round(budget.totalAhPerDay)} Ah, which suggests ~${budget.recommendedAh} Ah for ${daysText(budget.daysAutonomy)} at safe depth of discharge.`, 'Increase house capacity or reduce loads.');
   }
 
   return { houseSwitch, posBus, negBus, shunt, firstMainFuse, mainOpts, mainCable, mainCableRuns, bms };

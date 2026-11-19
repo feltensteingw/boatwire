@@ -47,6 +47,7 @@ export function describeChange(a: Project, b: Project): Change | null {
 
   // Boat settings and zones
   if (!same(a.prices, b.prices)) return b.prices ? { label: 'Changed a price', mergeKey: 'prices' } : { label: 'Reset the prices to the defaults', destructive: true };
+  if (!same(a.energy, b.energy)) return { label: 'Changed the energy assumptions', mergeKey: 'energy' };
 
   if (!same(a.profile, b.profile)) {
     const za = ids(a.profile.zones);
@@ -63,6 +64,8 @@ export function describeChange(a: Project, b: Project): Change | null {
     }
     if (b.scenarios.length > a.scenarios.length) return { label: 'Added a scenario' };
     const edited = b.scenarios.find((s) => !same(s, a.scenarios.find((x) => x.id === s.id)));
+    const was = a.scenarios.find((x) => x.id === edited?.id);
+    if (edited && was && !same(edited.energy, was.energy)) return { label: `Changed the energy assumptions for ${edited.name}`, mergeKey: `energy:${edited.id}` };
     return { label: `Changed the scenario ${edited?.name ?? ''}`.trim(), mergeKey: `scenario:${edited?.id}` };
   }
 

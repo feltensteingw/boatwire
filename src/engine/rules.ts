@@ -173,7 +173,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'bank-sizing': {
     title: 'House bank sizing',
-    why: 'Usable capacity should cover about two days of consumption: lead-acid is good for about 50% depth of discharge, LiFePO4 about 80%.',
+    why: 'Usable capacity should cover the days of autonomy you plan for (two unless you change it under Reports → Energy budget): lead-acid is good for about 50% depth of discharge, LiFePO4 about 80%.',
   },
   'series-parallel': {
     title: 'Series / parallel bank wiring',
