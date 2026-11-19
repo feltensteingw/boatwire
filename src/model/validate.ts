@@ -233,6 +233,9 @@ function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[], opts: Parse
     const kind = w.kind as WireKind;
     const wire: Wire = { ...(w as unknown as Wire), id, kind, domain: kind === 'ac' || kind === 'gnd' ? 'ac' : 'dc', from, to, lengthFt: Math.max(0, num(w.lengthFt, 3)) };
     if (wire.gauge !== undefined && typeof wire.gauge !== 'string') delete wire.gauge;
+    const bundled = num(w.bundledWith, 0);
+    if (bundled >= 1) wire.bundledWith = Math.floor(bundled);
+    else delete wire.bundledWith;
     wires.push(wire);
   }
   if (droppedWires) notes.push(`${plural(droppedWires, 'wire')} on the existing-boat drawing pointed at something that is not there and ${droppedWires === 1 ? 'was' : 'were'} left out.`);

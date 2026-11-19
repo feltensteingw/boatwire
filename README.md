@@ -108,8 +108,8 @@ src/ui/         React + React Flow canvas, symbols, inspector, reports
 - `tests/auditRules.test.ts` has, for every design-check rule, one small drawing that breaks it and
   one that does not. It fails if a rule is added to `audit.ts` without a case.
 - `tests/idealPassesAudit.test.ts` checks that every generated design passes the design check.
-- `tests/standards.test.ts` checks the wire tables against the Blue Sea Systems figures they were
-  checked against.
+- `tests/standards.test.ts` and `tests/bundling.test.ts` check the wire tables, and the bundling
+  derating, against the Blue Sea Systems figures they were checked against.
 
 **Download size:** the page loads only the app, React and React Flow up front (about 170 KB gzipped).
 The layout engine, Firebase, PDF import, the help guide, Compare and Reports load on first use.
@@ -124,5 +124,7 @@ there; nothing else hard-codes them.
 
 - Cable lengths are estimated from zone positions (Boat & zones tab), not measured runs.
 - AC is drawn as a one-line diagram (hot/neutral/ground as one cable).
-- Bundling/temperature derating beyond engine-space derating is not applied.
+- The ideal design sizes every cable as if it ran on its own (a design note says so). Hand-drawn
+  DC wires can be marked as bundled, and the check then derates them. No other temperature
+  derating beyond engine spaces is applied.
 - Battery banks are drawn as one symbol with an arrangement label (e.g. 2S2P), not as individual batteries.

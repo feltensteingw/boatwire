@@ -398,7 +398,11 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
   const amps = wire.amps ?? est.get(wire.id);
   const volts = wire.domain === 'ac' ? acVoltsOf(project) : Number([a, b].find((n) => n?.type === 'load')?.data.volts ?? design.systemVoltage);
   const vd = wire.gauge && amps !== undefined ? vdropPct(amps, wire.lengthFt, wire.gauge, volts) : undefined;
-  const amp = wire.gauge ? ampacity(wire.gauge, wire.inEngineSpace, wire.kind === 'ac') : undefined;
+  // Bundling applies to DC conductors that carry current; the check ignores it on other wires.
+  const bundles = wire.kind === 'pos' || wire.kind === 'neg';
+  const bundled = bundles ? (wire.bundledWith ?? 0) : 0;
+  const amp = wire.gauge ? ampacity(wire.gauge, wire.inEngineSpace, wire.kind === 'ac', bundled) : undefined;
+  const ampNote = [wire.inEngineSpace ? 'engine space' : '', bundled ? `bundled with ${bundled} other wire${bundled === 1 ? '' : 's'}` : ''].filter(Boolean).join(', ');
   const mine = findings.filter((f) => f.wires?.includes(wire.id));
   const edit = (fn: (w: Wire) => void) =>
     updateExisting((d) => {
@@ -470,6 +474,26 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
             tip={`Engine rooms are hot, so the wire's current rating is reduced (derated) to ${Math.round((wire.kind === 'ac' ? AC_ENGINE_SPACE_DERATE : ENGINE_SPACE_DERATE) * 100)}%.`}
             onChange={(v) => edit((w) => void (w.inEngineSpace = v))}
           />
+          {bundles && (
+            <Field
+              label="Bundled with"
+              help="How many other wires that carry current (positive or negative, not grounding or signal) run with this one in the same bundle, loom, sheath or conduit. Packed wires run hotter, so each is rated for less current: see Ampacity below. 0 means it runs on its own."
+            >
+              <NumInput
+                value={wire.bundledWith ?? 0}
+                unit="others"
+                min={0}
+                step={1}
+                onChange={(v) =>
+                  edit((w) => {
+                    const n = Math.max(0, Math.floor(v));
+                    if (n) w.bundledWith = n;
+                    else delete w.bundledWith;
+                  })
+                }
+              />
+            </Field>
+          )}
         </div>
       ) : null}
       <table className="kv">
@@ -494,7 +518,7 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
             <tr>
               <th>Ampacity</th>
               <td>
-                {Math.round(amp)} A{wire.inEngineSpace ? ' (engine space)' : ''}
+                {Math.round(amp)} A{ampNote ? ` (${ampNote})` : ''}
               </td>
             </tr>
           )}

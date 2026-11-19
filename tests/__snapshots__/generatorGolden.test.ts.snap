@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`generated designs are unchanged > 12 V lead-acid cruiser (the example boat) > design 1`] = `
-"Ideal (ideal), 12 V: 57 components, 84 wires, 1 findings
+"Ideal (ideal), 12 V: 57 components, 84 wires, 2 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7
@@ -146,13 +146,14 @@ w82 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
 w83 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · drop 0.3% of 3% · by ac-panel-shore · notes branch-protection,shore-only
 w84 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
-g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > 12 V lead-acid cruiser (the example boat) > fingerprint 1`] = `"d17d33d59217bb4e"`;
+exports[`generated designs are unchanged > 12 V lead-acid cruiser (the example boat) > fingerprint 1`] = `"113721217ef3d333"`;
 
 exports[`generated designs are unchanged > 12 V lithium house with a lead-acid start battery (alternator to start, DC-DC to house) > design 1`] = `
-"12 V lithium (lfp12), 12 V: 57 components, 86 wires, 1 findings
+"12 V lithium (lfp12), 12 V: 57 components, 86 wires, 2 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6
@@ -299,13 +300,14 @@ w84 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
 w85 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · drop 0.3% of 3% · by ac-panel-shore · notes branch-protection,shore-only
 w86 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
-g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~460 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~460 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > 12 V lithium house with a lead-acid start battery (alternator to start, DC-DC to house) > fingerprint 1`] = `"696e57e8d80176dc"`;
+exports[`generated designs are unchanged > 12 V lithium house with a lead-acid start battery (alternator to start, DC-DC to house) > fingerprint 1`] = `"abae0e1025100b27"`;
 
 exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > design 1`] = `
-"24 V (v24), 24 V: 66 components, 101 wires, 3 findings
+"24 V (v24), 24 V: 66 components, 101 wires, 4 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=300 · part "Battery switch, 300 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=300 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9
@@ -478,13 +480,14 @@ w101 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment gro
 
 g1 warning bank-sizing: House bank is 200 Ah; daily use is ~92 Ah, which suggests ~230 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
 g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel.
-g3 info series-parallel: Start battery: 2 batteries assumed for 24 V; your list has 1. → 12 V batteries make 24 V in strings of 2. If you make this change, list 2 batteries. [start-bat]"
+g3 info series-parallel: Start battery: 2 batteries assumed for 24 V; your list has 1. → 12 V batteries make 24 V in strings of 2. If you make this change, list 2 batteries. [start-bat]
+g4 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"dd0bc505a2fd101f"`;
+exports[`generated designs are unchanged > 24 V lithium with external BMS and external regulator > fingerprint 1`] = `"fc3d912e467df40c"`;
 
 exports[`generated designs are unchanged > 230 V shore power, metric units > design 1`] = `
-"Ideal (ideal), 12 V: 57 components, 84 wires, 1 findings
+"Ideal (ideal), 12 V: 57 components, 84 wires, 2 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7
@@ -629,13 +632,14 @@ w82 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
 w83 ac ac-panel-shore.b1 → ac-water-heater.l · 14/3 · 8.8 ft · 6.5 A · drop 0.13% of 3% · by ac-panel-shore · notes branch-protection,shore-only
 w84 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
-g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > 230 V shore power, metric units > fingerprint 1`] = `"d4af1197099108ac"`;
+exports[`generated designs are unchanged > 230 V shore power, metric units > fingerprint 1`] = `"a034dff15064aff6"`;
 
 exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > design 1`] = `
-"24 V (v24), 24 V: 92 components, 135 wires, 3 findings
+"24 V (v24), 24 V: 92 components, 135 wires, 4 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=300 · part "Battery switch, 300 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=300 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11,s12
@@ -868,13 +872,14 @@ w135 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment gro
 
 g1 warning bank-sizing: House bank is 200 Ah; daily use is ~94 Ah, which suggests ~380 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
 g2 info converter-24-12: 8 load(s) only run on 12 V; they are fed through a 20 A 24→12 V converter and a 12 V sub-panel.
-g3 info series-parallel: Start battery: 2 batteries assumed for 24 V; your list has 1. → 12 V batteries make 24 V in strings of 2. If you make this change, list 2 batteries. [start-bat]"
+g3 info series-parallel: Start battery: 2 batteries assumed for 24 V; your list has 1. → 12 V batteries make 24 V in strings of 2. If you make this change, list 2 batteries. [start-bat]
+g4 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > fingerprint 1`] = `"82039e2e390d281a"`;
+exports[`generated designs are unchanged > dedicated windlass and refrigeration banks, wind and hydro, 24 V with 12 V-only loads > fingerprint 1`] = `"c3ef18e1290d2721"`;
 
 exports[`generated designs are unchanged > diode battery isolator with an excitation wire > design 1`] = `
-"Ideal (ideal), 12 V: 56 components, 84 wires, 1 findings
+"Ideal (ideal), 12 V: 56 components, 84 wires, 2 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6
@@ -1018,13 +1023,14 @@ w82 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
 w83 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · drop 0.3% of 3% · by ac-panel-shore · notes branch-protection,shore-only
 w84 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
-g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > diode battery isolator with an excitation wire > fingerprint 1`] = `"2d89e27a101493f3"`;
+exports[`generated designs are unchanged > diode battery isolator with an excitation wire > fingerprint 1`] = `"a96a25ab90cb528c"`;
 
 exports[`generated designs are unchanged > engine-run charging relay > design 1`] = `
-"Ideal (ideal), 12 V: 57 components, 85 wires, 1 findings
+"Ideal (ideal), 12 V: 57 components, 85 wires, 2 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7
@@ -1170,13 +1176,14 @@ w83 gnd ac-microwave.g → ac-gnd.s5 · 10 · 5.2 ft · 0 A · equipment ground
 w84 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · drop 0.3% of 3% · by ac-panel-shore · notes branch-protection,shore-only
 w85 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
-g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > engine-run charging relay > fingerprint 1`] = `"7168af467ac2e5df"`;
+exports[`generated designs are unchanged > engine-run charging relay > fingerprint 1`] = `"f907000ee6d8b95e"`;
 
 exports[`generated designs are unchanged > inverter only: no shore power, no generator > design 1`] = `
-"Ideal (ideal), 12 V: 38 components, 53 wires, 1 findings
+"Ideal (ideal), 12 V: 38 components, 53 wires, 2 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=300 · part "Battery switch, 300 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=300 · notes common-negative · terms s1,s2,s3,s4,s5,s6
@@ -1271,13 +1278,14 @@ w51 ac inv.acout → ac-panel.in · 14/3 · 4.2 ft · 8.3 A · drop 0.15% of 3%
 w52 ac ac-panel.b1 → ac-ac-outlets.l · 14/3 · 6.4 ft · 2.5 A · drop 0.07% of 3% · by ac-panel · notes branch-protection
 w53 gnd ac-ac-outlets.g → ac-gnd.s3 · 10 · 6.4 ft · 0 A · equipment ground
 
-g1 warning bank-sizing: House bank is 200 Ah; daily use is ~72 Ah, which suggests ~290 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+g1 warning bank-sizing: House bank is 200 Ah; daily use is ~72 Ah, which suggests ~290 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > inverter only: no shore power, no generator > fingerprint 1`] = `"e550c20f4ab66e6e"`;
+exports[`generated designs are unchanged > inverter only: no shore power, no generator > fingerprint 1`] = `"1f36d0db12cd2e9d"`;
 
 exports[`generated designs are unchanged > no start battery: the engine starts from the house bank > design 1`] = `
-"Ideal (ideal), 12 V: 51 components, 76 wires, 2 findings
+"Ideal (ideal), 12 V: 51 components, 76 wires, 3 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=600 · part "Battery switch, 600 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=600 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7
@@ -1409,13 +1417,14 @@ w75 ac ac-panel-shore.b1 → ac-water-heater.l · 12/3 · 8.8 ft · 12.5 A · dr
 w76 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment ground
 
 g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
-g2 info house-start-split: No dedicated start battery: the engine starts from the house bank. → Add a start battery (role "Engine start") so a flat house bank can never stop you starting the engine."
+g2 info house-start-split: No dedicated start battery: the engine starts from the house bank. → Add a start battery (role "Engine start") so a flat house bank can never stop you starting the engine.
+g3 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > no start battery: the engine starts from the house bank > fingerprint 1`] = `"d1206aa1cf12f4d4"`;
+exports[`generated designs are unchanged > no start battery: the engine starts from the house bank > fingerprint 1`] = `"66fddc112e81cb6d"`;
 
 exports[`generated designs are unchanged > shore power and generator, separate inverter and two-output charger, shore-only loads > design 1`] = `
-"Ideal (ideal), 12 V: 65 components, 98 wires, 1 findings
+"Ideal (ideal), 12 V: 65 components, 98 wires, 2 findings
 
 house-switch <switch> "House battery switch" · @battery · rating=300 · part "Battery switch, 300 A continuous" · notes battery-switch · terms in,out
 pos-bus <bus-pos> "Main positive bus" · @battery · rating=300 · notes common-negative · terms s1,s2,s3,s4,s5,s6,s7,s8
@@ -1582,99 +1591,100 @@ w96 pos chgfuse-battery-charger.out → pos-bus.s8 · 10 · 0.5 ft · 40 A · dr
 w97 pos chg-battery-charger.out2 → chgfuse2-battery-charger.in · 16 · 4 ft · 10 A · drop 2.78% of 3% · by chgfuse2-battery-charger
 w98 pos chgfuse2-battery-charger.out → start-bus.s4 · 16 · 0.5 ft · 10 A · drop 0.35% of 3%
 
-g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
+g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
+g2 info bundling: Cable sizes assume each cable runs on its own, not bundled with other wires that carry current. → Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size."
 `;
 
-exports[`generated designs are unchanged > shore power and generator, separate inverter and two-output charger, shore-only loads > fingerprint 1`] = `"008e903eb612de9b"`;
+exports[`generated designs are unchanged > shore power and generator, separate inverter and two-output charger, shore-only loads > fingerprint 1`] = `"a6a8a10e1caecf3d"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > FET battery isolator 1`] = `"56 components, 83 wires, 1 findings, 4076b5e4612110d3"`;
+exports[`more generated designs are unchanged (fingerprint only) > FET battery isolator 1`] = `"56 components, 83 wires, 2 findings, 50bf04e63413215b"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a 12 kW generator on 120 V (beyond the largest AC breaker, cables sized for the current) 1`] = `"60 components, 88 wires, 2 findings, ed5214197e4f4fd9"`;
+exports[`more generated designs are unchanged (fingerprint only) > a 12 kW generator on 120 V (beyond the largest AC breaker, cables sized for the current) 1`] = `"60 components, 88 wires, 3 findings, 47cb8e03fbe1d84f"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a 200 A starter (twice that is beyond the largest start fuse) 1`] = `"57 components, 84 wires, 2 findings, 43bb8ce048e9d25e"`;
+exports[`more generated designs are unchanged (fingerprint only) > a 200 A starter (twice that is beyond the largest start fuse) 1`] = `"57 components, 84 wires, 3 findings, e1b49965ceb217d0"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a 1500 W solar array on 12 V (beyond the largest controller and PV breaker) 1`] = `"57 components, 84 wires, 3 findings, dfc5a7e9a9ee61f6"`;
+exports[`more generated designs are unchanged (fingerprint only) > a 1500 W solar array on 12 V (beyond the largest controller and PV breaker) 1`] = `"57 components, 84 wires, 4 findings, a1b4572cc199c048"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a 5000 W inverter/charger on 12 V (an 800 A Class T inverter fuse) 1`] = `"57 components, 84 wires, 8 findings, d3688c971a82a095"`;
+exports[`more generated designs are unchanged (fingerprint only) > a 5000 W inverter/charger on 12 V (an 800 A Class T inverter fuse) 1`] = `"57 components, 84 wires, 9 findings, 5faebc8c7a14b7e0"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a big alternator (heavier charging relay) 1`] = `"57 components, 84 wires, 1 findings, 58bef5e611388fcd"`;
+exports[`more generated designs are unchanged (fingerprint only) > a big alternator (heavier charging relay) 1`] = `"57 components, 84 wires, 2 findings, c8c0f69e57853db0"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a dedicated winch bank with no winch aboard 1`] = `"65 components, 95 wires, 2 findings, d4c4a11fd102cca2"`;
+exports[`more generated designs are unchanged (fingerprint only) > a dedicated winch bank with no winch aboard 1`] = `"65 components, 95 wires, 3 findings, 3609c4a580881360"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > a very large inverter on 12 V (parallel cables, beyond fuse sizes) 1`] = `"57 components, 84 wires, 10 findings, 17d0ac7579ff8004"`;
+exports[`more generated designs are unchanged (fingerprint only) > a very large inverter on 12 V (parallel cables, beyond fuse sizes) 1`] = `"57 components, 84 wires, 11 findings, 463643d9d6b93edd"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > an engine with no alternator 1`] = `"52 components, 76 wires, 1 findings, 1b7207b53bb27507"`;
+exports[`more generated designs are unchanged (fingerprint only) > an engine with no alternator 1`] = `"52 components, 76 wires, 2 findings, 0d50848654b264b6"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > bow thruster and electric winch on 12 V, fed from the house bank 1`] = `"65 components, 94 wires, 6 findings, 6c15d71cd3cc5de3"`;
+exports[`more generated designs are unchanged (fingerprint only) > bow thruster and electric winch on 12 V, fed from the house bank 1`] = `"65 components, 94 wires, 7 findings, 0c41738071adcae7"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > charging relay chosen with only one battery bank 1`] = `"51 components, 76 wires, 3 findings, fc5a52429d2a41eb"`;
+exports[`more generated designs are unchanged (fingerprint only) > charging relay chosen with only one battery bank 1`] = `"51 components, 76 wires, 4 findings, ff7e23e715940599"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > diode isolator with no compensation 1`] = `"56 components, 83 wires, 1 findings, a5c9b773cb7f1f57"`;
+exports[`more generated designs are unchanged (fingerprint only) > diode isolator with no compensation 1`] = `"56 components, 83 wires, 2 findings, f6b08d27236a3852"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > diode isolator, alternator sense lead moved 1`] = `"56 components, 84 wires, 1 findings, e8bb1a69b4fe9b15"`;
+exports[`more generated designs are unchanged (fingerprint only) > diode isolator, alternator sense lead moved 1`] = `"56 components, 84 wires, 2 findings, 091dd243b91522e1"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > equipment in a zone that no longer exists 1`] = `"57 components, 84 wires, 2 findings, 4c795a8ca503eb8c"`;
+exports[`more generated designs are unchanged (fingerprint only) > equipment in a zone that no longer exists 1`] = `"57 components, 84 wires, 3 findings, 3ab4be8ae5976d2d"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 12 V lithium 1`] = `"57 components, 86 wires, 1 findings, 696e57e8d80176dc"`;
+exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 12 V lithium 1`] = `"57 components, 86 wires, 2 findings, abae0e1025100b27"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 24 V lithium 1`] = `"62 components, 92 wires, 3 findings, 05ecea447edebc4b"`;
+exports[`more generated designs are unchanged (fingerprint only) > example boat, scenario 24 V lithium 1`] = `"62 components, 92 wires, 4 findings, 32257953f64a3b3a"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > generator only, no shore power 1`] = `"56 components, 84 wires, 1 findings, 79b9c3ba7aa03962"`;
+exports[`more generated designs are unchanged (fingerprint only) > generator only, no shore power 1`] = `"56 components, 84 wires, 2 findings, 3ece4e00754420c2"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > inverter/charger with no shore power or generator, plus a charger and a shore-only load 1`] = `"57 components, 83 wires, 5 findings, 90dea54c419468e5"`;
+exports[`more generated designs are unchanged (fingerprint only) > inverter/charger with no shore power or generator, plus a charger and a shore-only load 1`] = `"57 components, 83 wires, 6 findings, 4b1b721cd34c179d"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > inverter/charger with shore power, a separate charger and a shore-only load 1`] = `"61 components, 93 wires, 1 findings, e61fffc547963a20"`;
+exports[`more generated designs are unchanged (fingerprint only) > inverter/charger with shore power, a separate charger and a shore-only load 1`] = `"61 components, 93 wires, 2 findings, f126b65d0dbcdbe5"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > isolator chosen with only one battery bank 1`] = `"51 components, 76 wires, 3 findings, f57e2004d6cd78c6"`;
+exports[`more generated designs are unchanged (fingerprint only) > isolator chosen with only one battery bank 1`] = `"51 components, 76 wires, 4 findings, c120e348ddf09ae7"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lead-acid with an external regulator 1`] = `"58 components, 86 wires, 1 findings, 583f6e66c20a8a5a"`;
+exports[`more generated designs are unchanged (fingerprint only) > lead-acid with an external regulator 1`] = `"58 components, 86 wires, 2 findings, 59c0517210eecb90"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house and lithium start battery, external regulator 1`] = `"59 components, 89 wires, 2 findings, a73fc49dfa63da19"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house and lithium start battery, external regulator 1`] = `"59 components, 89 wires, 3 findings, bbe0242cc26f066f"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house and lithium start battery, stock regulator (an error the design reports) 1`] = `"59 components, 89 wires, 3 findings, bf5e3d8e289551cc"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house and lithium start battery, stock regulator (an error the design reports) 1`] = `"59 components, 89 wires, 4 findings, a43183b15d557160"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house with a lead-acid windlass bank 1`] = `"65 components, 98 wires, 1 findings, 578af0cea0f38734"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house with a lead-acid windlass bank 1`] = `"65 components, 98 wires, 2 findings, 8a55efa140ece62d"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house with an isolator chosen and an external regulator 1`] = `"59 components, 89 wires, 2 findings, 2e9ad909ea19e414"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house with an isolator chosen and an external regulator 1`] = `"59 components, 89 wires, 3 findings, 3d1843fb244df8ab"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house with the charging relay chosen 1`] = `"57 components, 86 wires, 2 findings, bfda19d77a0fd59c"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house with the charging relay chosen 1`] = `"57 components, 86 wires, 3 findings, bd2355516596c6f6"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house, external regulator, no start battery 1`] = `"53 components, 80 wires, 2 findings, 82ae7de687f1c9d7"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house, external regulator, no start battery 1`] = `"53 components, 80 wires, 3 findings, 73644bdc58fc5748"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium house, no start battery, stock regulator (an error the design reports) 1`] = `"53 components, 80 wires, 3 findings, e660ca02aebf6ee8"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium house, no start battery, stock regulator (an error the design reports) 1`] = `"53 components, 80 wires, 4 findings, 32ce2831fd4b3acb"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery 1`] = `"58 components, 87 wires, 3 findings, e4176d58e2d50e38"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery 1`] = `"58 components, 87 wires, 4 findings, 58d9e590eb27a5bd"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an ACR chosen, 24 V 1`] = `"63 components, 93 wires, 6 findings, 5315e6e5cdad2518"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an ACR chosen, 24 V 1`] = `"63 components, 93 wires, 7 findings, 20a967b26236fa8b"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an isolator chosen 1`] = `"58 components, 87 wires, 4 findings, 09921dd01a527ef0"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with an isolator chosen 1`] = `"58 components, 87 wires, 5 findings, 705197c449bf1524"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with the charging relay chosen and an external regulator 1`] = `"59 components, 89 wires, 4 findings, 1273a1da6750cc4b"`;
+exports[`more generated designs are unchanged (fingerprint only) > lithium start battery with the charging relay chosen and an external regulator 1`] = `"59 components, 89 wires, 5 findings, be071dd9d621703a"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > no AC at all 1`] = `"46 components, 67 wires, 1 findings, c1f47eacb8813b74"`;
+exports[`more generated designs are unchanged (fingerprint only) > no AC at all 1`] = `"46 components, 67 wires, 2 findings, 8b43f77006e3feee"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > no engine 1`] = `"47 components, 70 wires, 1 findings, d3e5e37bfad82096"`;
+exports[`more generated designs are unchanged (fingerprint only) > no engine 1`] = `"47 components, 70 wires, 2 findings, c3408f7641583380"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > no house bank at all 1`] = `"0 components, 0 wires, 1 findings, 9baeaaa8dbd540f6"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > nothing but a house bank 1`] = `"6 components, 5 wires, 0 findings, cf57acfcc5b958ec"`;
+exports[`more generated designs are unchanged (fingerprint only) > nothing but a house bank 1`] = `"6 components, 5 wires, 1 findings, 4b59e05f3cde258e"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > separate inverter with no shore power, and a charger with nothing to feed it 1`] = `"57 components, 83 wires, 5 findings, 35e2f6700a72748c"`;
+exports[`more generated designs are unchanged (fingerprint only) > separate inverter with no shore power, and a charger with nothing to feed it 1`] = `"57 components, 83 wires, 6 findings, c968a0d2f1e9fd79"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > shore power with a charger and no inverter 1`] = `"57 components, 85 wires, 1 findings, 758a17c9326f751f"`;
+exports[`more generated designs are unchanged (fingerprint only) > shore power with a charger and no inverter 1`] = `"57 components, 85 wires, 2 findings, e9df9bc68b95d799"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > template: Coastal cruiser 1`] = `"49 components, 73 wires, 0 findings, d1ead4f6ac65439b"`;
+exports[`more generated designs are unchanged (fingerprint only) > template: Coastal cruiser 1`] = `"49 components, 73 wires, 1 findings, d7874d01bd7e3219"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > template: Day sailer / weekender 1`] = `"23 components, 31 wires, 0 findings, e61dfe00edcb208d"`;
+exports[`more generated designs are unchanged (fingerprint only) > template: Day sailer / weekender 1`] = `"23 components, 31 wires, 1 findings, 491f813fa19c761a"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > template: Large cruiser, 24 V 1`] = `"74 components, 111 wires, 5 findings, 6bd6fa5e82e34b38"`;
+exports[`more generated designs are unchanged (fingerprint only) > template: Large cruiser, 24 V 1`] = `"74 components, 111 wires, 6 findings, 60319a4b6bc51e98"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > template: Offshore cruiser, lithium and solar 1`] = `"60 components, 93 wires, 5 findings, 6d00206133f24e1d"`;
+exports[`more generated designs are unchanged (fingerprint only) > template: Offshore cruiser, lithium and solar 1`] = `"60 components, 93 wires, 6 findings, 91c3607d7048f708"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > three 12 V batteries on a 24 V boat (cannot be arranged) 1`] = `"62 components, 90 wires, 4 findings, 9739b26174bf9089"`;
+exports[`more generated designs are unchanged (fingerprint only) > three 12 V batteries on a 24 V boat (cannot be arranged) 1`] = `"62 components, 90 wires, 5 findings, b129bedbc5c56c43"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > thruster and winch on their own banks 1`] = `"81 components, 118 wires, 1 findings, f92e991f1907ec43"`;
+exports[`more generated designs are unchanged (fingerprint only) > thruster and winch on their own banks 1`] = `"81 components, 118 wires, 2 findings, 10b1c8b3cd0cd719"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > two house banks of different chemistry 1`] = `"59 components, 87 wires, 1 findings, 42891e4662eccf7f"`;
+exports[`more generated designs are unchanged (fingerprint only) > two house banks of different chemistry 1`] = `"59 components, 87 wires, 2 findings, 94742fd685ac6d0b"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"60 components, 88 wires, 4 findings, 56d469b3db40e55a"`;
+exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"60 components, 88 wires, 5 findings, 1c3bacffdf1030f1"`;

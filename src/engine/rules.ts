@@ -82,6 +82,11 @@ function build(units: Units): Record<string, RuleInfo> {
     why: `Wire is sized by whichever is larger: ampacity (it must carry the rating of the fuse protecting it) or voltage drop (${VDROP.critical}% for critical circuits like nav lights, bilge pumps and electronics; ${VDROP.nonCritical}% for others). Length is the full round trip, positive and negative.`,
     ref: REFS.E11,
   },
+  'bundling': {
+    title: 'Wires in a bundle',
+    why: 'Wires packed together in a bundle, loom, sheath or conduit cannot shed heat as well as a wire on its own, so each is rated for less current, and less again in a bigger bundle. Only wires that carry current count: positive and negative, not grounding or signal wires. BoatWire uses the ABYC E-11 figures as published by Blue Sea Systems. The ideal design sizes every cable as if it ran on its own. In Existing boat, set "Bundled with" on a wire to check it as bundled.',
+    ref: REFS.E11,
+  },
   'unsized-wire': {
     title: 'Wire size not recorded',
     why: 'A wire can only be checked once its conductor size is known: whether it can carry the current, whether its fuse is small enough to protect it, and how much voltage it loses over its length. Until then it is drawn dotted and left out of those checks, so a drawing with unsized wires has not been fully checked.',

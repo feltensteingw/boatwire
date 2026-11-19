@@ -52,5 +52,13 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   buildWindHydro(b, plan, core);
   buildAc(b, plan, core, startBus);
 
+  // Every cable above is sized as a single conductor; bundling is checked only on hand-drawn wires.
+  b.find(
+    'info',
+    'bundling',
+    'Cable sizes assume each cable runs on its own, not bundled with other wires that carry current.',
+    'Where cables share a bundle, loom or conduit, draw them in Existing boat and set "Bundled with" on each wire. The check then says which need a larger size.',
+  );
+
   return design;
 }

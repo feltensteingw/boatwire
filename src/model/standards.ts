@@ -10,7 +10,7 @@
 //
 // Corrected from that check: the engine-space factor for DC wire (0.82 →
 // 0.85) and the condition on the 72 in battery-fuse distance. Added: the
-// 40 in battery-fuse distance.
+// 40 in battery-fuse distance and the bundling table.
 //
 // Not checked, because Blue Sea does not publish them in the pages read:
 // AC cable ampacity, the minimum wire sizes, fuse interrupt ratings, the
@@ -60,6 +60,41 @@ export const GAUGES: GaugeSpec[] = [
   { awg: '2/0', cm: 133100, mm2: 67.4, ampacity105: 330 },
   { awg: '3/0', cm: 167800, mm2: 85.0, ampacity105: 385 },
   { awg: '4/0', cm: 211600, mm2: 107.2, ampacity105: 445 },
+];
+
+/**
+ * Ampacity of a 105 °C conductor run with one or two other current-carrying conductors in a
+ * sheath, conduit or bundle (outside engine spaces, 30 °C ambient), by AWG. Source: Blue Sea
+ * Systems 2023 Catalog p.164, "Data based on E-11 Table VI-B (Up to three conductors in a sheath,
+ * conduit or bundle)", https://www.delzer.com/oneasg/bss_cat/164/ (a distributor's copy of the
+ * catalog), read 2026-11-19. Applied to DC conductors only.
+ */
+export const AMPACITY_105_BUNDLED: Record<string, number> = {
+  '18': 14,
+  '16': 18,
+  '14': 25,
+  '12': 32,
+  '10': 42,
+  '8': 56,
+  '6': 84,
+  '4': 112,
+  '2': 147,
+  '1': 172,
+  '1/0': 200,
+  '2/0': 231,
+  '3/0': 270,
+  '4/0': 312,
+};
+
+/**
+ * Multipliers on AMPACITY_105_BUNDLED for larger bundles: from this many current-carrying
+ * conductors in all, smallest first. Source: Blue Sea Systems 2023 Catalog p.164 (as above):
+ * "For bundles of 4 to 6 conductors multiply by 0.857", 7 to 24 by 0.714, 25 or more by 0.571.
+ */
+export const BUNDLE_FACTORS: readonly { from: number; factor: number }[] = [
+  { from: 4, factor: 0.857 },
+  { from: 7, factor: 0.714 },
+  { from: 25, factor: 0.571 },
 ];
 
 /**
