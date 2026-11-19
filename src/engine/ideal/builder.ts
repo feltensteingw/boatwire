@@ -96,9 +96,13 @@ export class Builder {
       w.gauge = o.gauge;
     } else {
       const limit = o.limit ?? VDROP.critical;
+      // The cable must carry both its fuse or breaker and its current. The fuse is normally the
+      // larger, but not when no fuse is big enough for the current (rating() reports that).
+      // A current that is not a number (a blank or zero input upstream) counts only through its fuse.
+      const need = Math.max(o.protect ?? o.amps, Number.isFinite(o.amps) ? o.amps : 0);
       const r = sizeConductor({
         designAmps: o.amps,
-        protectAmps: o.protect ?? o.amps,
+        protectAmps: need,
         oneWayFt: o.vdLen ?? o.len,
         volts,
         vdropLimit: limit,
@@ -110,9 +114,6 @@ export class Builder {
       w.vdropPct = Math.round(r.vdropPct * 100) / 100;
       if (r.overflow) {
         const big = GAUGES[GAUGES.length - 1];
-        // Enough cables for the fuse and for the current. The fuse is normally the larger, but it
-        // is smaller when no fuse is big enough for the current (rating() reports that).
-        const need = Math.max(o.protect ?? o.amps, o.amps);
         const runs = Math.max(2, Math.ceil(need / ampacity(big.awg, o.engine, kind === 'ac')));
         w.cable = `${runs}× ${big.awg}`;
         w.vdropPct = Math.round((r.vdropPct / runs) * 100) / 100;

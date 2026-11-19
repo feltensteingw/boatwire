@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { audit } from '../src/engine/audit';
-import { nextStandard, protectionFor } from '../src/engine/calc';
+import { ampacity, nextStandard, protectionFor } from '../src/engine/calc';
 import { generateIdeal } from '../src/engine/generate';
 import { Builder } from '../src/engine/ideal/builder';
 import { exampleProject, newEquipment } from '../src/model/examples';
@@ -73,6 +73,20 @@ describe('picking a standard size', () => {
     expect(b.wire('pos', [bat, 'pos'], [fuse, 'in'], { amps: 480, protect: 600, len: 0.5 }).cable).toBe('2× 4/0');
     // in the engine space a 4/0 is good for less, as the design check counts it
     expect(b.wire('pos', [bat, 'pos'], [fuse, 'in'], { amps: 700, protect: 800, len: 0.5, engine: true }).cable).toBe('3× 4/0');
+    // a current that is not a number (a solar Vmp of 0 upstream) counts only through its fuse
+    expect(b.wire('pos', [bat, 'pos'], [fuse, 'in'], { amps: Infinity, protect: 63, len: 25.8 }).cable).toBe('2× 4/0');
+  });
+
+  it('a single cable is sized for the current when no breaker is big enough for it', () => {
+    const b = new Builder(12, 120, true);
+    const gen = b.add('generator', 'gen', 'Generator');
+    const brk = b.add('elci', 'brk', 'Generator main breaker');
+    // 100 A through a 50 A breaker: the cable is chosen for the 100 A
+    const w = b.wire('ac', [gen, 'l'], [brk, 'in'], { amps: 100, protect: 50, len: 2 });
+    expect(ampacity(w.gauge!, false, true)).toBeGreaterThanOrEqual(100);
+    expect(ampacity(b.wire('ac', [gen, 'l'], [brk, 'in'], { amps: 49, protect: 50, len: 2 }).gauge!, false, true)).toBeLessThan(100);
+    // the usual case, a breaker above the current, is unchanged: the breaker sets the size
+    expect(b.wire('ac', [gen, 'l'], [brk, 'in'], { amps: 20, protect: 30, len: 2 }).gauge).toBe(b.wire('ac', [gen, 'l'], [brk, 'in'], { amps: 30, protect: 30, len: 2 }).gauge);
   });
 });
 
@@ -87,8 +101,9 @@ describe('every part of the generator reports a current beyond its largest size'
     const mainCable = d.wires.find((w) => w.from.node === 'house0-bat' && w.to.node === 'house0-fuse')!;
     expect(mainCable.amps).toBe(915.4);
     expect(mainCable.cable).toBe('3× 4/0');
-    // the cables the generator draws now carry their current; what is left is the inverter's AC side
-    expect(audit(d).filter((f) => f.severity === 'error' && f.message.includes('2× 4/0'))).toEqual([]);
+    // every cable the generator draws carries its current (the inverter's AC output too), so the
+    // check agrees: the errors are the generator's own
+    expect(audit(d).filter((f) => f.severity === 'error')).toEqual([]);
     // at 24 V the same boat fits the lists
     expect(beyond(generateIdeal(p, V24))).toEqual([]);
   });
@@ -127,6 +142,11 @@ describe('every part of the generator reports a current beyond its largest size'
       }),
     ]);
     expect(rating(d, 'dc-panel')).toBe(150);
+    // its feeder is sized for the 163 A, not the 150 A breaker, so the check finds nothing else
+    const feeder = d.wires.find((w) => w.from.node === 'dc-panel-feed' && w.to.node === 'dc-panel')!;
+    expect(feeder.amps).toBe(162.6);
+    expect(ampacity(feeder.gauge!)).toBeGreaterThanOrEqual(163);
+    expect(audit(d).filter((f) => f.severity === 'error')).toEqual([]);
 
     const q = boat((r) => {
       for (let i = 1; i <= 3; i++) add(r, 'fridge', { watts: 360, v24ok: false }, `12 V fridge ${i}`);
@@ -175,6 +195,11 @@ describe('every part of the generator reports a current beyond its largest size'
 
     const huge = generateIdeal(boat((q) => void (the(q, 'solar').props.watts = 3000)));
     expect(about(huge, 'PV disconnect').map((f) => [f.severity, f.message.split(',')[0]])).toEqual([['error', `PV disconnect for ${solar.name} carries about 92 A`]]);
+
+    // a Vmp of 0 makes the array current infinite; its cables are counted from the breaker, as before
+    const blank = boat((q) => void (the(q, 'solar').props.arrayVmp = 0));
+    const pv = `pv-${the(blank, 'solar').id}`;
+    expect(generateIdeal(blank).wires.filter((w) => w.from.node === pv).map((w) => w.cable)).toEqual(['2× 4/0', '2× 4/0']);
   });
 
   it('AC: the inverter DC fuse, a generator breaker, an appliance breaker and an inverter-only panel main', () => {
@@ -188,10 +213,15 @@ describe('every part of the generator reports a current beyond its largest size'
       add(q, 'generator', { watts: 8000 }, 'Generator');
       add(q, 'air-conditioner', { watts: 7000 }, 'Air conditioner');
     });
-    expect(beyond(generateIdeal(p)).map((f) => [f.severity, f.message.split(',')[0]])).toEqual([
+    const gen = generateIdeal(p);
+    expect(beyond(gen).map((f) => [f.severity, f.message.split(',')[0]])).toEqual([
       ['error', 'Generator main breaker carries about 67 A'],
       ['error', 'Air conditioner breaker carries about 58 A'],
     ]);
+    // the cables are sized for the current, not the 50 A breakers, so the check finds nothing else
+    const genCable = gen.wires.find((w) => w.from.node === 'genset' && w.kind === 'ac')!;
+    expect(ampacity(genCable.gauge!, false, true)).toBeGreaterThanOrEqual(genCable.amps!);
+    expect(audit(gen).filter((f) => f.severity === 'error')).toEqual([]);
     // the same equipment on 230 V draws less than half the current
     p.profile.acStandard = 'eu230';
     expect(beyond(generateIdeal(p))).toEqual([]);
@@ -200,6 +230,10 @@ describe('every part of the generator reports a current beyond its largest size'
       q.equipment = q.equipment.filter((e) => e.kind !== 'shore-power' && e.kind !== 'inverter-charger');
       add(q, 'inverter', { watts: 8000 }, 'Inverter');
     });
-    expect(about(generateIdeal(invOnly, V24), 'AC panel main breaker').map((f) => [f.severity, f.message.split(',')[0], f.nodes])).toEqual([['error', 'AC panel main breaker carries about 67 A', ['ac-panel']]]);
+    const only = generateIdeal(invOnly, V24);
+    expect(about(only, 'AC panel main breaker').map((f) => [f.severity, f.message.split(',')[0], f.nodes])).toEqual([['error', 'AC panel main breaker carries about 67 A', ['ac-panel']]]);
+    const acOut = only.wires.find((w) => w.from.node === 'inv' && w.kind === 'ac')!;
+    expect(acOut.amps).toBe(66.7);
+    expect(ampacity(acOut.gauge!, false, true)).toBeGreaterThanOrEqual(66.7);
   });
 });
