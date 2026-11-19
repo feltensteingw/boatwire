@@ -20,6 +20,8 @@ const sources = (name: string) => directives.get(name) ?? [];
 
 describe('content-security policy in firebase.json', () => {
   it('is sent as an enforcing header, once', () => {
+    // To go back to report-only on purpose, change the expected key here in the same commit:
+    // CI runs these tests before it deploys, so a rename alone never reaches the site.
     expect(cspHeaders.map((h) => h.key)).toEqual(['Content-Security-Policy']);
   });
 

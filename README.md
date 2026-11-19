@@ -60,7 +60,10 @@ failed request (`www.google.com/images/cleardot.gif`). It also still allows `*.f
 an `accounts.google.com` frame, which the app does not use today. `'wasm-unsafe-eval'` lets PDF import decode JPEG 2000 scans (pdf.js
 does that with WebAssembly); running text as code stays blocked. The browser tests serve the same
 policy (`E2E_CSP`), and `tests/securityHeaders.test.ts` checks that `firebase.json` enforces it. A new
-outside host the app needs must be added to the policy, or the browser will refuse it.
+outside host the app needs must be added to the policy, or the browser will refuse it. To switch
+back to report-only quickly, roll back to the previous release in the Firebase console (Hosting,
+Release history). A rename in `firebase.json` also needs the expected key changed in that test, or
+CI refuses to deploy it.
 
 | Task | Command |
 |------|---------|
