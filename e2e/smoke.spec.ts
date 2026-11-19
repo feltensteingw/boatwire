@@ -301,6 +301,30 @@ test('the content-security policy from firebase.json is enforced here, and the a
     document.head.appendChild(s);
   });
   expect(await page.evaluate(() => (window as any).__inlineRan)).toBeUndefined();
+  // and so is running text as code: 'wasm-unsafe-eval' lets WebAssembly compile, nothing more.
+  // (Run from a timer, outside Playwright's own evaluate call, which the policy does not cover.)
+  const evalResult = await page.evaluate(
+    () =>
+      new Promise((done) =>
+        setTimeout(() => {
+          const out: Record<string, string> = {};
+          try {
+            new Function('return 1')();
+            out.code = 'ran';
+          } catch {
+            out.code = 'refused';
+          }
+          try {
+            new WebAssembly.Module(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+            out.wasm = 'compiled';
+          } catch {
+            out.wasm = 'refused';
+          }
+          done(out);
+        }),
+      ),
+  );
+  expect(evalResult).toEqual({ code: 'refused', wasm: 'compiled' });
   await page.evaluate(() => ((window as any).__csp = []));
 
   // the parts of the app most likely to trip a policy: workers, PDF import, picture export
@@ -322,6 +346,33 @@ test('the content-security policy from firebase.json is enforced here, and the a
   // the only console error allowed is the one from the deliberate inline script above
   expect(errors.filter((e) => !e.includes('Executing inline script'))).toEqual([]);
   expect(errors.filter((e) => e.includes('Executing inline script'))).toHaveLength(1);
+});
+
+test('under the content-security policy, a scanned PDF whose picture is JPEG 2000 still imports', async ({ page }) => {
+  // pdf.js decodes JPEG 2000 with WebAssembly inside its worker. A policy without
+  // 'wasm-unsafe-eval' refuses that silently (no page-level report, no error): the picture comes out
+  // plain white. diagram-jpeg2000.pdf is diagram.png, shrunk and stored as JPEG 2000 (/JPXDecode).
+  const errors = await openFresh(page);
+  await page.getByRole('button', { name: 'Existing boat', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Trace over my wiring diagram/ }).click();
+  await (await chooser).setFiles('e2e/fixtures/diagram-jpeg2000.pdf');
+  const img = page.locator('.underlay img');
+  await expect(img).toBeVisible({ timeout: 20_000 });
+  const inked = await img.evaluate(async (el: HTMLImageElement) => {
+    await el.decode();
+    const c = document.createElement('canvas');
+    c.width = el.naturalWidth;
+    c.height = el.naturalHeight;
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(el, 0, 0);
+    const px = ctx.getImageData(0, 0, c.width, c.height).data;
+    let dark = 0;
+    for (let i = 0; i < px.length; i += 4) if (Math.min(px[i], px[i + 1], px[i + 2]) < 200) dark++;
+    return dark / (px.length / 4);
+  });
+  expect(inked).toBeGreaterThan(0.02);
+  expect(errors).toEqual([]);
 });
 
 test('metric units: mm² and metres everywhere, same design underneath', async ({ page }) => {
