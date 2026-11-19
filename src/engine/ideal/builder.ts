@@ -5,7 +5,7 @@ import { growTerminal, makeNode } from '../../model/nodeDefs';
 import { fmtSize, type Units } from '../../model/units';
 import { GAUGES, VDROP } from '../../model/standards';
 import type { Chemistry, DNode, Equipment, Finding, NodeType, Severity, Wire, WireKind } from '../../model/types';
-import { sizeConductor } from '../calc';
+import { ampacity, nextStandard, PROTECTION_SIZES, protectionNeeded, sizeConductor, type ProtectionKind } from '../calc';
 import { num } from '../energy';
 
 /** One end of a wire: a component and the id of one of its terminals. */
@@ -25,6 +25,23 @@ export interface WOpts {
   gauge?: string;
   protectedBy?: string;
   equipmentGround?: boolean;
+}
+
+/** A part sized from a list of standard sizes, and what to say if the list has nothing big enough. */
+export interface SizeOpts {
+  /** The part, as the finding names it, e.g. "Inverter/charger DC fuse". */
+  what: string;
+  /** Current through the part, in amps. Defaults to the size asked for. */
+  carries?: number;
+  /** What to do about it. Defaults to splitting the load (or 24 V on a 12 V boat). */
+  fix?: string;
+  /** Components the finding points at. */
+  nodes?: string[];
+  /**
+   * The part limits its own output (a charge controller, a converter), so too small a one is
+   * never overloaded: it just cannot deliver everything.
+   */
+  limitsItself?: boolean;
 }
 
 const CHEM_LABEL: Record<Chemistry, string> = { flooded: 'Flooded', agm: 'AGM', gel: 'Gel', lifepo4: 'LiFePO4' };
@@ -79,9 +96,13 @@ export class Builder {
       w.gauge = o.gauge;
     } else {
       const limit = o.limit ?? VDROP.critical;
+      // The cable must carry both its fuse or breaker and its current. The fuse is normally the
+      // larger, but not when no fuse is big enough for the current (rating() reports that).
+      // A current that is not a number (a blank or zero input upstream) counts only through its fuse.
+      const need = Math.max(o.protect ?? o.amps, Number.isFinite(o.amps) ? o.amps : 0);
       const r = sizeConductor({
         designAmps: o.amps,
-        protectAmps: o.protect ?? o.amps,
+        protectAmps: need,
         oneWayFt: o.vdLen ?? o.len,
         volts,
         vdropLimit: limit,
@@ -93,7 +114,7 @@ export class Builder {
       w.vdropPct = Math.round(r.vdropPct * 100) / 100;
       if (r.overflow) {
         const big = GAUGES[GAUGES.length - 1];
-        const runs = Math.max(2, Math.ceil((o.protect ?? o.amps) / big.ampacity105));
+        const runs = Math.max(2, Math.ceil(need / ampacity(big.awg, o.engine, kind === 'ac')));
         w.cable = `${runs}× ${big.awg}`;
         w.vdropPct = Math.round((r.vdropPct / runs) * 100) / 100;
         this.find('warning', 'conductor-sizing', `${a[0].label} → ${b[0].label} needs ${runs} parallel ${fmtSize(big.awg, this.units)} cables.`, 'Consider a higher system voltage or moving the equipment closer to the batteries.', [a[0].id, b[0].id]);
@@ -117,6 +138,37 @@ export class Builder {
   find(severity: Severity, rule: string, message: string, fix?: string, nodes?: string[]) {
     if (this.findings.some((f) => f.message === message)) return;
     this.findings.push({ id: `g${this.findings.length + 1}`, rule, severity, message, fix, nodes });
+  }
+
+  /**
+   * The smallest size in `list` of at least `need` amps. When nothing in the list is big enough,
+   * the largest is drawn so the design stays complete, and a finding says so: an error when that
+   * part is smaller than the current through it, a warning when only its margin is short.
+   */
+  rating(need: number, list: readonly number[], o: SizeOpts): number {
+    const size = nextStandard(need, list);
+    if (size !== undefined) return size;
+    const max = list[list.length - 1];
+    const amps = o.carries ?? need;
+    const fix = o.fix ?? (this.V === 12 ? 'Use 24 V, which halves the current, split the load across two circuits, or use a larger dedicated circuit.' : 'Split the load across two circuits, or use a larger dedicated circuit.');
+    // ("for it": each kind of part has its own list, so the largest fuse differs between a branch and the main fuse)
+    const largest = `the largest BoatWire can choose for it is ${max} A`;
+    if (max >= amps) {
+      this.find('warning', 'beyond-sizes', `${o.what} should be at least ${Math.ceil(need)} A for about ${Math.round(amps)} A, but ${largest}. The ${max} A shown leaves too little margin.`, fix, o.nodes);
+    } else if (o.limitsItself) {
+      this.find('warning', 'beyond-sizes', `${o.what} would need to handle about ${Math.round(amps)} A, but ${largest}. The ${max} A shown limits its own output, so it cannot deliver all of it.`, fix, o.nodes);
+    } else {
+      this.find('error', 'beyond-sizes', `${o.what} carries about ${Math.round(amps)} A, but ${largest}. The ${max} A shown is too small for that current.`, fix, o.nodes);
+    }
+    return max;
+  }
+
+  /**
+   * Rating of the fuse or breaker for a continuous load of `loadAmps`. See rating() for a load too
+   * big for any. Use `feeder-fuse` for a fuse on a main feeder or at a battery (a Class T above 300 A).
+   */
+  protection(loadAmps: number, o: Omit<SizeOpts, 'carries' | 'limitsItself'>, kind: ProtectionKind = 'fuse'): number {
+    return this.rating(protectionNeeded(loadAmps), PROTECTION_SIZES[kind], { ...o, carries: loadAmps });
   }
 }
 

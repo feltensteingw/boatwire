@@ -59,6 +59,10 @@ function build(units: Units): Record<string, RuleInfo> {
     why: 'If a lithium BMS opens while the alternator is charging, the voltage spike can destroy the alternator diodes. Either keep the alternator on a lead-acid start battery and charge lithium through a DC-DC charger, or use an external regulator with an alternator protection device (APD).',
     ref: REFS.E13,
   },
+  'alternator-disconnect': {
+    title: 'Keep a battery on the running alternator',
+    why: 'A running alternator must always have a battery to charge. If its last battery is switched off or disconnected while it is charging, its output voltage spikes and can destroy the alternator diodes and the electronics on the same bus. When only one battery switch stands between the alternator and every battery, leave that switch on while the engine runs, and fit an alternator protection device (APD), which absorbs the spike if it happens.',
+  },
   'external-bms': {
     title: 'External BMS',
     why: 'An external BMS monitors cells and controls a contactor plus "allow-to-charge" / "allow-to-discharge" signals to chargers and loads, so it can stop charging gracefully before it has to disconnect the bank.',
@@ -166,6 +170,10 @@ function build(units: Units): Record<string, RuleInfo> {
   'not-drawn': {
     title: 'Equipment left out of the design',
     why: 'The ideal design is built around one propulsion engine, one inverter or inverter/charger, one shore power inlet, one AC generator, one engine start battery and one dedicated battery per job. Anything beyond that is not drawn yet, so it is listed here to make sure it is not missed: its cables, fuses and switches are absent from the diagram, the wire schedule and the bill of materials. Its loads still count in the energy budget.',
+  },
+  'beyond-sizes': {
+    title: 'Bigger than the largest part',
+    why: 'Fuses, breakers, switches, relays and controllers come in standard sizes, up to a largest one. When a circuit needs more, BoatWire still draws the largest so the diagram is complete, and reports it: an error when that part is smaller than the current through it, a warning when only its safety margin is short or when a controller simply cannot deliver everything. Its cables are still sized for the full current. The cure is less current through one part: a higher system voltage (24 V halves the current), the load split across two circuits, banks or controllers, a smaller generator or inverter, or a dedicated circuit with a larger part.',
   },
   'voltage-choice': {
     title: 'System voltage',

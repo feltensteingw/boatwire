@@ -3,7 +3,7 @@
 
 import { FUSE_CLASSES, VDROP } from '../../model/standards';
 import type { DNode } from '../../model/types';
-import { fuseClassFor, nextStandard } from '../calc';
+import { fuseClassFor, nextStandard, PROTECTION_SIZES } from '../calc';
 import { daysText, energyBudget } from '../energy';
 import { bankSummary, fuseLabel, SWITCH_SIZES, type Builder } from './builder';
 import { reportBank, type Plan } from './plan';
@@ -24,15 +24,29 @@ export interface Core {
   bms?: DNode;
 }
 
+/** Main battery fuse sizes, smallest first: the feeder fuses from 100 A, up to the largest Class T. */
+const MAIN_FUSE_SIZES = PROTECTION_SIZES['feeder-fuse'].filter((s) => s >= 100);
+
 export function buildHouseBank(b: Builder, p: Plan): Core {
   const { project, scenario, V, BZ, lfp, extBms, house, mainAmps } = p;
 
-  const mainFuseRating = nextStandard(mainAmps * 1.25, [100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 600, 800]);
+  const mainFuse = nextStandard(mainAmps * 1.25, MAIN_FUSE_SIZES);
+  const mainFuseRating = mainFuse ?? MAIN_FUSE_SIZES[MAIN_FUSE_SIZES.length - 1];
   const mainFuseClass = fuseClassFor(mainFuseRating, { atBattery: true, lithium: lfp });
-  if (mainFuseRating > FUSE_CLASSES['Class T'].max) {
-    b.find('error', 'class-t', `Main DC current (~${Math.round(mainAmps)} A) is beyond practical fuse and switch sizes.`, 'Raise the system voltage or split loads across banks.');
+  // (sized from the main fuse, so the main fuse error below covers it too)
+  const switchRating = b.rating(mainFuseRating, SWITCH_SIZES, { what: 'House battery switch', nodes: ['house-switch'] });
+  if (mainFuse === undefined) {
+    // The largest fuse is drawn so the diagram is complete. The switch, buses and BMS contactor are
+    // rated from it, so the finding points at them too.
+    const shown = mainAmps > mainFuseRating ? `The ${mainFuseRating} A fuse, switch and buses shown are too small for that current.` : `The ${mainFuseRating} A fuse shown leaves too little margin.`;
+    b.find(
+      'error',
+      'beyond-sizes',
+      `Main DC current (~${Math.round(mainAmps)} A) is beyond practical fuse and switch sizes. ${shown}`,
+      'Raise the system voltage or split loads across banks.',
+      [...house.map((_, i) => `house${i}-fuse`), 'house-switch', 'pos-bus', 'neg-bus', ...(extBms ? ['house-contactor'] : [])],
+    );
   }
-  const switchRating = nextStandard(mainFuseRating, SWITCH_SIZES);
   const houseSwitch = b.add('switch', 'house-switch', 'House battery switch', {
     zone: BZ,
     data: { rating: switchRating, part: `Battery switch, ${switchRating} A continuous` },

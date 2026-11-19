@@ -148,11 +148,21 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   boat('lithium start battery', (p) => {
     the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
   }),
+  boat('lithium house with a lead-acid windlass bank', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    p.equipment.push(newEquipment('battery-bank', { name: 'Bow battery', zone: 'bow', props: { role: 'windlass', chemistry: 'agm', unitVolts: 12, unitAh: 100, units: 1 } }));
+  }),
   boat('a dedicated winch bank with no winch aboard', (p) => {
     p.equipment.push(newEquipment('battery-bank', { name: 'Winch battery', zone: 'cockpit', props: { role: 'winch', chemistry: 'lifepo4', unitVolts: 12, unitAh: 100, units: 1 } }));
   }),
   boat('a very large inverter on 12 V (parallel cables, beyond fuse sizes)', (p) => {
     the(p, 'inverter-charger').props.watts = 8000;
+  }),
+  boat('a 5000 W inverter/charger on 12 V (an 800 A Class T inverter fuse)', (p) => {
+    the(p, 'inverter-charger').props.watts = 5000;
+  }),
+  boat('a 12 kW generator on 120 V (beyond the largest AC breaker, cables sized for the current)', (p) => {
+    p.equipment.push(newEquipment('generator', { props: { watts: 12000 } }));
   }),
 
   // --- engine and charging
@@ -172,6 +182,28 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
     the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
     Object.assign(the(p, 'engine').props, { chargeSplit: 'isolator-fet', regulator: 'external' });
   }),
+  boat('lithium start battery with an isolator chosen', (p) => {
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.chargeSplit = 'isolator-fet';
+  }),
+  boat('lithium start battery with the charging relay chosen and an external regulator', (p) => {
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    Object.assign(the(p, 'engine').props, { chargeSplit: 'relay-run', regulator: 'external' });
+  }),
+  boat('lithium house and lithium start battery, stock regulator (an error the design reports)', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+  }),
+  boat('lithium house and lithium start battery, external regulator', (p) => {
+    the(p, 'battery-bank', 'house').props.chemistry = 'lifepo4';
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.regulator = 'external';
+  }),
+  boat('lithium start battery with an ACR chosen, 24 V', (p) => {
+    the(p, 'battery-bank', 'start').props.chemistry = 'lifepo4';
+    the(p, 'engine').props.chargeSplit = 'acr';
+    return { id: 'v24', name: '24 V', systemVoltage: 24 };
+  }),
   boat('charging relay chosen with only one battery bank', (p) => {
     the(p, 'engine').props.chargeSplit = 'relay-run';
     without(p, (e) => e.props.role !== 'start');
@@ -188,6 +220,12 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   }),
   boat('an engine with no alternator', (p) => {
     the(p, 'engine').props.alternatorAmps = 0;
+  }),
+  boat('a 200 A starter (twice that is beyond the largest start fuse)', (p) => {
+    the(p, 'engine').props.starterAmps = 200;
+  }),
+  boat('a 1500 W solar array on 12 V (beyond the largest controller and PV breaker)', (p) => {
+    the(p, 'solar').props.watts = 1500;
   }),
   boat('no engine', (p) => without(p, (e) => e.kind !== 'engine')),
 

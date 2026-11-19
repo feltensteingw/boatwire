@@ -1,6 +1,7 @@
 import {
   AC_CABLE_AMPACITY,
   ENGINE_SPACE_DERATE,
+  FUSE_CLASSES,
   INVERTER_EFFICIENCY,
   LOW_BATTERY_FACTOR,
   MIN_GAUGE_AC,
@@ -97,15 +98,38 @@ export function isUnsized(w: Pick<Wire, 'gauge' | 'kind'>): boolean {
   return !w.gauge && (w.kind === 'pos' || w.kind === 'neg' || w.kind === 'ac');
 }
 
-export function nextStandard(amps: number, list: number[]): number {
-  for (const s of list) if (s >= amps) return s;
-  return list[list.length - 1];
+/**
+ * The smallest size in `list` (smallest first) of at least `amps`, or `undefined` when even the
+ * largest is too small. The generator goes through Builder.rating, which reports that case.
+ */
+export function nextStandard(amps: number, list: readonly number[]): number | undefined {
+  return list.find((s) => s >= amps);
 }
 
-/** Protection rating for a continuous load. */
-export function protectionFor(loadAmps: number, kind: 'fuse' | 'breaker-dc' | 'breaker-ac' = 'fuse'): number {
-  const list = kind === 'fuse' ? STANDARD_FUSES : kind === 'breaker-dc' ? STANDARD_BREAKERS_DC : STANDARD_BREAKERS_AC;
-  return nextStandard(Math.max(1, loadAmps * PROTECTION_FACTOR), list);
+/**
+ * Standard sizes of each kind of protective device. A `feeder-fuse` is on a main feeder or at a
+ * battery, where it is a Class T above 300 A (see fuseClassFor), so its sizes go on up to the
+ * largest Class T, as the main battery fuse does. Other fuses stop at the largest standard size.
+ */
+export const PROTECTION_SIZES = {
+  fuse: STANDARD_FUSES,
+  'feeder-fuse': [...STANDARD_FUSES, FUSE_CLASSES['Class T'].max],
+  'breaker-dc': STANDARD_BREAKERS_DC,
+  'breaker-ac': STANDARD_BREAKERS_AC,
+} as const;
+export type ProtectionKind = keyof typeof PROTECTION_SIZES;
+
+/** Rating a protective device needs for a continuous load, before rounding up to a standard size. */
+export function protectionNeeded(loadAmps: number): number {
+  return Math.max(1, loadAmps * PROTECTION_FACTOR);
+}
+
+/**
+ * Protection rating for a continuous load, or `undefined` when it is above every standard size of
+ * that kind. The generator goes through Builder.protection, which reports that case.
+ */
+export function protectionFor(loadAmps: number, kind: ProtectionKind = 'fuse'): number | undefined {
+  return nextStandard(protectionNeeded(loadAmps), PROTECTION_SIZES[kind]);
 }
 
 /** Pick a fuse family for a given position and rating. */

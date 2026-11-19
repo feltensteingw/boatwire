@@ -126,6 +126,12 @@ export const LOW_BATTERY_FACTOR = 0.875;
 /** Efficiency of a DC-DC converter (24 → 12 V). */
 export const CONVERTER_EFFICIENCY = 0.9;
 
+/** Input current of a DC-DC battery charger as a multiple of its rated output (conversion losses). */
+export const DCDC_INPUT_FACTOR = 1.15;
+
+/** Output ratings (A) of the DC-DC charger that keeps a start battery charged from the house bank, smallest first. */
+export const START_DCDC_SIZES: Record<12 | 24, number[]> = { 12: [10, 18], 24: [12] };
+
 /**
  * Assumptions behind the energy budget. Typical cruising values: the real figures depend on
  * latitude, season and how the boat is used.

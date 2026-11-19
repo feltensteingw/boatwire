@@ -4,7 +4,7 @@
 import { CATALOG_BY_KIND } from '../../model/catalog';
 import { CONVERTER_EFFICIENCY, VDROP } from '../../model/standards';
 import type { DNode } from '../../model/types';
-import { fuseClassFor, nextStandard, protectionFor } from '../calc';
+import { fuseClassFor } from '../calc';
 import { CONVERTER_SIZES, fuseLabel, type Builder, type End } from './builder';
 import type { Core } from './houseBank';
 import type { LoadInfo, Plan } from './plan';
@@ -28,7 +28,7 @@ export function buildAlwaysOn(b: Builder, p: Plan, core: Core) {
 
   if (aoLoads.length && firstMainFuse) {
     const aoAmps = aoLoads.reduce((s, l) => s + l.amps, 0);
-    const aoRating = protectionFor(aoAmps);
+    const aoRating = b.protection(aoAmps, { what: 'Always-on feed fuse', nodes: ['ao-fuse'] });
     const aoFuse = b.add('fuse', 'ao-fuse', 'Always-on feed fuse', {
       zone: BZ,
       sublabel: fuseLabel(aoRating, fuseClassFor(aoRating, {})),
@@ -40,7 +40,7 @@ export function buildAlwaysOn(b: Builder, p: Plan, core: Core) {
     jw.cable = mainCableRuns;
     b.wire('pos', [aoFuse, 'out'], [block, 'in'], { amps: aoAmps, protect: aoRating, len: 1.5, protectedBy: aoFuse.id });
     for (const l of aoLoads) {
-      const rating = protectionFor(l.amps);
+      const rating = b.protection(l.amps, { what: `${l.e.name} fuse`, nodes: ['ao-block'] });
       const t = b.stud(block, { rating, label: `${rating} A · ${l.e.name}` });
       const load = loadNode(b, p, l);
       const total = run(BZ, PZ) + run(PZ, l.e.zone);
@@ -63,7 +63,15 @@ export function buildPanel(b: Builder, p: Plan, id: string, label: string, loads
   const { BZ, PZ, run } = p;
   const sum = loads.reduce((s, l) => s + l.amps, 0);
   const feederAmps = Math.max(10, sum * 0.7);
-  const mainRating = protectionFor(feederAmps, 'breaker-dc');
+  const mainRating = b.protection(
+    feederAmps,
+    {
+      what: `${label} main breaker`,
+      fix: `Split the loads between two panels, each with its own feeder and main breaker${b.V === 12 ? ', or use 24 V, which halves the current' : ''}.`,
+      nodes: [id],
+    },
+    'breaker-dc',
+  );
   const panel = b.add('dc-panel', id, label, {
     zone: PZ,
     sublabel: `Main ${mainRating} A`,
@@ -84,7 +92,7 @@ export function buildPanel(b: Builder, p: Plan, id: string, label: string, loads
   const fw = b.wire('pos', [feedFuse, 'out'], [panel, 'in'], { amps: feederAmps, protect: mainRating, len: feederLen, volts: feed.volts, protectedBy: feedFuse.id, notes: ['conductor-sizing'] });
   b.wire('neg', feed.neg, [pneg, b.stud(pneg)], { amps: feederAmps, len: feederLen, gauge: fw.gauge, volts: feed.volts, notes: ['negative-same-size'] });
   for (const l of loads) {
-    const rating = Math.max(5, protectionFor(l.amps, 'breaker-dc'));
+    const rating = Math.max(5, b.protection(l.amps, { what: `${l.e.name} breaker`, nodes: [id] }, 'breaker-dc'));
     const t = b.stud(panel, { rating, label: `${rating} A · ${l.e.name}` });
     const load = loadNode(b, p, l);
     b.pair(
@@ -109,9 +117,15 @@ export function buildPanels(b: Builder, p: Plan, core: Core) {
 
   if (v12Loads.length) {
     const amps12 = v12Loads.reduce((s, l) => s + l.amps, 0);
-    const convRating = nextStandard(amps12 * 1.25, CONVERTER_SIZES);
+    const convRating = b.rating(amps12 * 1.25, CONVERTER_SIZES, {
+      what: '24→12 V converter',
+      carries: amps12,
+      limitsItself: true,
+      fix: 'Use two converters, each feeding part of the 12 V loads, or choose 24 V versions of some of them.',
+      nodes: ['conv-24-12'],
+    });
     const inAmps = (convRating * 12) / V / CONVERTER_EFFICIENCY;
-    const inFuseRating = protectionFor(inAmps);
+    const inFuseRating = b.protection(inAmps, { what: 'Converter fuse', nodes: ['conv-fuse'] });
     const conv = b.add('converter', 'conv-24-12', '24→12 V converter', {
       zone: PZ,
       col: 6,

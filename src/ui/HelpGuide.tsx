@@ -28,7 +28,7 @@ const SYMBOLS: [NodeType, string, string, Record<string, unknown>?][] = [
   ['mppt', 'Solar MPPT controller', 'Converts panel voltage down to battery voltage.'],
   ['alternator', 'Alternator', 'Engine-driven charging.'],
   ['regulator', 'Regulator / BMS', 'Smart control box: field control, cell monitoring.'],
-  ['apd', 'Alternator protection', 'Absorbs the spike if a lithium BMS disconnects.'],
+  ['apd', 'Alternator protection', 'Absorbs the spike if the alternator loses its battery while charging (a lithium BMS or a battery switch opens).'],
   ['inverter-charger', 'Inverter / charger', 'DC ↔ AC. Makes mains power from batteries and charges them on shore.'],
   ['shore-inlet', 'Shore inlet', 'Where the shore cord plugs in.'],
   ['elci', 'Main breaker + ELCI', 'Trips on leakage that could electrocute swimmers.'],
@@ -168,7 +168,7 @@ const SECTIONS: Section[] = [
   {
     id: 'ideal',
     title: 'The ideal design',
-    keywords: 'generated automatic why wired inspector click component wire ratings part',
+    keywords: 'generated automatic why wired inspector click component wire ratings part largest size too big beyond current',
     body: (
       <>
         <p>
@@ -188,6 +188,9 @@ const SECTIONS: Section[] = [
         </ul>
         <p>
           <b>Click anything</b> on the diagram. The panel on the right shows its rating, the suggested part, its connections and a plain-English <b>Why it's wired this way</b>. Click a wire to see its size, length, current and voltage drop, and how the size was chosen.
+        </p>
+        <p>
+          <b>Too much current for one part.</b> Fuses, breakers, switches and controllers are chosen from standard sizes. If something needs more than the largest, for example an 8000 W inverter on 12 V, the design still shows the largest size so the diagram is complete, and the Design check names that part: an error when it is smaller than the current through it, a warning when only its safety margin is short. Its cables are still sized for the full current. Each finding says what to do, such as moving to 24 V, splitting the load or choosing a smaller generator.
         </p>
         <p className="hint">The ideal design can't be edited directly; change the equipment list instead. To draw your own wiring, use Existing boat.</p>
       </>
@@ -272,7 +275,7 @@ const SECTIONS: Section[] = [
         </p>
         <table className="g-table">
           <tbody>
-            <tr><td><b>Automatic</b> (recommended)</td><td>Picks an ACR for lead-acid and a DC-DC charger for lithium.</td></tr>
+            <tr><td><b>Automatic</b> (recommended)</td><td>Picks an ACR when both batteries are lead-acid, and a DC-DC charger when either is lithium.</td></tr>
             <tr><td><b>ACR / voltage-sensitive relay</b></td><td>Joins the banks whenever either is being charged (by any source), and separates them when voltage falls. Simple and cheap.</td></tr>
             <tr><td><b>Charging relay (engine-run / D+)</b></td><td>Joins the banks only while the engine runs (the alternator's D+ signal). Predictable, but solar or shore charging won't reach the start battery through it.</td></tr>
             <tr><td><b>FET isolator</b></td><td>Electronic one-way valves: one alternator feeds both banks, which are never connected to each other. Almost no voltage loss.</td></tr>
@@ -282,8 +285,9 @@ const SECTIONS: Section[] = [
         <h4>Lithium (LiFePO4)</h4>
         <p>
           Lithium needs its own charge profile and must never be paralleled with lead-acid. If its BMS disconnects while the alternator is charging, the voltage spike can destroy the alternator. So for a lithium house bank, BoatWire either charges the lead-acid start battery
-          from the alternator and feeds the house bank through a <b>DC-DC charger</b>, or, with an <b>external regulator</b>, charges lithium directly with an <b>alternator protection device</b>. Relay and isolator options are ignored for lithium, with a note explaining
-          why.
+          from the alternator and feeds the house bank through a <b>DC-DC charger</b>, or, with an <b>external regulator</b>, charges lithium directly with an <b>alternator protection device</b>. A lithium start battery with a lead-acid house bank works the other
+          way round: the alternator charges the house bank, and a DC-DC charger set to a lithium profile keeps the start battery charged. The house battery switch is then the only thing between the alternator and a battery, so the design adds an alternator
+          protection device: never switch the house bank off with the engine running. If both are lithium, the alternator needs an external regulator. Whenever either battery is lithium, relay and isolator options are ignored, with a note explaining why.
         </p>
       </>
     ),
