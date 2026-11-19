@@ -131,10 +131,10 @@
   --border-2: #c4b693;
   --text: #2e2618;
   --muted: #6b5d44;
-  --faint: #9a8b6c;
+  --faint: #746850;
   --navy: #1d3557;
   --navy-2: #2a4a72;
-  --accent: #2b6f8f;
+  --accent: #2a6c8c;
   --accent-soft: #dcebee;
   --grid: #d9ccab;
   --mini: #c9b98f;
@@ -212,7 +212,7 @@
   --border-2: #3f74a8;
   --text: #eef5ff;
   --muted: #b3cbe6;
-  --faint: #86a6c9;
+  --faint: #99b4d2;
   --navy: #082544;
   --navy-2: #0e3a66;
   --accent: #7fd3ff;
@@ -1232,6 +1232,10 @@ textarea.note-edit:focus {
 :root[data-theme='night'] .pill {
   background: #6a2a1a;
   color: #f0b0a0;
+}
+/* the darker orange of this scheme needs pure black text to stay readable (4.6:1) */
+:root[data-theme='contrast'] .pill {
+  color: #000000;
 }
 
 /* ---------------------------------------------------------------- symbols */

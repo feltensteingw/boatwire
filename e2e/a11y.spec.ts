@@ -50,9 +50,9 @@ test('no serious accessibility problems in any view or dialog', async ({ page })
   expect(found, found.join('\n')).toEqual([]);
 });
 
-// The other colour schemes are not scanned yet: Night vision is dim red on black on purpose, and
-// Chart, Blueprint and High contrast each have a few known low-contrast labels still to fix.
-for (const theme of ['dark']) {
+// Every colour scheme but one gets the same scan. Night watch is left out: it is dim red on black
+// on purpose, to keep the eyes adjusted to the dark, so it cannot meet the contrast rules.
+for (const theme of ['dark', 'chart', 'blueprint', 'contrast']) {
   test(`${theme} theme passes the same check`, async ({ page }) => {
     await openFresh(page);
     await page.locator('.header > .theme-pick').selectOption(theme);
