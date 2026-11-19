@@ -1627,13 +1627,13 @@ start-bat <battery> "Start battery" · [1× 12 V 90 Ah AGM · 1S1P = 12 V 90 Ah]
 start-fuse <fuse> "Start battery fuse" · [300 A MRBF] · @battery · rating=300 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
 start-switch <switch> "Start battery switch" · @battery · rating=300 · notes battery-switch · terms in,out
 start-bus <bus-pos> "Start positive bus" · @battery · terms s1,s2,s3,s4
-alternator <alternator> "Alternator 1" · [90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alternator <alternator> "Alternator 1" · [Starboard engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
 alt-fuse <fuse> "Alternator 1 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 acr <acr> "Automatic charging relay" · [500 A] · @battery · rating=500 · part "ACR / VSR 500 A" · notes acr,twin-engines · terms a,b,neg
 acr-fuse-house <fuse> "ACR fuse (house side)" · [200 A MIDI] · @battery · rating=200 fuseClass=MIDI · notes battery-fuse · terms in,out
 acr-fuse-start <fuse> "ACR fuse (start side)" · [200 A MIDI] · @battery · rating=200 fuseClass=MIDI · notes battery-fuse · terms in,out
 engine-2 <engine> "Port engine" · [Engine 2 · Starter ~150 A] · @engine · eq:engine-2 · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
-alternator-2 <alternator> "Alternator 2" · [150 A] · @engine · amps=150 · part "150 A alternator" · terms b,neg,field
+alternator-2 <alternator> "Alternator 2" · [Port engine · 150 A] · @engine · amps=150 · part "150 A alternator" · terms b,neg,field
 alt-fuse-2 <fuse> "Alternator 2 output fuse" · [200 A MIDI] · @battery · rating=200 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 pv-solar <solar-panel> "Solar arch (2 × 200 W)" · [400 W · Vmp 36 V] · @arch · eq:solar · watts=400 amps=11.11 · terms pos,neg
 pvbrk-solar <breaker> "PV disconnect" · [20 A DC breaker] · @battery · rating=20 · part "PV DC breaker 20 A" · notes mppt · terms in,out
@@ -1747,10 +1747,10 @@ g2 warning conductor-sizing: House main fuse → House battery switch needs 2 pa
 g3 warning conductor-sizing: House bank → House battery monitor needs 2 parallel 4/0 AWG cables. → Consider a higher system voltage or moving the equipment closer to the batteries. [house0-bat,house-shunt]
 g4 warning conductor-sizing: House battery switch → Main positive bus needs 2 parallel 4/0 AWG cables. → Consider a higher system voltage or moving the equipment closer to the batteries. [house-switch,pos-bus]
 g5 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads.
-g6 info twin-engines: Both engines start from Start battery. It and its cables are sized for one starter at a time, so start the engines one after the other. [start-bat]"
+g6 info twin-engines: Both engines start from Start battery. Its fuse and cables are sized for one starter at a time, so start the engines one after the other. [start-bat]"
 `;
 
-exports[`generated designs are unchanged > twin engines sharing one start battery > fingerprint 1`] = `"e895a5d755a31b36"`;
+exports[`generated designs are unchanged > twin engines sharing one start battery > fingerprint 1`] = `"4b2518f71eba8387"`;
 
 exports[`generated designs are unchanged > twin engines with no start battery > design 1`] = `
 "Ideal (ideal), 12 V: 55 components, 82 wires, 2 findings
@@ -1789,11 +1789,11 @@ ld-windlass <load> "Anchor windlass (1000 W)" · [1000 W · 83.3 A] · @bow · e
 helm-windlass <helm-switch> "Anchor windlass (1000 W) control" · @cockpit · notes heavy-load · terms out
 engine <engine> "Starboard engine" · [Engine 1 · Starter ~150 A] · @engine · eq:engine · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
 engine-switch <switch> "Engine 1 start switch" · @battery · rating=300 · notes battery-switch · terms in,out
-alternator <alternator> "Alternator 1" · [90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alternator <alternator> "Alternator 1" · [Starboard engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
 alt-fuse <fuse> "Alternator 1 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 engine-2 <engine> "Port engine" · [Engine 2 · Starter ~150 A] · @engine · eq:engine-2 · amps=150 kind=engine glyph=ENG · notes starter-exempt,common-negative,twin-engines · terms pos,neg,run
 engine-switch-2 <switch> "Engine 2 start switch" · @battery · rating=300 · notes battery-switch · terms in,out
-alternator-2 <alternator> "Alternator 2" · [90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alternator-2 <alternator> "Alternator 2" · [Port engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
 alt-fuse-2 <fuse> "Alternator 2 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 pv-solar <solar-panel> "Solar arch (2 × 200 W)" · [400 W · Vmp 36 V] · @arch · eq:solar · watts=400 amps=11.11 · terms pos,neg
 pvbrk-solar <breaker> "PV disconnect" · [20 A DC breaker] · @battery · rating=20 · part "PV DC breaker 20 A" · notes mppt · terms in,out
@@ -1898,7 +1898,7 @@ g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which sugges
 g2 info house-start-split: No dedicated start battery: both engines start from the house bank. → Add a start battery (role "Engine start") for each engine, or one they share, so a flat house bank can never stop you starting them."
 `;
 
-exports[`generated designs are unchanged > twin engines with no start battery > fingerprint 1`] = `"480b71c22c05cd19"`;
+exports[`generated designs are unchanged > twin engines with no start battery > fingerprint 1`] = `"41b02020491007e1"`;
 
 exports[`generated designs are unchanged > twin engines, a start battery each (emergency parallel switch) > design 1`] = `
 "Ideal (ideal), 12 V: 68 components, 100 wires, 1 findings
@@ -1940,7 +1940,7 @@ start-bat <battery> "Starboard start battery" · [1× 12 V 90 Ah AGM · 1S1P = 1
 start-fuse <fuse> "Start battery 1 fuse" · [300 A MRBF] · @battery · rating=300 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
 start-switch <switch> "Start battery 1 switch" · @battery · rating=300 · notes battery-switch · terms in,out
 start-bus <bus-pos> "Start positive bus 1" · @battery · terms s1,s2,s3,s4
-alternator <alternator> "Alternator 1" · [90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alternator <alternator> "Alternator 1" · [Starboard engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
 alt-fuse <fuse> "Alternator 1 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 acr <acr> "Automatic charging relay 1" · [120 A] · @battery · rating=120 · part "ACR / VSR 120 A" · notes acr · terms a,b,neg
 acr-fuse-house <fuse> "ACR 1 fuse (house side)" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes battery-fuse · terms in,out
@@ -1950,7 +1950,7 @@ start-bat-2 <battery> "Port start battery" · [1× 12 V 90 Ah AGM · 1S1P = 12 V
 start-fuse-2 <fuse> "Start battery 2 fuse" · [300 A MRBF] · @battery · rating=300 fuseClass=MRBF · notes battery-fuse,starter-exempt · terms in,out
 start-switch-2 <switch> "Start battery 2 switch" · @battery · rating=300 · notes battery-switch · terms in,out
 start-bus-2 <bus-pos> "Start positive bus 2" · @battery · terms s1,s2,s3,s4
-alternator-2 <alternator> "Alternator 2" · [90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
+alternator-2 <alternator> "Alternator 2" · [Port engine · 90 A] · @engine · amps=90 · part "90 A alternator" · terms b,neg,field
 alt-fuse-2 <fuse> "Alternator 2 output fuse" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes charging-source-fuse · terms in,out
 acr-2 <acr> "Automatic charging relay 2" · [120 A] · @battery · rating=120 · part "ACR / VSR 120 A" · notes acr · terms a,b,neg
 acr-fuse-house-2 <fuse> "ACR 2 fuse (house side)" · [125 A MIDI] · @battery · rating=125 fuseClass=MIDI · notes battery-fuse · terms in,out
@@ -2076,7 +2076,7 @@ w100 gnd ac-water-heater.g → ac-gnd.s6 · 10 · 8.8 ft · 0 A · equipment gro
 g1 warning bank-sizing: House bank is 400 Ah; daily use is ~183 Ah, which suggests ~740 Ah for two days at safe depth of discharge. → Increase house capacity or reduce loads."
 `;
 
-exports[`generated designs are unchanged > twin engines, a start battery each (emergency parallel switch) > fingerprint 1`] = `"dc70c4f7fb1a32c4"`;
+exports[`generated designs are unchanged > twin engines, a start battery each (emergency parallel switch) > fingerprint 1`] = `"f07b0656d639a3f3"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > FET battery isolator 1`] = `"56 components, 83 wires, 1 findings, 4076b5e4612110d3"`;
 
@@ -2166,14 +2166,14 @@ exports[`more generated designs are unchanged (fingerprint only) > three 12 V ba
 
 exports[`more generated designs are unchanged (fingerprint only) > thruster and winch on their own banks 1`] = `"81 components, 118 wires, 1 findings, f92e991f1907ec43"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, engine-run relay chosen 1`] = `"60 components, 90 wires, 3 findings, d3607bdbef759d0f"`;
+exports[`more generated designs are unchanged (fingerprint only) > twin engines sharing one start battery, engine-run relay chosen 1`] = `"60 components, 90 wires, 3 findings, e0be13237bb096fd"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > twin engines, a start battery each, 24 V what-if 1`] = `"73 components, 106 wires, 4 findings, f7767e76d1108a43"`;
+exports[`more generated designs are unchanged (fingerprint only) > twin engines, a start battery each, 24 V what-if 1`] = `"73 components, 106 wires, 4 findings, 0e7e283149ff71c3"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > twin engines, lithium house, a lead-acid start battery each 1`] = `"68 components, 104 wires, 1 findings, 7031c35c530e5299"`;
+exports[`more generated designs are unchanged (fingerprint only) > twin engines, lithium house, a lead-acid start battery each 1`] = `"68 components, 104 wires, 1 findings, 0dc1468cdf3b9e10"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > twin engines, start batteries of different chemistry 1`] = `"68 components, 101 wires, 4 findings, d1bf7a1c556c667b"`;
+exports[`more generated designs are unchanged (fingerprint only) > twin engines, start batteries of different chemistry 1`] = `"68 components, 101 wires, 4 findings, df5386b90369be44"`;
 
 exports[`more generated designs are unchanged (fingerprint only) > two house banks of different chemistry 1`] = `"59 components, 87 wires, 1 findings, 42891e4662eccf7f"`;
 
-exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"63 components, 94 wires, 4 findings, 28e8334646e298c1"`;
+exports[`more generated designs are unchanged (fingerprint only) > two of everything that is drawn once 1`] = `"63 components, 94 wires, 4 findings, dce7cca1e201a500"`;

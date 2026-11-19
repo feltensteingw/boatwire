@@ -64,8 +64,11 @@ describe('twin engines: ids and roles', () => {
     expect(node(d, 'alternator-2')!.label).toBe('Alternator 2');
     expect(node(d, 'start-fuse-2')!.label).toBe('Start battery 2 fuse');
     expect(node(d, 'engine-2')!.sublabel).toBe('Engine 2 · Starter ~150 A');
+    // alternators are drawn far from their engines, so each names its engine
+    expect(node(d, 'alternator-2')!.sublabel).toBe('Port engine · 90 A');
     const one = generateIdeal(stableIds(exampleProject()));
     expect(node(one, 'alternator')!.label).toBe('Alternator');
+    expect(node(one, 'alternator')!.sublabel).toBe('90 A');
     expect(node(one, 'engine')!.sublabel).toBe('Starter ~150 A');
   });
 
@@ -104,8 +107,10 @@ describe('twin engines: start batteries', () => {
     const d = generateIdeal(twin('each', { portStart: { chemistry: 'lifepo4' } }));
     expect(node(d, 'start-parallel')).toBeUndefined();
     const f = d.findings.find((x) => x.rule === 'twin-engines' && x.message.startsWith('No emergency parallel switch'));
-    expect(f?.message).toBe('No emergency parallel switch: Port start battery is lithium and Starboard start battery lead-acid, and they must never be joined.');
-    expect(f?.fix).toBe('Use one chemistry for both.');
+    expect(f?.message).toBe('No emergency parallel switch: Port start battery is lithium and Starboard start battery lead-acid, and they must never be connected directly, so neither battery can start the other engine if one goes flat.');
+    expect(f?.fix).toBe('Use the same chemistry for both start batteries to get the emergency parallel switch.');
+    // the lithium battery's own warning names it
+    expect(d.findings.filter((x) => x.rule === 'alternator-lfp').map((x) => x.message)).toEqual(['Port start battery is lithium: most designs keep the start battery lead-acid so the alternator always has a battery it cannot be disconnected from.']);
     // the lithium one is charged through its own DC-DC charger; the lead-acid one keeps its relay
     expect(ids(d)).toEqual(expect.arrayContaining(['start-dcdc-2', 'acr']));
     expect(ids(d)).not.toContain('start-dcdc');
@@ -135,7 +140,8 @@ describe('twin engines: start batteries', () => {
     const alone = generateIdeal(stableIds(exampleProject()));
     expect(between(alone, 'start-bat', 'start-fuse')[0].gauge).not.toBe([...gauges][0]);
     expect(ids(d)).not.toContain('start-parallel');
-    expect(d.findings.find((f) => f.rule === 'twin-engines')?.message).toBe('Both engines start from Start battery. It and its cables are sized for one starter at a time, so start the engines one after the other.');
+    // (the battery itself is the one in the equipment list: only its fuse and cables are sized)
+    expect(d.findings.find((f) => f.rule === 'twin-engines')?.message).toBe('Both engines start from Start battery. Its fuse and cables are sized for one starter at a time, so start the engines one after the other.');
   });
 
   it('no start battery: each engine has its own start switch from the house bank, and one note says so', () => {
@@ -235,6 +241,22 @@ describe('twin engines: alternators', () => {
     expect(between(d, 'alt-fuse-2', 'start-bus-2')).toHaveLength(1);
     expect(node(d, 'start-parallel')).toBeDefined();
     expect(errorsOf(d)).toEqual([]);
+  });
+
+  it('numbers two engines of the same name in their findings, so neither is dropped as a repeat', () => {
+    const p = exampleProject();
+    p.equipment = p.equipment.filter((e) => e.kind !== 'engine' && e.props.role !== 'start');
+    p.equipment.push(newEquipment('engine'), newEquipment('engine'));
+    const d = generateIdeal(stableIds(p), p.scenarios.find((s) => s.id === 'lfp12'));
+    expect(d.findings.filter((f) => f.rule === 'alternator-lfp').map((f) => f.message)).toEqual([
+      'Engine 1: Lithium house bank with the alternator wired to it but no start battery and a stock regulator.',
+      'Engine 2: Lithium house bank with the alternator wired to it but no start battery and a stock regulator.',
+    ]);
+    expect(node(d, 'alternator-2')!.sublabel).toBe('Engine 2 · 90 A');
+    // two start batteries of the same name, both lithium: each has its own warning
+    const q = twin('each', { portStart: { chemistry: 'lifepo4' } });
+    for (const e of q.equipment.filter((x) => x.props.role === 'start')) Object.assign(e, { name: 'Start battery', props: { ...e.props, chemistry: 'lifepo4' } });
+    expect(generateIdeal(q).findings.filter((f) => f.rule === 'alternator-lfp').map((f) => f.message.split(':')[0])).toEqual(['Start battery 1 is lithium', 'Start battery 2 is lithium']);
   });
 
   it("names the engine in each engine's findings, so neither is dropped as a repeat", () => {

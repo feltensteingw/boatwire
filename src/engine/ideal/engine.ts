@@ -27,9 +27,17 @@ const profileOf = (chem: string | undefined) => (chem && Object.hasOwn(PROFILE, 
 /** Suffix of the ids of the i-th engine's (or start battery's) parts: none for the first, "-2" for the second. */
 const idSuffix = (i: number) => (i ? `-${i + 1}` : '');
 
+/**
+ * The names findings use for a list of equipment: their own, or "Engine 1", "Engine 2" when two
+ * share one (Builder.find drops a message identical to one already given).
+ */
+const findingNames = (list: Equipment[], fallback: string) => list.map((e, i) => (list.some((x, j) => j !== i && x.name === e.name) ? `${fallback} ${i + 1}` : e.name));
+
 /** A start battery: one engine's own, or one both engines share. */
 interface StartBattery {
   bank: Equipment;
+  /** Its name in findings. */
+  name: string;
   chem: Chemistry;
   /** Id suffix, label number (" 1", " 2") and finding prefix ("Port engine: ") of its parts: set only when each engine has its own. */
   sfx: string;
@@ -51,6 +59,8 @@ interface StartBattery {
 /** One engine, and what was decided about its alternator before anything is drawn. */
 interface Slot {
   engine: Equipment;
+  /** Its name in findings and on its alternator. */
+  name: string;
   /** Id suffix (none, or "-2"), label number (" 1", " 2" on twins) and finding prefix ("Port engine: " on twins). */
   sfx: string;
   tag: string;
@@ -107,12 +117,16 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBuses: DNod
   // two start batteries: one for each engine; one: both engines start from it
   const each = startBanks.length > 1;
 
+  const engineNames = findingNames(engines, 'Engine');
+  const startNames = findingNames(startBanks, 'Start battery');
+
   const starts: StartBattery[] = startBanks.map((bank, i) => ({
     bank,
+    name: startNames[i],
     chem: bankSummary(bank, V).chem,
     sfx: idSuffix(i),
     tag: each ? ` ${i + 1}` : '',
-    who: each ? `${engines[i].name}: ` : '',
+    who: each ? `${engineNames[i]}: ` : '',
     shared: twin && !each,
     starterA: 0,
     crankLen: 0,
@@ -127,9 +141,10 @@ export function buildEngine(b: Builder, p: Plan, core: Core): { startBuses: DNod
     const EZ = engine.zone || BZ;
     return {
       engine,
+      name: engineNames[i],
       sfx: idSuffix(i),
       tag: twin ? ` ${i + 1}` : '',
-      who: twin ? `${engine.name}: ` : '',
+      who: twin ? `${engineNames[i]}: ` : '',
       start,
       starterA: num(engine, 'starterAmps', 150) * scale,
       altA: num(engine, 'alternatorAmps', 0) * scale,
@@ -193,8 +208,8 @@ function buildOneEngine(b: Builder, p: Plan, core: Core, s: Slot) {
 }
 
 /**
- * A start battery with its fuse, switch and bus. One both engines share is sized for the larger
- * starter over the longer cable run, for one start at a time.
+ * A start battery with its fuse, switch and bus. For one both engines share, the fuse and cables
+ * are sized for the larger starter over the longer cable run, for one start at a time.
  */
 function drawStartBattery(b: Builder, p: Plan, st: StartBattery): NonNullable<StartBattery['drawn']> {
   const { V, BZ } = p;
@@ -219,22 +234,30 @@ function drawStartBattery(b: Builder, p: Plan, st: StartBattery): NonNullable<St
   const w1 = b.wire('pos', [sbat, 'pos'], [sfuse, 'in'], so);
   b.wire('pos', [sfuse, 'out'], [ssw, 'in'], { ...so, len: 1, gauge: w1.gauge, protectedBy: sfuse.id });
   b.wire('pos', [ssw, 'out'], [startBus, b.stud(startBus)], { ...so, len: 1.5, gauge: w1.gauge, protectedBy: sfuse.id });
-  if (s.chem === 'lifepo4') b.find('warning', 'alternator-lfp', `${who}Lithium start battery: most designs keep the start battery lead-acid so the alternator always has a battery it cannot be disconnected from.`);
-  if (st.shared) b.find('info', 'twin-engines', `Both engines start from ${bank.name}. It and its cables are sized for one starter at a time, so start the engines one after the other.`, undefined, [sbat.id]);
+  // (with a start battery for each engine, the battery is named)
+  if (s.chem === 'lifepo4') b.find('warning', 'alternator-lfp', `${who ? `${st.name} is lithium` : 'Lithium start battery'}: most designs keep the start battery lead-acid so the alternator always has a battery it cannot be disconnected from.`);
+  // (only the fuse and cables are sized here: the battery is the one in the equipment list)
+  if (st.shared) b.find('info', 'twin-engines', `Both engines start from ${st.name}. Its fuse and cables are sized for one starter at a time, so start the engines one after the other.`, undefined, [sbat.id]);
   st.drawn = { node: sbat, fuse: sfuse, bus: startBus, cable: w1.gauge! };
   return st.drawn;
 }
 
 /**
  * A start battery for each engine: a normally-off switch between them, so either battery can start
- * either engine if one is flat. Never between lithium and lead-acid, which must not be joined.
+ * either engine if one is flat. Never between lithium and lead-acid, which must not be connected directly.
  */
 function parallelSwitch(b: Builder, p: Plan, s1: StartBattery, s2: StartBattery) {
   const { run } = p;
   const [d1, d2] = [s1.drawn!, s2.drawn!];
   if ((s1.chem === 'lifepo4') !== (s2.chem === 'lifepo4')) {
     const [li, lead] = s1.chem === 'lifepo4' ? [s1, s2] : [s2, s1];
-    b.find('info', 'twin-engines', `No emergency parallel switch: ${li.bank.name} is lithium and ${lead.bank.name} lead-acid, and they must never be joined.`, 'Use one chemistry for both.', [d1.node.id, d2.node.id]);
+    b.find(
+      'info',
+      'twin-engines',
+      `No emergency parallel switch: ${li.name} is lithium and ${lead.name} lead-acid, and they must never be connected directly, so neither battery can start the other engine if one goes flat.`,
+      'Use the same chemistry for both start batteries to get the emergency parallel switch.',
+      [d1.node.id, d2.node.id],
+    );
     return;
   }
   const sw = b.add('switch', 'start-parallel', 'Emergency parallel switch', { zone: d1.bus.zone, sublabel: 'Normally off', data: { rating: 300, part: '300 A, emergency parallel (normally off)' }, notes: ['twin-engines'] });
@@ -248,9 +271,10 @@ function parallelSwitch(b: Builder, p: Plan, s1: StartBattery, s2: StartBattery)
 
 function buildAlternator(b: Builder, p: Plan, core: Core, e: EngineInfo) {
   const { BZ, run, lfp } = p;
-  const { engine, sfx, tag, who, startBus, altA, extReg, EZ, split, needsDcdc, toStart, wantsIso, useIso, wantsRunRelay } = e;
+  const { engine, name, sfx, tag, who, startBus, altA, extReg, EZ, split, needsDcdc, toStart, wantsIso, useIso, wantsRunRelay } = e;
 
-  const alt = b.add('alternator', `alternator${sfx}`, `Alternator${tag}`, { zone: EZ, sublabel: `${Math.round(altA)} A${extReg ? ' · ext. reg.' : ''}`, data: { amps: altA, part: `${num(engine, 'alternatorAmps')} A alternator` } });
+  // (on a twin-engine boat the sublabel names the engine: alternators and engines are drawn far apart)
+  const alt = b.add('alternator', `alternator${sfx}`, `Alternator${tag}`, { zone: EZ, sublabel: `${tag ? `${name} · ` : ''}${Math.round(altA)} A${extReg ? ' · ext. reg.' : ''}`, data: { amps: altA, part: `${num(engine, 'alternatorAmps')} A alternator` } });
   const altFuseR = b.protection(altA, { what: `${who}Alternator${tag} output fuse`, fix: ALT_FIX, nodes: [`alt-fuse${sfx}`] }, 'feeder-fuse');
   const altFuseCls = fuseClassFor(altFuseR, { lithium: lfp, mainFeeder: true });
   const altLen = run(EZ, BZ);
@@ -450,7 +474,7 @@ function chargeStartFromHouse(b: Builder, p: Plan, core: Core, a: Alt, startBus:
     const relayA = Math.max(...users.map((u) => u.altA));
     const runRelay = a.wantsRunRelay && !st.shared;
     if (st.shared && users.some((u) => u.wantsRunRelay)) {
-      b.find('info', 'twin-engines', `Both engines share ${st.bank.name}, so one voltage-sensing charging relay is used: it closes when either engine is charging.`, undefined, [`acr${sfx}`]);
+      b.find('info', 'twin-engines', `Both engines share ${st.name}, so one voltage-sensing charging relay is used: it closes when either engine is charging.`, undefined, [`acr${sfx}`]);
     }
     const acrR = relayA > 100 ? b.rating(relayA, [500], { what: `${st.who}${runRelay ? 'Charging relay' : 'Automatic charging relay'}${tag}`, fix: ALT_FIX, nodes: [`acr${sfx}`] }) : 120;
     const acr = runRelay

@@ -291,10 +291,11 @@ const SECTIONS: Section[] = [
         </p>
         <h4>Two engines</h4>
         <p>
-          List both engines and BoatWire draws both, each with its own starter cable and its own alternator. Each alternator gets its own cable, fuse and charging relay or DC-DC charger, set up as above from that engine's own choices; the two are never joined onto one cable.
-          The main house fuse, switch and cables are sized for both alternators charging at once. Start batteries follow the equipment list. With one for each engine, each engine starts from its own, and a normally-off <b>emergency parallel switch</b> between them
-          lets either battery start either engine (left out if one is lithium and the other lead-acid). With one start battery, both engines start from it: it is sized for one starter at a time, so start the engines one after the other, and it gets one
-          voltage-sensing charging relay for both. With none, both start from the house bank. The energy budget counts both alternators, taking both engines to run the hours you set. A third engine is not drawn yet; the design lists it.
+          List both engines and BoatWire draws both, each with its own starter cable and its own alternator. Each alternator gets its own cable and fuse, and where used its own isolator, regulator or DC-DC charger, set up as above from that engine's own choices; the
+          two are never joined onto one cable. The charging relay, or the DC-DC charger from the house bank, belongs to the start battery, so there is one per start battery. The main house fuse, switch and cables are sized for both alternators charging at once.
+          Start batteries follow the equipment list. With one for each engine, each engine starts from its own, and a normally-off <b>emergency parallel switch</b> between them lets either battery start either engine (left out if one is lithium and the other
+          lead-acid). With one start battery, both engines start from it: its fuse and cables are sized for one starter at a time, so start the engines one after the other, and it gets one voltage-sensing charging relay for both. With none, both start from the
+          house bank. The energy budget counts both alternators, taking both engines to run the hours you set. A third engine is not drawn yet; the design lists it.
         </p>
       </>
     ),
