@@ -1,7 +1,9 @@
 import { HelpLink } from './Help';
 import { useMemo } from 'react';
 import { generateIdeal } from '../engine/generate';
+import { designCost } from '../engine/cost';
 import { designMetrics, type Metrics } from '../engine/reports';
+import { fmtMoney } from '../model/prices';
 import { lenUnit, toLen, toWeight, weightUnit } from '../model/units';
 import type { Chemistry, Scenario, SystemVoltage } from '../model/types';
 import { acVoltsOf } from '../state/derived';
@@ -29,7 +31,7 @@ export function Compare() {
     () =>
       project.scenarios.map((s) => {
         const d = generateIdeal(project, s);
-        return { s, d, m: designMetrics(d, acV, units) };
+        return { s, d, m: designMetrics(d, acV, units), cost: designCost(d, project.prices, units) };
       }),
     [project, acV, units],
   );
@@ -45,6 +47,29 @@ export function Compare() {
         {vals.map((v, i) => (
           <td key={i} className={!isNaN(target) && nums[i] === target && metrics.length > 1 ? 'best' : ''}>
             {v}
+          </td>
+        ))}
+      </tr>
+    );
+  };
+  // Estimated cost: the total, then each bill-of-materials category that any scenario spends on.
+  const costCategories = [...new Set(metrics.flatMap((x) => x.cost.byCategory.map((c) => c.category)))];
+  const costRow = (label: string, f: (c: (typeof metrics)[number]['cost']) => number, total = false) => {
+    const vals = metrics.map((x) => f(x.cost));
+    const low = Math.min(...vals);
+    return (
+      <tr key={label} className={total ? 'cost-total' : 'cost-part'}>
+        <th>{label}</th>
+        {vals.map((v, i) => (
+          <td key={i} className={total && metrics.length > 1 && Math.round(v) === Math.round(low) ? 'best' : ''}>
+            {v > 0 ? fmtMoney(v, metrics[i].cost.currency) : '—'}
+            {total && v > low + 0.5 && <span className="more"> (+{fmtMoney(v - low, metrics[i].cost.currency)})</span>}
+            {total && metrics[i].cost.unpriced > 0 && (
+              <span className="more" data-tip="Lines with no price are left out of this total. The bill of materials for this scenario shows which.">
+                {' '}
+                · {metrics[i].cost.unpriced} not priced
+              </span>
+            )}
           </td>
         ))}
       </tr>
@@ -97,6 +122,13 @@ export function Compare() {
             {row('Components', (m) => m.components, 'min')}
             {row('Errors', (m) => m.errors, 'min')}
             {row('Warnings', (m) => m.warnings, 'min')}
+            <tr className="cat">
+              <td colSpan={metrics.length + 1}>
+                Estimated parts cost <span className="hint">(rough figures from the price list; change them under Reports → Bill of materials → Prices…)</span>
+              </td>
+            </tr>
+            {costRow('Total', (c) => c.total, true)}
+            {costCategories.map((cat) => costRow(cat, (c) => c.byCategory.find((x) => x.category === cat)?.cost ?? 0))}
             {differing.length > 0 && (
               <tr className="cat">
                 <td colSpan={metrics.length + 1}>Components that differ</td>

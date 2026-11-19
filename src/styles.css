@@ -1991,6 +1991,119 @@ table.cmp td.best {
   }
 }
 
+/* ---- cost estimate: bill of materials, upgrade plan, Compare, price list ---- */
+.report-buttons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+table.bom tfoot .total td {
+  font-weight: 700;
+  border-top: 2px solid var(--border-2);
+  padding-top: 8px;
+}
+table.bom tr.cat td.r {
+  font-weight: 600;
+}
+.cost-note {
+  margin-top: 10px;
+  max-width: 760px;
+}
+.chg-cost {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+table.cmp tr.cost-total th,
+table.cmp tr.cost-total td {
+  font-weight: 700;
+}
+table.cmp tr.cost-part th {
+  font-weight: 400;
+  padding-left: 22px;
+}
+table.cmp .more {
+  font-weight: 400;
+  color: var(--muted);
+}
+table.cmp tr.cat .hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.modal.prices {
+  width: min(680px, calc(100vw - 32px));
+  max-height: 86vh;
+}
+.modal.prices h3 {
+  margin: 0;
+}
+.modal.prices h4 {
+  margin: 16px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.prices-note {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border-left: 4px solid var(--warn);
+  background: var(--panel-2);
+  border-radius: 4px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.prices-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+.prices-tools label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.prices-tools input[type='text'] {
+  width: 56px;
+}
+.prices-tools .spacer {
+  flex: 1;
+}
+table.prices-table th {
+  text-align: left;
+  font-weight: 400;
+}
+table.prices-table th,
+table.prices-table td {
+  vertical-align: middle;
+}
+table.prices-table td.basis {
+  color: var(--muted);
+  white-space: nowrap;
+  width: 80px;
+}
+table.prices-table td.r {
+  width: 130px;
+}
+table.prices-table td.r input {
+  width: 84px;
+  text-align: right;
+}
+table.prices-table td.was {
+  width: 150px;
+  font-size: 12px;
+}
+table.prices-table tr.own th {
+  font-weight: 700;
+}
+table.prices-table tr.own td.r input {
+  border-color: var(--accent);
+}
+
 /* ---------------------------------------------------------------- cloud */
 .cloud {
   position: relative;

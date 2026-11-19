@@ -303,7 +303,7 @@ const SECTIONS: Section[] = [
             The <b>Scenario</b> menu at the top picks which one the diagram shows.
           </li>
           <li>
-            <b>Compare</b> puts all scenarios side by side: house bank, main fuse and cable, largest cable, estimated copper weight, total cable length, component count, errors and warnings. The best value in each row is highlighted, and components that exist in only some scenarios are listed.
+            <b>Compare</b> puts all scenarios side by side: house bank, main fuse and cable, largest cable, estimated copper weight, total cable length, component count, errors and warnings, and an estimated parts cost with its breakdown. The best value in each row is highlighted, and components that exist in only some scenarios are listed. The costs are rough estimates from a price list you can edit under <b>Reports → Bill of materials → Prices…</b>
           </li>
           <li>
             <b>+ New scenario</b> adds one; edit its settings in the column header. <b>View diagram →</b> opens it.
@@ -360,7 +360,7 @@ const SECTIONS: Section[] = [
   {
     id: 'reports',
     title: 'Reports',
-    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list full report electrician pdf',
+    keywords: 'reports wire schedule bill of materials bom energy budget csv print shopping list full report electrician pdf cost price prices estimate money budget currency',
     body: (
       <>
         <table className="g-table">
@@ -368,12 +368,20 @@ const SECTIONS: Section[] = [
             <tr><td><b>Design check</b></td><td>All findings for the chosen design.</td></tr>
             <tr><td><b>Upgrade plan</b></td><td>Prioritized changes from your existing wiring to the ideal.</td></tr>
             <tr><td><b>Wire schedule</b></td><td>Every conductor: from, to, size, length, current, voltage drop, protection. Hand it to whoever is pulling cable.</td></tr>
-            <tr><td><b>Bill of materials</b></td><td>A shopping list: cable by size and total length, fuses, breakers, bus bars, lugs, and so on.</td></tr>
+            <tr><td><b>Bill of materials</b></td><td>A shopping list: cable by size and total length, fuses, breakers, bus bars, lugs, and so on, with an estimated cost for each line and a total.</td></tr>
             <tr><td><b>Energy budget</b></td><td>Daily consumption per item, and how the house bank and charging compare.</td></tr>
             <tr><td><b>Full report</b></td><td>All of the above plus the wiring diagram, the date, the BoatWire version and the standards notice, in one printable document for your electrician.</td></tr>
           </tbody>
         </table>
         <p>Switch between <b>Ideal</b> and <b>Existing</b> at the top. <b>Download CSV</b> opens in Excel or Google Sheets. <b>Print</b> gives a clean paper copy.</p>
+        <h4>Cost estimates</h4>
+        <ul>
+          <li>The costs are <b>rough estimates of parts only</b>, not quotes. Labour, shipping and tax are not included.</li>
+          <li>They come from a price list of ballpark US-dollar figures that have not been checked against any supplier. Open <b>Bill of materials → Prices…</b> to change any of them to what you actually pay. Your prices are saved with the boat.</li>
+          <li>Batteries are priced by the energy they hold (per kWh, by chemistry), cable by length and size, and equipment such as chargers and inverters by its rating.</li>
+          <li>You can change the currency symbol. The numbers are not converted.</li>
+          <li><b>Compare</b> shows the total for each scenario and where it goes. The <b>Upgrade plan</b> shows the parts cost of each priority group, for the changes whose parts are known.</li>
+        </ul>
       </>
     ),
   },

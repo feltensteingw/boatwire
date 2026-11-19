@@ -46,6 +46,8 @@ export function describeChange(a: Project, b: Project): Change | null {
   }
 
   // Boat settings and zones
+  if (!same(a.prices, b.prices)) return b.prices ? { label: 'Changed a price', mergeKey: 'prices' } : { label: 'Reset the prices to the defaults', destructive: true };
+
   if (!same(a.profile, b.profile)) {
     const za = ids(a.profile.zones);
     const fresh = b.profile.zones.filter((z) => !za.has(z.id));

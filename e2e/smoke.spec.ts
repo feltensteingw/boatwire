@@ -374,3 +374,42 @@ test('metric units: mm² and metres everywhere, same design underneath', async (
   await expect(page.locator('.wlabel')).toHaveText(['35 mm²']);
   expect(errors).toEqual([]);
 });
+
+test('cost estimate: priced bill of materials, editable prices, and a difference between scenarios', async ({ page }) => {
+  const errors = await openFresh(page);
+  await page.getByRole('button', { name: 'Reports', exact: true }).click();
+  await page.locator('.report-tabs button', { hasText: 'Bill of materials' }).click();
+  const total = page.locator('table.bom tfoot .total td').last();
+  await expect(total).toHaveText(/^\$[\d,]+$/);
+  const before = await total.textContent();
+  await expect(page.locator('.cost-note')).toContainText('rough estimates, not quotes');
+
+  // change one price: the total follows, the change is saved with the boat, and it can be undone
+  await page.getByRole('button', { name: 'Prices…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Price list' });
+  await expect(dialog).toContainText('have not been checked');
+  const agm = dialog.getByLabel('AGM, per kWh');
+  await expect(agm).toHaveValue('330');
+  await agm.fill('600');
+  await expect(dialog.locator('tr.own')).toHaveCount(1);
+  await expect.poll(async () => (await storedProject(page)).prices).toEqual({ rates: { 'battery:agm': 600 } });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(total).not.toHaveText(before!);
+  const dearer = await total.textContent();
+
+  // Compare shows a total per scenario, and they differ
+  await page.getByRole('button', { name: 'Compare', exact: true }).click();
+  const totals = page.locator('table.cmp tr.cost-total td');
+  await expect(totals).toHaveCount(3);
+  await expect(totals.first()).toContainText(dearer!);
+  const amounts = (await totals.allTextContents()).map((t) => t.match(/^\$[\d,]+/)![0]);
+  expect(new Set(amounts).size).toBe(3);
+  await expect(page.locator('table.cmp tr.cost-total td.best')).toHaveCount(1);
+
+  // putting the price back removes the saved change
+  await undo(page);
+  await expect.poll(async () => (await storedProject(page)).prices).toBeUndefined();
+  await expect(page.locator('.toast-msg')).toContainText('Undid: Changed a price');
+  expect(errors).toEqual([]);
+});

@@ -5,7 +5,7 @@ import { NODE_DEFS } from '../model/nodeDefs';
 import { FUSE_CLASSES, GAUGES } from '../model/standards';
 import type { Design, DNode, Finding, Wire } from '../model/types';
 import { audit, estimateCurrents } from './audit';
-import { gaugeIndex, gaugeSpec } from './calc';
+import { fuseClassFor, gaugeIndex, gaugeSpec } from './calc';
 import { ruleInfo } from './rules';
 import { cableLabel, cableText, fmtLen, fmtSize, lenUnit, M_PER_FT, toLen, type Units } from '../model/units';
 
@@ -94,15 +94,24 @@ export interface BomRow {
   spec: string;
   qty: number;
   unit: string;
+  /** Which entry of the price list (model/prices.ts) prices this line, if any does. */
+  priceKey?: string;
+  /** How many of that entry's units the line amounts to: feet of cable, kWh of battery, amps, watts, or a count. */
+  priceQty?: number;
 }
 
 export function billOfMaterials(design: Design, units: Units = 'imperial'): BomRow[] {
   const rows = new Map<string, BomRow>();
-  const add = (category: string, item: string, spec: string, qty: number, unit = 'ea') => {
+  /** `price` = the price-list entry for this line and how many of its units one of these is (1 for a part sold each). */
+  const add = (category: string, item: string, spec: string, qty: number, unit = 'ea', price?: [key: string, perItem: number]) => {
     const k = `${category}|${item}|${spec}|${unit}`;
+    const priceQty = price && Number.isFinite(price[1]) && price[1] > 0 ? price[1] * (unit === 'ea' ? qty : 1) : undefined;
     const r = rows.get(k);
-    if (r) r.qty += qty;
-    else rows.set(k, { category, item, spec, qty, unit });
+    if (r) {
+      r.qty += qty;
+      if (r.priceQty !== undefined && priceQty !== undefined) r.priceQty += priceQty;
+      else r.priceQty = undefined;
+    } else rows.set(k, { category, item, spec, qty, unit, priceKey: price?.[0], priceQty });
   };
   for (const n of design.nodes) {
     if (n.type === 'load' || n.type === 'ac-load' || n.type === 'engine' || n.type === 'note') continue;
@@ -122,13 +131,13 @@ export function billOfMaterials(design: Design, units: Units = 'imperial'): BomR
           : n.domain === 'ac'
             ? 'AC equipment'
             : 'Charging & control';
-    add(cat, def.label, spec, 1);
+    add(cat, def.label, spec, 1, 'ea', nodePrice(n, design.systemVoltage));
     // panel breakers
     if (n.type === 'dc-panel' || n.type === 'ac-panel' || n.type === 'fuse-block') {
       for (const t of n.terminals) {
         if (!t.rating) continue;
         const what = n.type === 'fuse-block' ? 'ATC/ATO blade fuse' : n.type === 'ac-panel' ? 'AC breaker (double-pole)' : 'DC panel breaker';
-        add('Protection', what, `${t.rating} A`, 1);
+        add('Protection', what, `${t.rating} A`, 1, 'ea', [n.type === 'fuse-block' ? 'part:blade-fuse' : n.type === 'ac-panel' ? 'part:ac-breaker' : 'part:dc-breaker', 1]);
       }
     }
   }
@@ -141,13 +150,56 @@ export function billOfMaterials(design: Design, units: Units = 'imperial'): BomR
     const single = { gauge: w.gauge, kind: w.kind };
     const len = w.lengthFt * 1.1 * runs;
     const label = w.kind === 'ac' ? `Marine AC cable ${cableLabel(single, units)}` : `Marine tinned wire ${fmtSize(w.gauge, units)}`;
-    add('Cable', label, w.kind === 'ac' ? 'Type 3 boat cable' : wireColor(w, hasAc), len, lenUnit(units));
-    if (gaugeIndex(w.gauge) >= gaugeIndex('8') && w.kind !== 'ac') add('Terminals', 'Tinned lug', fmtSize(w.gauge, units), 2 * runs);
-    else if (w.kind !== 'ac') add('Terminals', 'Heat-shrink ring terminal', fmtSize(w.gauge, units), 2);
+    add('Cable', label, w.kind === 'ac' ? 'Type 3 boat cable' : wireColor(w, hasAc), len, lenUnit(units), [`${w.kind === 'ac' ? 'accable' : 'cable'}:${w.gauge}`, 1]);
+    if (gaugeIndex(w.gauge) >= gaugeIndex('8') && w.kind !== 'ac') add('Terminals', 'Tinned lug', fmtSize(w.gauge, units), 2 * runs, 'ea', ['part:lug', 1]);
+    else if (w.kind !== 'ac') add('Terminals', 'Heat-shrink ring terminal', fmtSize(w.gauge, units), 2, 'ea', ['part:ring-terminal', 1]);
   }
-  // Cable was summed in feet; round each total up to whole feet or metres to buy.
-  for (const r of rows.values()) if (r.category === 'Cable') r.qty = Math.ceil(units === 'metric' ? r.qty * M_PER_FT : r.qty);
+  // Cable was summed in feet; round each total up to whole feet or metres to buy. It is priced per foot.
+  for (const r of rows.values()) {
+    if (r.category !== 'Cable') continue;
+    r.qty = Math.ceil(units === 'metric' ? r.qty * M_PER_FT : r.qty);
+    if (r.priceKey) r.priceQty = units === 'metric' ? r.qty / M_PER_FT : r.qty;
+  }
   return [...rows.values()].sort((a, b) => a.category.localeCompare(b.category) || a.item.localeCompare(b.item));
+}
+
+/**
+ * The price-list entry for a component, and how many of that entry's units the component is:
+ * 1 for a part sold each, kWh for a battery, amps or watts for equipment priced by its rating.
+ */
+function nodePrice(n: DNode, systemVolts: number): [string, number] | undefined {
+  const d = n.data;
+  const numOf = (v: unknown) => (typeof v === 'number' && v > 0 ? v : NaN);
+  switch (n.type) {
+    case 'battery':
+      return [`battery:${String(d.chemistry ?? 'agm')}`, (numOf(d.ah) * (numOf(d.volts) || systemVolts)) / 1000];
+    case 'fuse':
+      // a hand-drawn fuse with no type recorded is priced as the usual type for its rating
+      return [`fuse:${String(d.fuseClass ?? fuseClassFor(Number(d.rating ?? 0), {}))}`, 1];
+    case 'bus-pos':
+    case 'bus-neg':
+    case 'ac-ground-bus':
+      return ['part:busbar', 1];
+    case 'dcdc':
+    case 'converter':
+    case 'mppt':
+      return [`rate:${n.type}`, numOf(d.rating)];
+    case 'charger':
+    case 'alternator':
+      return [`rate:${n.type}`, numOf(d.amps)];
+    case 'inverter':
+    case 'inverter-charger':
+    case 'generator':
+      return [`rate:${n.type}`, numOf(d.watts)];
+    case 'solar-panel':
+      return ['rate:solar', numOf(d.watts)];
+    case 'wind-gen':
+      return ['rate:wind', numOf(d.watts)];
+    case 'hydro-gen':
+      return ['rate:hydro', numOf(d.watts)];
+    default:
+      return [`part:${n.type}`, 1];
+  }
 }
 
 // ------------------------------------------------------------ scenario metrics
@@ -208,6 +260,8 @@ export interface Change {
   title: string;
   detail?: string;
   rule?: string;
+  /** Parts the change needs, where they are known: price-list entry and how many of its units. Used for the cost estimate. */
+  parts?: [key: string, qty: number][];
 }
 
 const INFRA: DNode['type'][] = [
@@ -256,6 +310,7 @@ export function changeList(existing: Design, ideal: Design, acVolts: number, uni
       title: `Add ${missing.length} × ${NODE_DEFS[type as DNode['type']].label}`,
       detail: missing.map((n) => `${n.label}${n.sublabel ? ` (${n.sublabel})` : ''}`).join('; '),
       rule: missing[0].notes?.[0],
+      parts: missing.map((n) => nodePrice(n, ideal.systemVoltage)).filter((x): x is [string, number] => !!x),
     });
   }
   for (const [type, nodes] of ce) {
@@ -285,7 +340,7 @@ export function changeList(existing: Design, ideal: Design, acVolts: number, uni
     if (!ew.gauge) {
       changes.push({ priority: 'improvement', title: `${iNode.label}: record the wire size`, detail: `Ideal: ${fmtSize(iw.gauge, units)}.` });
     } else if (gaugeIndex(ew.gauge) < gaugeIndex(iw.gauge)) {
-      changes.push({ priority: 'recommended', title: `${iNode.label}: upsize wire ${fmtSize(ew.gauge, units)} → ${fmtSize(iw.gauge, units)}`, detail: `At ~${Math.round(ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0)} A over ${fmtLen(iw.lengthFt, units)}.`, rule: 'conductor-sizing' });
+      changes.push({ priority: 'recommended', title: `${iNode.label}: upsize wire ${fmtSize(ew.gauge, units)} → ${fmtSize(iw.gauge, units)}`, detail: `At ~${Math.round(ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0)} A over ${fmtLen(iw.lengthFt, units)}.`, rule: 'conductor-sizing' , parts: [[`${iw.kind === 'ac' ? 'accable' : 'cable'}:${iw.gauge}`, iw.lengthFt * (iw.kind === 'ac' ? 1 : 2)]] });
     }
   }
   const order = { safety: 0, recommended: 1, improvement: 2 };

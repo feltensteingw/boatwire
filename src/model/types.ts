@@ -5,6 +5,8 @@
 // "existing" wiring design. The rules engine turns (profile + equipment +
 // scenario) into an ideal Design; the audit engine checks any Design.
 
+import type { PriceOverrides } from './prices';
+
 export type SystemVoltage = 12 | 24;
 export type Chemistry = 'flooded' | 'agm' | 'gel' | 'lifepo4';
 export type AcStandard = 'us120' | 'eu230';
@@ -299,4 +301,6 @@ export interface Project {
   scenarios: Scenario[];
   activeScenario: string;
   existing?: Design;
+  /** Prices the owner has changed from the defaults (model/prices.ts), for the cost estimate. */
+  prices?: PriceOverrides;
 }

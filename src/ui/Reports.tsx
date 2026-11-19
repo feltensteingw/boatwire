@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { energyBudget } from '../engine/energy';
+import { planCosts, priceBom } from '../engine/cost';
 import { billOfMaterials, changeList, findingCounts, wireSchedule } from '../engine/reports';
 import { ruleInfo, STANDARDS_NOTICE } from '../engine/rules';
 import { activeScenario } from '../engine/scenario';
@@ -9,6 +10,8 @@ import { useStore, type ReportTab } from '../state/store';
 import { Diagram } from './Diagram';
 import { downloadText, toCsv } from './download';
 import { FindingsList } from './Findings';
+import { currencyOf, fmtMoney } from '../model/prices';
+import { PriceList } from './PriceList';
 
 const TABS: { id: ReportTab; label: string; tip: string }[] = [
   { id: 'findings', label: 'Design check', tip: 'Every error, warning and note for the chosen design, with suggested fixes.' },
@@ -140,21 +143,40 @@ function WireTable() {
 function Bom() {
   const design = useReportDesign();
   const units = useStore((s) => s.project.profile.units);
-  const rows = useMemo(() => billOfMaterials(design, units), [design, units]);
-  const csv = () => downloadText('bill-of-materials.csv', toCsv([['Category', 'Item', 'Specification', 'Qty', 'Unit'], ...rows.map((r) => [r.category, r.item, r.spec, r.qty, r.unit])]));
+  const prices = useStore((s) => s.project.prices);
+  const [pricing, setPricing] = useState(false);
+  const cost = useMemo(() => priceBom(billOfMaterials(design, units), prices), [design, units, prices]);
+  const { rows, currency } = cost;
+  const money = (n: number | undefined) => (n === undefined ? '—' : fmtMoney(n, currency));
+  const csv = () =>
+    downloadText(
+      'bill-of-materials.csv',
+      toCsv([
+        ['Category', 'Item', 'Specification', 'Qty', 'Unit', `Unit price (${currency}, estimate)`, `Cost (${currency}, estimate)`],
+        ...rows.map((r) => [r.category, r.item, r.spec, r.qty, r.unit, r.unitPrice === undefined ? '' : Math.round(r.unitPrice * 100) / 100, r.cost === undefined ? '' : Math.round(r.cost * 100) / 100]),
+        ['', 'Total (estimate, parts only)', cost.unpriced ? `${cost.unpriced} line${cost.unpriced === 1 ? '' : 's'} not priced` : '', '', '', '', Math.round(cost.total * 100) / 100],
+      ]),
+    );
   let lastCat = '';
   return (
     <div>
       <div className="report-actions">
         <span className="hint">Cable quantities include 10% for routing and waste. Parts are specifications, not brand recommendations.</span>
-        <button onClick={csv}>Download CSV</button>
+        <span className="report-buttons">
+          <button onClick={() => setPricing(true)} data-tip="See and change the prices the cost estimate uses.">
+            Prices…
+          </button>
+          <button onClick={csv}>Download CSV</button>
+        </span>
       </div>
-      <table className="grid">
+      <table className="grid bom">
         <thead>
           <tr>
             <th>Item</th>
             <th>Specification</th>
             <th className="r">Qty</th>
+            <th className="r">Unit price</th>
+            <th className="r">Cost</th>
           </tr>
         </thead>
         <tbody>
@@ -164,7 +186,8 @@ function Bom() {
             return [
               head && (
                 <tr key={`h${i}`} className="cat">
-                  <td colSpan={3}>{r.category}</td>
+                  <td colSpan={4}>{r.category}</td>
+                  <td className="r">{money(cost.byCategory.find((c) => c.category === r.category)?.cost)}</td>
                 </tr>
               ),
               <tr key={i}>
@@ -173,11 +196,24 @@ function Bom() {
                 <td className="r">
                   {r.qty} {r.unit === 'ea' ? '' : r.unit}
                 </td>
+                <td className="r">{money(r.unitPrice)}</td>
+                <td className="r">{money(r.cost)}</td>
               </tr>,
             ];
           })}
         </tbody>
+        <tfoot>
+          <tr className="total">
+            <td colSpan={4}>Estimated parts cost</td>
+            <td className="r">{money(cost.total)}</td>
+          </tr>
+        </tfoot>
       </table>
+      <p className="hint cost-note">
+        <b>The costs are rough estimates, not quotes.</b> They cover parts only (no labour, shipping or tax) and come from a price list of ballpark figures that you can correct under <b>Prices…</b>
+        {cost.unpriced > 0 && ` ${cost.unpriced} line${cost.unpriced === 1 ? ' has' : 's have'} no price and ${cost.unpriced === 1 ? 'is' : 'are'} left out of the total.`}
+      </p>
+      {pricing && <PriceList onClose={() => setPricing(false)} />}
     </div>
   );
 }
@@ -255,6 +291,7 @@ function Changes() {
   const ideal = useIdeal();
   const existing = useExisting();
   const changes = useMemo(() => (existing ? changeList(existing, ideal, acVoltsOf(project), project.profile.units) : []), [existing, ideal, project]);
+  const costs = useMemo(() => planCosts(changes, project.prices), [changes, project.prices]);
   if (!existing)
     return (
       <div className="empty">
@@ -280,6 +317,12 @@ function Changes() {
           <section key={g.id} className={`chg-${g.id}`}>
             <h3>
               {g.title} <span className="count">{items.length}</span>
+              {costs[g.id].priced > 0 && (
+                <span className="chg-cost" data-tip="A rough estimate of the parts for these changes, from the price list (Bill of materials → Prices…). Labour is not included.">
+                  about {fmtMoney(costs[g.id].cost, currencyOf(project.prices))} in parts
+                  {costs[g.id].unpriced > 0 && ` for ${costs[g.id].priced} of the ${items.length}; the rest ${costs[g.id].unpriced === 1 ? 'is' : 'are'} rewiring or cannot be estimated`}
+                </span>
+              )}
             </h3>
             <ol>
               {items.map((c, i) => (

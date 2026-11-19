@@ -5,6 +5,7 @@
 // repaired and reported as notes; something that is not a project at all throws ProjectError
 // with a message a boat owner can act on.
 
+import { DEFAULT_CURRENCY, priceDef, type PriceOverrides } from './prices';
 import { CATALOG_BY_KIND } from './catalog';
 import { blankProject, uid } from './examples';
 import { makeNode, NODE_DEFS } from './nodeDefs';
@@ -138,7 +139,22 @@ export function parseProject(raw: unknown, opts: ParseOptions = {}): Parsed {
     if (existing) project.existing = existing;
     else notes.push('The existing-boat drawing was damaged and has been left out.');
   }
+  const prices = parsePrices(data.prices);
+  if (prices) project.prices = prices;
   return { project, notes };
+}
+
+/** The owner's own prices: only known price-list entries with a sensible number are kept. */
+function parsePrices(raw: unknown): PriceOverrides | undefined {
+  if (!isObj(raw)) return undefined;
+  const out: PriceOverrides = {};
+  if (typeof raw.currency === 'string' && raw.currency.trim() && raw.currency.trim() !== DEFAULT_CURRENCY) out.currency = raw.currency.trim().slice(0, 4);
+  if (isObj(raw.rates)) {
+    const rates: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw.rates)) if (priceDef(k) && typeof v === 'number' && Number.isFinite(v) && v >= 0) rates[k] = v;
+    if (Object.keys(rates).length) out.rates = rates;
+  }
+  return out.currency || out.rates ? out : undefined;
 }
 
 function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[], opts: ParseOptions): Design | undefined {

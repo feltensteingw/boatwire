@@ -6,6 +6,7 @@ import { joinTerminals } from '../engine/connect';
 import { growTerminal, terminal } from '../model/nodeDefs';
 import type { Design, DNode, Equipment, EquipmentKind, LayerSettings, Project, Scenario, Wire, WireEnd } from '../model/types';
 import { draftRunLength } from '../engine/existing';
+import { DEFAULT_CURRENCY, priceDef, type PriceOverrides } from '../model/prices';
 import type { ThemeId } from '../ui/themes';
 import { parseProject } from '../model/validate';
 import { removeZone } from '../model/zones';
@@ -61,6 +62,10 @@ interface State {
   loadExample(): void;
 
   updateProfile(fn: (p: Project['profile']) => void): void;
+  /** Set the owner's price for a price-list entry; undefined goes back to the default. */
+  setPrice(key: string, value: number | undefined): void;
+  setCurrency(symbol: string): void;
+  resetPrices(): void;
   /** Remove a zone, first moving whatever is located in it to `moveTo`. */
   removeZone(id: string, moveTo?: string): void;
   addEquipment(kind: EquipmentKind): string;
@@ -88,6 +93,14 @@ interface State {
 }
 
 const VIEW_IDS: View[] = ['ideal', 'existing', 'compare', 'reports'];
+
+/** Drop the parts of the owner's price list that say nothing, so an untouched list is simply absent. */
+function tidyPrices(p: PriceOverrides): PriceOverrides | undefined {
+  const out: PriceOverrides = {};
+  if (p.currency && p.currency !== DEFAULT_CURRENCY) out.currency = p.currency;
+  if (p.rates && Object.keys(p.rates).length) out.rates = p.rates;
+  return out.currency || out.rates ? out : undefined;
+}
 
 /**
  * Browser storage that survives its own contents. If what is stored is not even valid JSON, it is
@@ -162,6 +175,28 @@ export const useStore = create<State>()(
       loadExample: () => set({ project: exampleProject(), cloudId: undefined, cloudBase: undefined, selection: null, view: 'ideal' }),
 
       updateProfile: (fn) => set({ project: mutate(get().project, (p) => fn(p.profile)) }),
+      setPrice: (key, value) =>
+        set({
+          project: mutate(get().project, (p) => {
+            const rates = { ...(p.prices?.rates ?? {}) };
+            // a price equal to the default is not a change worth keeping
+            if (value === undefined || !Number.isFinite(value) || value < 0 || value === priceDef(key)?.usd) delete rates[key];
+            else rates[key] = value;
+            p.prices = tidyPrices({ ...p.prices, rates });
+          }),
+        }),
+      setCurrency: (symbol) =>
+        set({
+          project: mutate(get().project, (p) => {
+            p.prices = tidyPrices({ ...p.prices, currency: symbol.trim().slice(0, 4) });
+          }),
+        }),
+      resetPrices: () =>
+        set({
+          project: mutate(get().project, (p) => {
+            delete p.prices;
+          }),
+        }),
       removeZone: (id, moveTo) => set({ project: mutate(get().project, (p) => removeZone(p, id, moveTo)) }),
       addEquipment: (kind) => {
         const e = newEquipment(kind);
