@@ -11,13 +11,7 @@ import { acVoltsOf, FINGERPRINT_BOATS, SAMPLE_BOATS } from './sampleBoats';
  * the BoatWire board in Asana. The test below pins what the check reports today, so fixing one
  * fails the test until its entry is removed from this list.
  */
-const KNOWN_GAPS: Record<string, { rules: string[]; task: string }> = {
-  // About 915 A is drawn through an 800 A fuse and two 4/0 cables, with no finding from the generator.
-  'a very large inverter on 12 V (parallel cables, beyond fuse sizes)': {
-    rules: ['conductor-sizing'],
-    task: 'Currents beyond the largest fuse or switch are silently capped',
-  },
-};
+const KNOWN_GAPS: Record<string, { rules: string[]; task: string }> = {};
 
 describe('every generated design passes the design check', () => {
   const boats = [...SAMPLE_BOATS, ...FINGERPRINT_BOATS];
@@ -47,5 +41,10 @@ describe('every generated design passes the design check', () => {
 
   it('the list of known gaps names boats that exist', () => {
     expect(Object.keys(KNOWN_GAPS).filter((name) => !boats.some((b) => b.name === name))).toEqual([]);
+  });
+
+  it('no known gap belongs to a boat whose problem the generator now reports itself', () => {
+    const reportsItself = (b: (typeof boats)[number]) => generateIdeal(b.project, b.scenario).findings.some((f) => f.severity === 'error');
+    expect(boats.filter((b) => KNOWN_GAPS[b.name] && reportsItself(b)).map((b) => b.name)).toEqual([]);
   });
 });

@@ -158,6 +158,12 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   boat('a very large inverter on 12 V (parallel cables, beyond fuse sizes)', (p) => {
     the(p, 'inverter-charger').props.watts = 8000;
   }),
+  boat('a 5000 W inverter/charger on 12 V (an 800 A Class T inverter fuse)', (p) => {
+    the(p, 'inverter-charger').props.watts = 5000;
+  }),
+  boat('a 12 kW generator on 120 V (beyond the largest AC breaker, cables sized for the current)', (p) => {
+    p.equipment.push(newEquipment('generator', { props: { watts: 12000 } }));
+  }),
 
   // --- engine and charging
   boat('lithium house, external regulator, no start battery', (p) => {
@@ -214,6 +220,12 @@ export const FINGERPRINT_BOATS: SampleBoat[] = [
   }),
   boat('an engine with no alternator', (p) => {
     the(p, 'engine').props.alternatorAmps = 0;
+  }),
+  boat('a 200 A starter (twice that is beyond the largest start fuse)', (p) => {
+    the(p, 'engine').props.starterAmps = 200;
+  }),
+  boat('a 1500 W solar array on 12 V (beyond the largest controller and PV breaker)', (p) => {
+    the(p, 'solar').props.watts = 1500;
   }),
   boat('no engine', (p) => without(p, (e) => e.kind !== 'engine')),
 
