@@ -1,5 +1,8 @@
 import {
   AC_CABLE_AMPACITY,
+  AC_ENGINE_SPACE_DERATE,
+  AMPACITY_105_BUNDLED,
+  BUNDLE_FACTORS,
   ENGINE_SPACE_DERATE,
   FUSE_CLASSES,
   INVERTER_EFFICIENCY,
@@ -25,11 +28,25 @@ export function gaugeIndex(awg: string): number {
   return GAUGES.findIndex((g) => g.awg === awg);
 }
 
-export function ampacity(awg: string, inEngineSpace = false, acCable = false): number {
+/**
+ * Current a conductor may carry, in amps.
+ * @param bundledWith how many other current-carrying conductors run with it in a bundle, sheath or
+ *   conduit. Only DC conductors are derated for it; AC cable is not (see AC_CABLE_AMPACITY).
+ *
+ * A derated DC rating is rounded to whole amps, as Blue Sea Systems prints its table, so a fuse
+ * equal to the printed rating is accepted (14 AWG in the engine space: 35 × 0.85 = 29.75, printed
+ * 30). AC cable ratings are BoatWire's own figures and are not rounded.
+ */
+export function ampacity(awg: string, inEngineSpace = false, acCable = false, bundledWith = 0): number {
   const g = gaugeSpec(awg);
   if (!g) return 0;
-  const base = acCable ? (AC_CABLE_AMPACITY[awg] ?? 0) : g.ampacity105;
-  return base * (inEngineSpace ? ENGINE_SPACE_DERATE : 1);
+  if (acCable) return (AC_CABLE_AMPACITY[awg] ?? 0) * (inEngineSpace ? AC_ENGINE_SPACE_DERATE : 1);
+  const engine = inEngineSpace ? ENGINE_SPACE_DERATE : 1;
+  const conductors = 1 + Math.max(0, Math.floor(bundledWith || 0));
+  if (conductors === 1) return Math.round(g.ampacity105 * engine);
+  let factor = 1;
+  for (const b of BUNDLE_FACTORS) if (conductors >= b.from) factor = b.factor;
+  return Math.round((AMPACITY_105_BUNDLED[awg] ?? 0) * factor * engine);
 }
 
 /**

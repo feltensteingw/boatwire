@@ -10,6 +10,25 @@ import { joinTerminals } from './connect';
 
 const LEAD = new Set(['flooded', 'agm', 'gel']);
 
+/**
+ * The fuses and breakers whose output a wire is connected to, with their ratings: what the check
+ * holds the wire's ampacity against. None for a negative or a starter cable, which need no fuse.
+ */
+export function protectionOf(w: Wire, node: (id: string) => DNode | undefined): { n: DNode; rating: number }[] {
+  if (w.notes?.includes('starter-exempt') || w.kind === 'neg') return [];
+  const out: { n: DNode; rating: number }[] = [];
+  for (const e of [w.from, w.to]) {
+    const n = node(e.node);
+    if (!n || !NODE_DEFS[n.type].protective) continue;
+    const t = n.terminals.find((x) => x.id === e.term);
+    const isOut = e.term !== 'in' || n.type === 'fuse' || n.type === 'breaker';
+    if (!isOut) continue;
+    const rating = t?.rating ?? n.data.rating;
+    if (typeof rating === 'number') out.push({ n, rating });
+  }
+  return out;
+}
+
 // Wording for a length BoatWire guessed from locations, as opposed to one the user entered.
 const guess = (w: Wire) => (w.lengthEstimated ? 'about ' : '');
 const guessed = (w: Wire) => (w.lengthEstimated ? ' (estimated from their locations; enter the measured length)' : '');
@@ -202,24 +221,19 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
   for (const w of design.wires) {
     if (!w.gauge || w.kind === 'sig' || w.kind === 'gnd') continue;
     const a = w.amps ?? amps.get(w.id);
-    const amp = ampacity(w.gauge, w.inEngineSpace, w.kind === 'ac') * (w.cable?.match(/^(\d+)×/) ? Number(w.cable.split('×')[0]) : 1);
+    const amp = ampacity(w.gauge, w.inEngineSpace, w.kind === 'ac', w.bundledWith) * (w.cable?.match(/^(\d+)×/) ? Number(w.cable.split('×')[0]) : 1);
     const ends = [w.from, w.to].map((e) => ({ e, n: g.node.get(e.node)! }));
     const names = `${ends[0].n?.label} → ${ends[1].n?.label}`;
+    // Bundling lowers the rating of DC conductors only (see ampacity).
+    const bundled = w.kind !== 'ac' ? Math.max(0, Math.floor(w.bundledWith ?? 0)) : 0;
+    const cable = bundled ? `${cableText(w, units)} (bundled with ${bundled} other wire${bundled === 1 ? '' : 's'})` : cableText(w, units);
+    const outOfBundle = bundled ? ', or route it outside the bundle' : '';
     if (a !== undefined && a > amp) {
-      add('error', 'conductor-sizing', `${names}: ${cableText(w, units)} carries ~${Math.round(a)} A, above its ${Math.round(amp)} A ampacity.`, 'Use a larger conductor.', undefined, [w.id]);
+      add('error', 'conductor-sizing', `${names}: ${cable} carries ~${Math.round(a)} A, above its ${Math.round(amp)} A ampacity.`, `Use a larger conductor${outOfBundle}.`, undefined, [w.id]);
     }
-    if (!w.notes?.includes('starter-exempt') && w.kind !== 'neg') {
-      for (const { e, n } of ends) {
-        if (!n || !NODE_DEFS[n.type].protective) continue;
-        const t = n.terminals.find((x) => x.id === e.term);
-        const isOut = e.term !== 'in' || n.type === 'fuse' || n.type === 'breaker';
-        if (!isOut) continue;
-        const rating = t?.rating ?? n.data.rating;
-        if (typeof rating === 'number' && rating > amp * 1.0001) {
-          add('error', 'branch-protection', `${names}: protected by ${rating} A but ${cableText(w, units)} is only rated ${Math.round(amp)} A.`, `Use a smaller fuse/breaker or a larger wire.`, [n.id], [w.id]);
-          break;
-        }
-      }
+    const over = protectionOf(w, (id) => g.node.get(id)).find((p) => p.rating > amp * 1.0001);
+    if (over) {
+      add('error', 'branch-protection', `${names}: protected by ${over.rating} A but ${cable} is only rated ${Math.round(amp)} A.`, `Use a smaller fuse/breaker or a larger wire${outOfBundle}.`, [over.n.id], [w.id]);
     }
     if (a !== undefined && w.lengthFt > 0) {
       const volts = w.domain === 'ac' ? acV : Number(ends.find((x) => x.n?.type === 'load')?.n?.data.volts ?? V);

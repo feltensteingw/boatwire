@@ -333,7 +333,7 @@ const SECTIONS: Section[] = [
   {
     id: 'existing',
     title: 'Existing boat & upgrade plan',
-    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag',
+    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag bundle bundled loom conduit sheath engine space',
     body: (
       <>
         <p>Use this when you're improving a boat you already own. Draw the wiring as it really is; BoatWire checks it and lists the changes needed to reach the ideal design.</p>
@@ -358,6 +358,9 @@ const SECTIONS: Section[] = [
           <li>Drag from one terminal dot to another to draw a wire. Red dots are positive, black are negative, orange are AC, green are ground, and blue are signal.</li>
           <li>Click a component to set its rating, chemistry or capacity. Panels and bus bars can have studs or circuits added.</li>
           <li>A new wire opens on the right so you can set its real size, length and type, and whether it runs through the hot engine space. Click any wire to change these later.</li>
+          <li>
+            <b>Bundled with</b>, on a DC positive or negative wire, is how many other wires that carry current run with it in the same bundle, loom, sheath or conduit. Wires packed together run hotter, so the check rates each one for less current. Leave it at 0 for a wire that runs on its own. Count the circuit's own negative if it is in the same cable: a duplex cable is bundled with 1. Blue Sea Systems' tables say you need not count wires that carry less than half their rating in a bundle, which covers most lighting and electronics wires, or wires that carry current only in short bursts, such as a starter or bow thruster cable.
+          </li>
           <li>A dotted wire labelled <b>size?</b> has no size yet. BoatWire cannot check it, and the status stays amber until every power wire has a size.</li>
           <li>To move a wire to a different terminal, click the wire, then drag the round grip beside either end onto the new terminal. BoatWire refuses a move that would join, say, positive to negative.</li>
           <li>A <b>Note</b> is free text for anything BoatWire has no symbol for. Notes show on the drawing and in exported pictures. They are not part of the checks or the reports.</li>
@@ -511,15 +514,18 @@ const SECTIONS: Section[] = [
   {
     id: 'limits',
     title: 'Safety & limitations',
-    keywords: 'safety abyc standards disclaimer electrician verify limitations',
+    keywords: 'safety abyc standards disclaimer electrician verify limitations blue sea bundle bundled',
     body: (
       <>
         <p className="hint caution">
-          BoatWire is a design aid, not a substitute for a qualified marine electrician. Its wire tables and limits are based on widely published ABYC-derived values and have <b>not</b> been verified against the current ABYC E-11 text. Have any design reviewed before
-          you install it, especially AC wiring and lithium systems.
+          BoatWire is a design aid, not a substitute for a qualified marine electrician. Its wire tables and limits were checked against Blue Sea Systems' published tables (2023 catalog) on 19 November 2026. Those tables are a published summary, <b>not</b> the ABYC E-11
+          standard itself, and some values used here, such as AC cable ratings and the interrupt ratings of fuse types, are not in them. Have any design reviewed before you install it, especially AC wiring and lithium systems.
         </p>
         <ul>
           <li>Cable lengths are estimates from your zones. Measure real runs before buying cable.</li>
+          <li>
+            The ideal design sizes every cable as if it ran on its own. Keep heavy cables (charging, inverter, windlass, thruster) out of looms. Cables bundled together, in a loom or in conduit may need a larger size: set <b>Bundled with</b> on them in Existing boat to check them. For a new installation, choose <b>Start from the ideal design</b> there first.
+          </li>
           <li>Current draws are typical values. Use the figures from your equipment's manuals.</li>
           <li>Part suggestions are generic types, not endorsements. Check ratings on the actual product.</li>
         </ul>

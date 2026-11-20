@@ -11,8 +11,9 @@
 import { NODE_DEFS } from '../model/nodeDefs';
 import type { Design, DNode, Wire, WireEnd } from '../model/types';
 import { cableLabel, fmtLen, fmtSize, type Units } from '../model/units';
-import { estimateCurrents } from './audit';
-import { gaugeSpec } from './calc';
+import { GAUGES } from '../model/standards';
+import { estimateCurrents, protectionOf } from './audit';
+import { ampacity, gaugeIndex, gaugeSpec } from './calc';
 
 export interface Change {
   priority: 'safety' | 'recommended' | 'improvement';
@@ -148,8 +149,12 @@ function copper(w: Wire): number | undefined {
   if (!w.gauge) return undefined;
   const g = gaugeSpec(w.gauge);
   if (!g) return undefined;
-  const runs = w.cable?.match(/^(\d+)×/) ? Number(w.cable.split('×')[0]) : 1;
-  return g.cm * runs;
+  return g.cm * runs(w);
+}
+
+/** Number of parallel runs in a wire's cable ("2× 4/0" is 2). */
+function runs(w: Wire): number {
+  return w.cable?.match(/^(\d+)×/) ? Number(w.cable.split('×')[0]) : 1;
 }
 
 export function compareWithIdeal(existing: Design, ideal: Design, units: Units = 'imperial'): IdealDiff {
@@ -247,19 +252,40 @@ export function compareWithIdeal(existing: Design, ideal: Design, units: Units =
       mark([ew.id], 'On a different terminal from the ideal design');
     }
     if (iw.kind !== 'sig' && ew.gauge && iw.gauge) {
-      const ce = copper(ew);
-      const ci = copper(iw);
-      if (ce !== undefined && ci !== undefined && ce < ci) {
-        const size = (w: Wire) => (w.cable ? cableLabel(w, units)! : fmtSize(w.gauge, units));
-        changes.push({
-          priority: 'recommended',
-          title: `${circuit(IN, iw)}: upsize wire ${size(ew)} → ${size(iw)}`,
-          detail: `At ~${Math.round(ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0)} A over ${fmtLen(iw.lengthFt, units)}.`,
-          rule: 'conductor-sizing',
-          parts: [[`${iw.kind === 'ac' ? 'accable' : 'cable'}:${iw.gauge}`, iw.lengthFt * (iw.kind === 'ac' ? 1 : 2)]],
-          wires: [ew.id],
-        });
-        mark([ew.id], `Smaller than the ideal design's ${size(iw)}`);
+      const size = (w: Wire) => (w.cable ? cableLabel(w, units)! : fmtSize(w.gauge, units));
+      const current = ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0;
+      // The ideal size assumes a cable on its own. A single DC wire drawn as bundled needs the
+      // smallest size from the ideal one up that the check accepts in its bundle: one that
+      // carries its current and its fuse. If none does, the check's own finding says what to do.
+      const bundled = (ew.kind === 'pos' || ew.kind === 'neg') && runs(ew) === 1 && runs(iw) === 1 ? Math.floor(ew.bundledWith ?? 0) : 0;
+      if (bundled > 0) {
+        const need = Math.max(current, ...protectionOf(ew, (id) => EN.get(id)).map((p) => p.rating));
+        const target = GAUGES.slice(gaugeIndex(iw.gauge)).find((g) => ampacity(g.awg, ew.inEngineSpace, false, bundled) >= need)?.awg;
+        if (target && gaugeIndex(ew.gauge) < gaugeIndex(target)) {
+          changes.push({
+            priority: 'recommended',
+            title: `${circuit(IN, iw)}: upsize wire ${fmtSize(ew.gauge, units)} → ${fmtSize(target, units)}`,
+            detail: `At ~${Math.round(current)} A over ${fmtLen(iw.lengthFt, units)}, bundled with ${bundled} other wire${bundled === 1 ? '' : 's'}.`,
+            rule: 'conductor-sizing',
+            parts: [[`cable:${target}`, iw.lengthFt * 2]],
+            wires: [ew.id],
+          });
+          mark([ew.id], `Too small for its bundle; the ideal design's ${size(iw)} assumes a cable on its own`);
+        }
+      } else {
+        const ce = copper(ew);
+        const ci = copper(iw);
+        if (ce !== undefined && ci !== undefined && ce < ci) {
+          changes.push({
+            priority: 'recommended',
+            title: `${circuit(IN, iw)}: upsize wire ${size(ew)} → ${size(iw)}`,
+            detail: `At ~${Math.round(current)} A over ${fmtLen(iw.lengthFt, units)}.`,
+            rule: 'conductor-sizing',
+            parts: [[`${iw.kind === 'ac' ? 'accable' : 'cable'}:${iw.gauge}`, iw.lengthFt * (iw.kind === 'ac' ? 1 : 2)]],
+            wires: [ew.id],
+          });
+          mark([ew.id], `Smaller than the ideal design's ${size(iw)}`);
+        }
       }
     }
     // the breaker or fuse position this wire is on

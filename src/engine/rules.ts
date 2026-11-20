@@ -9,7 +9,7 @@ export interface RuleInfo {
 
 /** Shown wherever a design is presented as advice (Boat & zones tab, printed report) while STANDARDS_VERIFIED is false. */
 export const STANDARDS_NOTICE =
-  'Wire tables and limits are seeded from widely published ABYC-derived values and have not been checked against the current ABYC E-11 text. Have a qualified marine electrician review any design before installation.';
+  "Wire tables and limits were checked against Blue Sea Systems' published tables (2023 catalog) on 19 November 2026. Those tables summarise ABYC E-11; they are not the ABYC standard itself, and a few values used here, such as AC cable ratings and the interrupt ratings of fuse types, are not in them. Have a qualified marine electrician review any design before installation.";
 
 /** Plain-English explanations attached to nodes, wires and findings. */
 function build(units: Units): Record<string, RuleInfo> {
@@ -84,6 +84,11 @@ function build(units: Units): Record<string, RuleInfo> {
   'conductor-sizing': {
     title: 'Conductor sizing',
     why: `Wire is sized by whichever is larger: ampacity (it must carry the rating of the fuse protecting it) or voltage drop (${VDROP.critical}% for critical circuits like nav lights, bilge pumps and electronics; ${VDROP.nonCritical}% for others). Length is the full round trip, positive and negative.`,
+    ref: REFS.E11,
+  },
+  'bundling': {
+    title: 'Wires in a bundle',
+    why: 'Wires packed together in a bundle, loom, sheath or conduit cannot shed heat as well as a wire on its own, so each is rated for less current, and less again in a bigger bundle. Only wires that carry current count: positive and negative, including a circuit\'s own negative in the same cable, but not grounding or signal wires. Blue Sea Systems also says you need not count wires that carry less than half their rating in a bundle, or that carry current only in short bursts. BoatWire uses the ABYC E-11 figures as Blue Sea publishes them (2023 catalog, p.164). The ideal design sizes every cable as if it ran on its own. In Existing boat, set "Bundled with" on a wire to check it as bundled.',
     ref: REFS.E11,
   },
   'unsized-wire': {

@@ -233,6 +233,11 @@ const CASES: Case[] = [
     good: (d) => d.wire(d.switchedBattery().feed, [d.add('load', 'Windlass', { amps: 100 }), 'pos'], { gauge: '2' }),
   },
   {
+    rule: 'conductor-sizing', severity: 'error', when: 'a wire in a bundle carries more than its bundled ampacity', says: /\(bundled with \d+ other wires?\) carries ~\d+ A, above its \d+ A ampacity/,
+    bad: (d) => d.wire(d.switchedBattery().feed, [d.add('load', 'Water heater', { amps: 28 }), 'pos'], { gauge: '12', bundledWith: 3 }),
+    good: (d) => d.wire(d.switchedBattery().feed, [d.add('load', 'Water heater', { amps: 28 }), 'pos'], { gauge: '12', bundledWith: 1 }),
+  },
+  {
     rule: 'conductor-sizing', severity: 'warning', when: 'a long thin run loses too much voltage', says: /% voltage drop \(limit/,
     bad: (d) => d.wire(d.switchedBattery().feed, [d.add('load', 'Cabin lights', { amps: 10 }), 'pos'], { gauge: '14', lengthFt: 40 }),
     good: (d) => d.wire(d.switchedBattery().feed, [d.add('load', 'Cabin lights', { amps: 10 }), 'pos'], { gauge: '14', lengthFt: 5 }),

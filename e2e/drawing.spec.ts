@@ -126,6 +126,31 @@ test('existing boat: quick-add parts, move a wire end, and notes', async ({ page
   expect(errors).toEqual([]);
 });
 
+test('existing boat: a wire bundled with others is rated for less current, and undo clears it', async ({ page }) => {
+  const errors = await openFresh(page);
+  await blankDrawing(page, ['battery', 'fuse', 'load']);
+  await wire(page, [1, 'out'], [2, 'pos']);
+  await expect(page.locator('.inspector .insp-kind')).toHaveText('DC positive');
+  const field = (label: string) => page.locator('.inspector .field', { hasText: label });
+  const ampacity = page.locator('.inspector .kv tr', { hasText: 'Ampacity' });
+  await field('Conductor size').locator('select').selectOption('12');
+  await expect(ampacity).toHaveText('Ampacity45 A');
+  // quick edits to one wire are one undo step; let this one stand alone
+  await page.waitForTimeout(1100);
+
+  // three others in the bundle: 32 A × 0.857, below the 30 A fuse
+  await field('Bundled with').locator('input').fill('3');
+  await expect(ampacity).toHaveText('Ampacity27 A (bundled with 3 other wires)');
+  expect((await storedProject(page)).existing.wires[0].bundledWith).toBe(3);
+  await expect(page.locator('.inspector .findings')).toContainText('protected by 30 A but 12 AWG (bundled with 3 other wires) is only rated 27 A.');
+
+  // one undo takes the bundle off and keeps the size
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => (await storedProject(page)).existing.wires[0].bundledWith).toBeUndefined();
+  expect((await storedProject(page)).existing.wires[0].gauge).toBe('12');
+  expect(errors).toEqual([]);
+});
+
 test('existing boat: a wire moved away from where the ideal design has it is marked and named in the upgrade plan', async ({ page }) => {
   const errors = await openFresh(page);
   await page.getByRole('button', { name: 'Existing boat', exact: true }).click();

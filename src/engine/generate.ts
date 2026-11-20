@@ -52,5 +52,13 @@ export function generateIdeal(project: Project, scenario?: Scenario): Design {
   buildWindHydro(b, plan, core);
   buildAc(b, plan, core, startBuses);
 
+  // Every cable above is sized as a single conductor; bundling is checked only on hand-drawn wires.
+  b.find(
+    'info',
+    'bundling',
+    'Cable sizes assume each cable runs on its own, not bundled with other wires that carry current.',
+    'Keep heavy cables, such as charging, inverter, windlass and thruster cables, out of looms. A cable in a bundle, loom or conduit is rated for 30% to 60% less current, depending on how many share it, so some need a larger size. To check them, set "Bundled with" on those wires in Existing boat; for a new installation, choose "Start from the ideal design" there first.',
+  );
+
   return design;
 }

@@ -266,6 +266,11 @@ export interface Wire {
   /** Id of the node providing over-current protection for this conductor. */
   protectedBy?: string;
   inEngineSpace?: boolean;
+  /**
+   * How many other current-carrying conductors run with this one in a bundle, sheath or conduit
+   * (a whole number, absent for none). Set on hand-drawn DC wires; the ideal design assumes none.
+   */
+  bundledWith?: number;
   notes?: string[];
   /** Short label override, e.g. "14/3" for AC cable or "2× 4/0" for parallel runs. */
   cable?: string;
