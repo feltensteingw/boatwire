@@ -29,6 +29,7 @@ export const DEFAULT_LAYERS: LayerSettings = {
   fuses: true,
   signal: true,
   grounding: false,
+  idealDiff: true,
   labels: { gauge: true, protection: false, current: false, length: false, vdrop: false, parts: false },
 };
 

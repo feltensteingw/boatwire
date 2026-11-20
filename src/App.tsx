@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { arrangePositions, autoLayout } from './layout/layout';
 import { existingFromEquipment, existingFromIdeal, equipmentNode, paletteNode } from './engine/existing';
 import { activeScenario } from './engine/scenario';
+import { compareWithIdeal } from './engine/compare';
 import { generateIdeal } from './engine/generate';
 import { billOfMaterials, wireSchedule } from './engine/reports';
 import { NODE_DEFS } from './model/nodeDefs';
@@ -390,6 +391,14 @@ function LayerBar({ manual }: { manual?: boolean }) {
         />
         <Toggle checked={layers.signal} label="Control" tip="Show low-current control and sensing wires (dashed blue): BMS signals, regulator sense leads, relay triggers, helm switches." onChange={(v) => setLayers((l) => ({ ...l, signal: v }))} />
         <Toggle checked={layers.grounding} label="Equip. grounds" tip="Show the green AC safety-ground wires to each AC appliance and the bond to DC negative." onChange={(v) => setLayers((l) => ({ ...l, grounding: v }))} />
+        {manual && (
+          <Toggle
+            checked={layers.idealDiff !== false}
+            label="Differences"
+            tip="Mark (orange dashes) the wires that go somewhere else than in the ideal design, or are smaller, or are on a different fuse or breaker. The Upgrade plan lists each one."
+            onChange={(v) => setLayers((l) => ({ ...l, idealDiff: v }))}
+          />
+        )}
       </div>
       <div className="lgroup">
         <span className="lg-title">Labels</span>
@@ -463,7 +472,10 @@ const QUICK_PARTS: [NodeType, string][] = [
 function ExistingView() {
   const existing = useExisting();
   const findings = useFindings(existing);
+  const ideal = useIdeal();
   const project = useStore((s) => s.project);
+  const markDiffs = useStore((s) => s.layers.idealDiff !== false);
+  const differs = useMemo(() => (existing && markDiffs ? compareWithIdeal(existing, ideal, project.profile.units).wires : undefined), [existing, ideal, markDiffs, project.profile.units]);
   const setExisting = useStore((s) => s.setExisting);
   const addExistingNode = useStore((s) => s.addExistingNode);
   const updateExisting = useStore((s) => s.updateExisting);
@@ -645,8 +657,14 @@ function ExistingView() {
         <div className="canvas-title">
           <b>Existing boat</b>
           <span className="hint"> — drag from one terminal dot to another to draw a wire, or tap one dot and then the other. Click a wire to set its size and length, or drag one of its ends to another terminal. Shift-drag selects several components; Delete removes the selection.</span>
+          {differs && differs.size > 0 && (
+            <span className="hint diff-hint">
+              {' '}
+              {differs.size === 1 ? '1 wire is' : `${differs.size} wires are`} marked with orange dashes where they differ from the ideal design (hover one to see how; the Upgrade plan lists them).
+            </span>
+          )}
         </div>
-        <Diagram design={existing} findings={findings} mode="manual" />
+        <Diagram design={existing} findings={findings} mode="manual" differs={differs} />
       </div>
       <Inspector design={existing} findings={findings} editable />
     </div>
