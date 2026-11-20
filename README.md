@@ -53,9 +53,18 @@ thing, but it is not Firestore: check real cloud behaviour on a PR preview.
 **Security headers** are set in `firebase.json` for every response: no MIME sniffing, no framing
 (`X-Frame-Options: DENY`; Firebase's own `/__/auth/*` sign-in pages are not affected by custom
 headers), a strict referrer policy, and device features switched off. A Content-Security-Policy is
-sent in **report-only** mode: it blocks nothing yet, but the browser console lists anything it
-would block. The browser tests enforce the same policy locally (`E2E_CSP`). Once sign-in and cloud
-saving show no reports on the live site, rename the header to `Content-Security-Policy` to enforce it.
+enforced. Beyond the site itself it allows what Google sign-in and Firestore use: Google's sign-in
+loader script (`apis.google.com`), calls to Google APIs (`*.googleapis.com`: sign-in, token refresh,
+Firestore), the sign-in helper frame on `boatwire-1r3u0.firebaseapp.com`, Google profile photos
+(`*.googleusercontent.com`), and the one image Firestore loads to test the connection after a
+failed request (`www.google.com/images/cleardot.gif`). It also still allows `*.firebaseio.com` and
+an `accounts.google.com` frame, which the app does not use today. `'wasm-unsafe-eval'` lets PDF import decode JPEG 2000 scans (pdf.js
+does that with WebAssembly); running text as code stays blocked. The browser tests serve the same
+policy (`E2E_CSP`), and `tests/securityHeaders.test.ts` checks that `firebase.json` enforces it. A new
+outside host the app needs must be added to the policy, or the browser will refuse it. To switch
+back to report-only quickly, roll back to the previous release in the Firebase console (Hosting,
+Release history). A rename in `firebase.json` also needs the expected key changed in that test, or
+CI refuses to deploy it.
 
 | Task | Command |
 |------|---------|
@@ -93,6 +102,7 @@ src/engine/     generate.ts  equipment + scenario → ideal Design; sets the ord
                 audit.ts     rule checks on any Design (net tracing in graph.ts)
                 calc.ts      ampacity, voltage drop, protection sizing, run lengths
                 reports.ts   wire schedule, BOM, scenario metrics, upgrade plan
+                compare.ts   existing drawing vs ideal design, connection by connection (for the upgrade plan)
                 energy.ts    daily load budget and bank sizing
                 rules.ts     plain-English "why" text for every rule
 src/layout/     ELK (elkjs) layered orthogonal layout, run in a Web Worker; manual layout for drawings

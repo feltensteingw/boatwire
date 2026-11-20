@@ -4,10 +4,11 @@
 import { NODE_DEFS } from '../model/nodeDefs';
 import { FUSE_CLASSES, GAUGES } from '../model/standards';
 import type { Design, DNode, Finding, Wire } from '../model/types';
-import { audit, estimateCurrents, protectionOf } from './audit';
-import { ampacity, fuseClassFor, gaugeIndex, gaugeSpec } from './calc';
+import { audit, estimateCurrents } from './audit';
+import { compareWithIdeal, type Change } from './compare';
+import { fuseClassFor, gaugeIndex, gaugeSpec } from './calc';
 import { ruleInfo } from './rules';
-import { cableLabel, cableText, fmtLen, fmtSize, lenUnit, M_PER_FT, toLen, type Units } from '../model/units';
+import { cableLabel, cableText, fmtSize, lenUnit, M_PER_FT, toLen, type Units } from '../model/units';
 
 // ------------------------------------------------------------ wire schedule
 
@@ -255,14 +256,7 @@ export function designMetrics(design: Design, acVolts: number, units: Units = 'i
 
 // ------------------------------------------------------------ change list
 
-export interface Change {
-  priority: 'safety' | 'recommended' | 'improvement';
-  title: string;
-  detail?: string;
-  rule?: string;
-  /** Parts the change needs, where they are known: price-list entry and how many of its units. Used for the cost estimate. */
-  parts?: [key: string, qty: number][];
-}
+export type { Change } from './compare';
 
 const INFRA: DNode['type'][] = [
   'fuse', 'switch', 'shunt', 'acr', 'isolator', 'dcdc', 'bms', 'contactor', 'apd', 'regulator', 'mppt', 'controller', 'dump-load',
@@ -322,38 +316,8 @@ export function changeList(existing: Design, ideal: Design, acVolts: number, uni
       });
     }
   }
-  // 4. Per-load circuit comparison (gauge and protection)
-  const ex = new Map(existing.nodes.filter((n) => n.equipmentId).map((n) => [n.equipmentId!, n]));
-  const exNode = new Map(existing.nodes.map((n) => [n.id, n]));
-  const exAmps = estimateCurrents(existing);
-  const supply = (d: Design, n: DNode) => {
-    const term = n.type === 'ac-load' ? 'l' : 'pos';
-    const w = d.wires.find((x) => (x.to.node === n.id && x.to.term === term) || (x.from.node === n.id && x.from.term === term));
-    return w;
-  };
-  for (const iNode of ideal.nodes) {
-    if (!iNode.equipmentId || !['load', 'ac-load'].includes(iNode.type)) continue;
-    const eNode = ex.get(iNode.equipmentId);
-    if (!eNode) continue;
-    const iw = supply(ideal, iNode);
-    const ew = supply(existing, eNode);
-    if (!iw || !ew || !iw.gauge) continue;
-    if (!ew.gauge) {
-      changes.push({ priority: 'improvement', title: `${iNode.label}: record the wire size`, detail: `Ideal: ${fmtSize(iw.gauge, units)}.` });
-    } else {
-      const current = ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0;
-      // The ideal size assumes a cable on its own. A DC wire drawn as bundled needs the smallest
-      // size from there up that the check accepts in its bundle: one that carries its current and
-      // its fuse. If none does, the check's own finding says what to do.
-      const bundled = ew.kind === 'pos' || ew.kind === 'neg' ? Math.floor(ew.bundledWith ?? 0) : 0;
-      const need = Math.max(current, ...protectionOf(ew, (id) => exNode.get(id)).map((p) => p.rating));
-      const target = bundled > 0 ? GAUGES.slice(gaugeIndex(iw.gauge)).find((g) => ampacity(g.awg, ew.inEngineSpace, false, bundled) >= need)?.awg : iw.gauge;
-      if (target && gaugeIndex(ew.gauge) < gaugeIndex(target)) {
-        const inBundle = bundled > 0 ? `, bundled with ${bundled} other wire${bundled === 1 ? '' : 's'}` : '';
-        changes.push({ priority: 'recommended', title: `${iNode.label}: upsize wire ${fmtSize(ew.gauge, units)} → ${fmtSize(target, units)}`, detail: `At ~${Math.round(current)} A over ${fmtLen(iw.lengthFt, units)}${inBundle}.`, rule: 'conductor-sizing' , parts: [[`${iw.kind === 'ac' ? 'accable' : 'cable'}:${target}`, iw.lengthFt * (iw.kind === 'ac' ? 1 : 2)]] });
-      }
-    }
-  }
+  // 4. Connection by connection: where each wire goes, its size, and the fuse or breaker on it
+  changes.push(...compareWithIdeal(existing, ideal, units).changes);
   const order = { safety: 0, recommended: 1, improvement: 2 };
   return changes.sort((a, b) => order[a.priority] - order[b.priority]);
 }

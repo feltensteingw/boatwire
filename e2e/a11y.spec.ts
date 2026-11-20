@@ -50,9 +50,9 @@ test('no serious accessibility problems in any view or dialog', async ({ page })
   expect(found, found.join('\n')).toEqual([]);
 });
 
-// The other colour schemes are not scanned yet: Night vision is dim red on black on purpose, and
-// Chart, Blueprint and High contrast each have a few known low-contrast labels still to fix.
-for (const theme of ['dark']) {
+// Every colour scheme but one gets the same scan. Night watch is left out: it is dim red on black
+// on purpose, to keep the eyes adjusted to the dark, so it cannot meet the contrast rules.
+for (const theme of ['dark', 'chart', 'blueprint', 'contrast']) {
   test(`${theme} theme passes the same check`, async ({ page }) => {
     await openFresh(page);
     await page.locator('.header > .theme-pick').selectOption(theme);
@@ -64,6 +64,64 @@ for (const theme of ['dark']) {
     await expect(page.getByRole('dialog', { name: 'New boat' })).toBeVisible();
     found.push(...(await problems(page, `${theme} new boat`)));
     expect(found, found.join('\n')).toEqual([]);
+  });
+}
+
+/** Text contrast of every element matching `selector`, against the colours painted behind it. */
+function textContrast(page: Page, selector: string) {
+  return page.locator(selector).evaluateAll((els) => {
+    // rgb(…) / rgba(…), or color(srgb …) with channels from 0 to 1 (what color-mix() computes to)
+    const rgba = (c: string) => {
+      const p = c.match(/[\d.]+/g)!.map(Number);
+      const k = c.startsWith('color(') ? 255 : 1;
+      return [p[0] * k, p[1] * k, p[2] * k, p[3] ?? 1];
+    };
+    const lum = (c: number[]) => {
+      const f = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+    };
+    return els.map((el) => {
+      // the backgrounds from the element outwards until an opaque one, laid over each other
+      const layers: number[][] = [];
+      for (let e: Element | null = el; e; e = e.parentElement) {
+        const c = rgba(getComputedStyle(e).backgroundColor);
+        if (c[3] > 0) layers.unshift(c);
+        if (c[3] === 1) break;
+      }
+      const bg = layers.reduce((under, c) => under.map((u, i) => c[i] * c[3] + u * (1 - c[3])), [255, 255, 255]);
+      const [hi, lo] = [lum(rgba(getComputedStyle(el).color)), lum(bg)].sort((a, b) => b - a);
+      return `${el.className} "${el.textContent}" ${((hi + 0.05) / (lo + 0.05)).toFixed(2)}`;
+    });
+  });
+}
+
+// axe skips some small text: the "?" help marks, the upgrade-plan counts and the units beside
+// inputs. These sit on tinted fills, so check them directly in the schemes that have struggled.
+for (const theme of ['chart', 'blueprint', 'contrast']) {
+  test(`${theme} theme: help marks, counts and units are readable`, async ({ page }) => {
+    await openFresh(page);
+    await page.locator('.header > .theme-pick').selectOption(theme);
+    await page.locator('.eq-head', { hasText: 'Cabin lights' }).click();
+    const seen = [...(await textContrast(page, '.help-dot')), ...(await textContrast(page, '.unit'))];
+
+    await blankDrawing(page, ['battery', 'fuse']);
+    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await page.locator('.report-tabs button', { hasText: 'Upgrade plan' }).click();
+    await expect(page.locator('.changes .count').first()).toBeVisible();
+    const counts = await textContrast(page, '.changes .count');
+    expect(counts.length).toBeGreaterThan(0);
+    seen.push(...counts);
+    if (theme === 'contrast') {
+      // High contrast keeps the counts in their heading's colour (red for safety, orange for recommended)
+      const colours = await page
+        .locator('.changes h3')
+        .evaluateAll((hs) => hs.map((h) => [getComputedStyle(h).color, getComputedStyle(h.querySelector('.count')!).color]));
+      for (const [heading, count] of colours) expect(count).toBe(heading);
+    }
+
+    expect(seen.length).toBeGreaterThan(5);
+    const low = seen.filter((s) => Number(s.split(' ').pop()) < 4.5);
+    expect(low, `${theme}: ${low.join(', ')}`).toEqual([]);
   });
 }
 

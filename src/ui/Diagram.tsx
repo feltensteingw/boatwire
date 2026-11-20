@@ -54,6 +54,8 @@ interface Props {
   readOnly?: boolean;
   /** With readOnly: called with a PNG of the whole diagram once it has been laid out. */
   onSnapshot?: (pngDataUrl: string) => void;
+  /** Existing boat: wire id → why it differs from the ideal design. Those wires are marked. */
+  differs?: Map<string, string>;
 }
 
 export function Diagram(props: Props) {
@@ -64,7 +66,7 @@ export function Diagram(props: Props) {
   );
 }
 
-function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
+function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }: Props) {
   const layers = useStore((s) => s.layers);
   const nonce = useStore((s) => s.layoutNonce);
   const selection = useStore((s) => s.selection);
@@ -210,13 +212,13 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot }: Props) {
           target: le.target,
           sourceHandle: le.sourcePort,
           targetHandle: le.targetPort,
-          data: { wire: w, points: le.points, labels: layers.labels, amps: w.amps ?? currents.get(w.id), protection, units },
+          data: { wire: w, points: le.points, labels: layers.labels, amps: w.amps ?? currents.get(w.id), protection, units, differs: differs?.get(w.id) },
           ...wireState(le.id, w.kind === 'sig', selection?.kind === 'wire' && selection.id === le.id),
         };
       }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, layers.labels, currents, units]);
+  }, [layout, layers.labels, currents, units, differs]);
 
   // reflect external selection (e.g. clicking a finding)
   useEffect(() => {

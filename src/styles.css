@@ -131,10 +131,10 @@
   --border-2: #c4b693;
   --text: #2e2618;
   --muted: #6b5d44;
-  --faint: #9a8b6c;
+  --faint: #746850;
   --navy: #1d3557;
   --navy-2: #2a4a72;
-  --accent: #2b6f8f;
+  --accent: #2a6c8c;
   --accent-soft: #dcebee;
   --grid: #d9ccab;
   --mini: #c9b98f;
@@ -212,7 +212,7 @@
   --border-2: #3f74a8;
   --text: #eef5ff;
   --muted: #b3cbe6;
-  --faint: #86a6c9;
+  --faint: #99b4d2;
   --navy: #082544;
   --navy-2: #0e3a66;
   --accent: #7fd3ff;
@@ -279,6 +279,25 @@
   --bus-gnd: #006b24;
   --shadow: none;
   color-scheme: light;
+}
+
+/* The "?" help marks and the upgrade-plan counts sit on the border colour. In these schemes the
+   secondary or heading colour is too faint on it, so they take the full ink colour. High contrast
+   has black borders, so there they become a light pill with a black ring instead, and the energy
+   bar's empty track gets the same treatment so a part-filled bar does not look full. The counts
+   keep their heading's red or orange there, which is dark enough on the light pill. */
+:root[data-theme='chart'] .help-dot,
+:root[data-theme='chart'] .changes .count,
+:root[data-theme='blueprint'] .help-dot,
+:root[data-theme='blueprint'] .changes .count,
+:root[data-theme='contrast'] .help-dot {
+  color: var(--text);
+}
+:root[data-theme='contrast'] .help-dot,
+:root[data-theme='contrast'] .changes .count,
+:root[data-theme='contrast'] .bal-track {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--text);
 }
 
 * {
@@ -1232,6 +1251,10 @@ textarea.note-edit:focus {
 :root[data-theme='night'] .pill {
   background: #6a2a1a;
   color: #f0b0a0;
+}
+/* the darker orange of this scheme needs pure black text to stay readable (4.6:1) */
+:root[data-theme='contrast'] .pill {
+  color: #000000;
 }
 
 /* ---------------------------------------------------------------- symbols */

@@ -216,6 +216,10 @@ function build(units: Units): Record<string, RuleInfo> {
     why: 'A load without a proper negative conductor will find a return path through other equipment, bonding or the hull — causing failures and corrosion.',
     ref: REFS.E11,
   },
+  'ideal-routing': {
+    title: 'Wired differently from the ideal design',
+    why: 'The upgrade plan compares each wire on your drawing with the ideal design. A different route that passes the design check is listed as an improvement only: it is how the ideal design is laid out, not a fault. Anything unsafe is reported by the design check itself.',
+  },
   'starter-exempt': {
     title: 'Starter circuit',
     why: 'The starter cable may be left unfused under ABYC, but a high-rated terminal fuse at the start battery is widely recommended. It is sized well above cranking current so it does not blow during a start.',
