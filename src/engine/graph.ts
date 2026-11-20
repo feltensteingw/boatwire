@@ -65,7 +65,7 @@ export function crossingProtects(n: DNode, fromTerm: string): boolean {
 export const SOURCE_TERMS: Record<string, string[]> = {
   alternator: ['b'],
   mppt: ['bat'],
-  charger: ['out1', 'out2'],
+  charger: ['out1', 'out2', 'out3'],
   controller: ['bat'],
   dcdc: ['out'],
   converter: ['out'],

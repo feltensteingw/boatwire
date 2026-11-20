@@ -67,17 +67,22 @@ export function Icon({ n }: { n: DNode }) {
       );
       break;
     case 'selector':
-    case 'transfer-switch':
+    case 'transfer-switch': {
+      // one contact per input: two at y 9 and 23, three at 7, 16 and 25
+      const inputs = Math.max(2, n.terminals.filter((x) => x.id.startsWith('in')).length);
+      const ys = inputs === 2 ? [9, 23] : Array.from({ length: inputs }, (_, i) => 7 + (18 * i) / (inputs - 1));
       body = (
         <g {...p}>
-          <circle cx="7" cy="9" r="2" />
-          <circle cx="7" cy="23" r="2" />
+          {ys.map((y) => (
+            <circle key={y} cx="7" cy={y} r="2" />
+          ))}
           <circle cx="25" cy="16" r="2" />
-          <path d="M23 15L9 10" />
+          <path d={`M23 15L9 ${ys[0] + 1}`} />
           {n.type === 'transfer-switch' && t(16, 30, 'ATS', 7)}
         </g>
       );
       break;
+    }
     case 'shunt':
     case 'dump-load':
       body = (

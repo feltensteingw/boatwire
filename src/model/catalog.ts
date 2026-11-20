@@ -283,7 +283,7 @@ export const CATALOG: CatalogItem[] = [
  */
 const PROP_HELP: Record<string, string> = {
   // batteries
-  role: 'What this bank does. House runs everything aboard; Engine start only cranks the engine. A dedicated bank (windlass, thruster, winch or refrigeration) sits next to its equipment and supplies its power, so the heavy cables stay short. The equipment is still switched from the house panel through a relay, and the bank is recharged from the house bank by a DC-DC charger.',
+  role: 'What this bank does. House runs everything aboard; Engine start only cranks the engine (with two engines, add one for each, or one they share). A dedicated bank (windlass, thruster, winch or refrigeration) sits next to its equipment and supplies its power, so the heavy cables stay short. The equipment is still switched from the house panel through a relay, and the bank is recharged from the house bank by a DC-DC charger.',
   chemistry: 'Battery type. Lead-acid (flooded, AGM, gel) is cheaper but only ~50% is usable. Lithium (LiFePO4) gives ~80% usable, is lighter and charges faster, but needs a BMS, Class T fuse and alternator protection.',
   unitVolts: 'Voltage of each individual battery. They are wired in series to reach the system voltage (e.g. two 6 V golf-cart batteries make 12 V).',
   unitAh: 'Amp-hour rating printed on each battery (20-hour rate).',
@@ -303,7 +303,7 @@ const PROP_HELP: Record<string, string> = {
   'inverter-charger.watts': 'Continuous AC output rating. Sets the size of the DC cable and fuse feeding it, which can be very large.',
   'inverter.watts': 'Continuous AC output rating. Sets the size of the DC cable and fuse feeding it, which can be very large.',
   chargeAmps: 'Maximum DC charging current when the unit runs on shore power or the generator.',
-  'shore-power.amps': 'Rating of the shore inlet and cord: 30 A or 50 A in North America, 16 A or 32 A in Europe.',
+  'shore-power.amps': 'Rating of the shore inlet and cord: 30 A or 50 A in North America, 16 A or 32 A in Europe. With two inlets, list each one with its own rating.',
   'generator.watts': 'Continuous rated output of the AC generator.',
   // loads
   'dc-load.watts': 'How much power the item draws while running (from its label or manual). Watts ÷ volts = amps.',
@@ -348,6 +348,12 @@ export function dedicatedRoleFor(kind: EquipmentKind): string | undefined {
 
 /** Heavy DC loads that are fed directly from the main bus rather than the panel. */
 export const HEAVY_DC_THRESHOLD_A = 30;
+
+/** Shore power inlets the ideal design draws. Any more are reported as not drawn. */
+export const MAX_SHORE_INLETS = 2;
+
+/** Engines the ideal design draws. Any more are reported as not drawn. */
+export const MAX_ENGINES = 2;
 
 export const DEFAULT_ZONES: Zone[] = [
   { id: 'bow', name: 'Bow / anchor locker', x: 0, rise: 2 },

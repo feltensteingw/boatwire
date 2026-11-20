@@ -183,7 +183,7 @@ function NodeInspector({ node, design, findings, editable }: { node: DNode; desi
             </Field>
           )}
           {node.type === 'isolator' && data.isolatorType !== 'fet' && (
-            <Field label="Voltage compensation" help={'How the alternator regulator is made to see battery voltage despite the ~0.7 V diode drop. If you draw a wire to the isolator\'s "E" terminal or the alternator\'s sense terminal, that also counts.'}>
+            <Field label="Voltage compensation" help={'How the alternator regulator is made to see battery voltage despite the ~0.7 V diode drop. If you draw a wire to the isolator\'s "E" terminal or the sense terminal of the alternator that feeds it, that also counts, as does an external regulator on that alternator.'}>
               <Select
                 value={String(data.compensation ?? 'none')}
                 options={[

@@ -1,4 +1,4 @@
-import { CATALOG_BY_KIND } from '../model/catalog';
+import { CATALOG_BY_KIND, MAX_ENGINES } from '../model/catalog';
 import { AC_STANDARDS, ENERGY_ASSUMPTIONS, ENERGY_LIMITS, INVERTER_EFFICIENCY, USABLE_DOD } from '../model/standards';
 import type { Chemistry, EnergyAssumptions, Equipment, Project, Scenario, SystemVoltage } from '../model/types';
 import { effectiveEquipment, scenarioVoltage } from './scenario';
@@ -40,7 +40,10 @@ export interface EnergyBudget {
   shortfallAhPerDay: number;
   /** Solar and wind charge beyond the day's use (0 when there is a shortfall). */
   surplusAhPerDay: number;
+  /** Output of every alternator drawn, together, at the system voltage. */
   alternatorAmps: number;
+  /** How many alternators that is: one per engine drawn, up to two. */
+  alternators: number;
   /** Output of the battery charger(s), 0 with no shore power aboard. */
   chargerAmps: number;
   /** Engine hours a day that would cover everything solar, wind and shore power do not. Infinity with no alternator. */
@@ -120,8 +123,10 @@ export function energyBudget(project: Project, scenario?: Scenario): EnergyBudge
   const daysAutonomy = A.daysAutonomy;
   const solarW = eq.filter((e) => e.kind === 'solar').reduce((s, e) => s + num(e, 'watts'), 0);
   const whW = eq.filter((e) => e.kind === 'wind' || e.kind === 'hydro').reduce((s, e) => s + num(e, 'watts'), 0);
-  const engine = eq.find((e) => e.kind === 'engine');
-  const altA = engine ? num(engine, 'alternatorAmps') * (12 / V) : 0;
+  // the engines the design draws; with two, both are taken to run the hours assumed
+  const engines = eq.filter((e) => e.kind === 'engine').slice(0, MAX_ENGINES);
+  const altA = engines.reduce((s, e) => s + num(e, 'alternatorAmps') * (12 / V), 0);
+  const alternators = engines.filter((e) => num(e, 'alternatorAmps') > 0).length;
   const solarAh = (solarW * A.solarPeakHours * A.solarDerate) / V;
   const windAh = (whW * 24 * A.windHydroCapacityFactor) / V;
   // Lead-acid absorbs slowly; effective alternator contribution ~60% (lead) / 85% (LFP). A mains charger tapers the same way.
@@ -160,6 +165,7 @@ export function energyBudget(project: Project, scenario?: Scenario): EnergyBudge
     shortfallAhPerDay: shortfall,
     surplusAhPerDay: Math.max(0, charging - totalAh),
     alternatorAmps: altA,
+    alternators,
     chargerAmps,
     engineHoursToBalance: altA > 0 ? deficit / (altA * altEff) : Infinity,
     extraEngineHours: shortfall === 0 ? 0 : altA > 0 ? shortfall / (altA * altEff) : Infinity,
