@@ -5,9 +5,10 @@ import { NODE_DEFS } from '../model/nodeDefs';
 import { FUSE_CLASSES, GAUGES } from '../model/standards';
 import type { Design, DNode, Finding, Wire } from '../model/types';
 import { audit, estimateCurrents } from './audit';
+import { compareWithIdeal, type Change } from './compare';
 import { fuseClassFor, gaugeIndex, gaugeSpec } from './calc';
 import { ruleInfo } from './rules';
-import { cableLabel, cableText, fmtLen, fmtSize, lenUnit, M_PER_FT, toLen, type Units } from '../model/units';
+import { cableLabel, cableText, fmtSize, lenUnit, M_PER_FT, toLen, type Units } from '../model/units';
 
 // ------------------------------------------------------------ wire schedule
 
@@ -255,14 +256,7 @@ export function designMetrics(design: Design, acVolts: number, units: Units = 'i
 
 // ------------------------------------------------------------ change list
 
-export interface Change {
-  priority: 'safety' | 'recommended' | 'improvement';
-  title: string;
-  detail?: string;
-  rule?: string;
-  /** Parts the change needs, where they are known: price-list entry and how many of its units. Used for the cost estimate. */
-  parts?: [key: string, qty: number][];
-}
+export type { Change } from './compare';
 
 const INFRA: DNode['type'][] = [
   'fuse', 'switch', 'shunt', 'acr', 'isolator', 'dcdc', 'bms', 'contactor', 'apd', 'regulator', 'mppt', 'controller', 'dump-load',
@@ -322,27 +316,8 @@ export function changeList(existing: Design, ideal: Design, acVolts: number, uni
       });
     }
   }
-  // 4. Per-load circuit comparison (gauge and protection)
-  const ex = new Map(existing.nodes.filter((n) => n.equipmentId).map((n) => [n.equipmentId!, n]));
-  const exAmps = estimateCurrents(existing);
-  const supply = (d: Design, n: DNode) => {
-    const term = n.type === 'ac-load' ? 'l' : 'pos';
-    const w = d.wires.find((x) => (x.to.node === n.id && x.to.term === term) || (x.from.node === n.id && x.from.term === term));
-    return w;
-  };
-  for (const iNode of ideal.nodes) {
-    if (!iNode.equipmentId || !['load', 'ac-load'].includes(iNode.type)) continue;
-    const eNode = ex.get(iNode.equipmentId);
-    if (!eNode) continue;
-    const iw = supply(ideal, iNode);
-    const ew = supply(existing, eNode);
-    if (!iw || !ew || !iw.gauge) continue;
-    if (!ew.gauge) {
-      changes.push({ priority: 'improvement', title: `${iNode.label}: record the wire size`, detail: `Ideal: ${fmtSize(iw.gauge, units)}.` });
-    } else if (gaugeIndex(ew.gauge) < gaugeIndex(iw.gauge)) {
-      changes.push({ priority: 'recommended', title: `${iNode.label}: upsize wire ${fmtSize(ew.gauge, units)} → ${fmtSize(iw.gauge, units)}`, detail: `At ~${Math.round(ew.amps ?? exAmps.get(ew.id) ?? iw.amps ?? 0)} A over ${fmtLen(iw.lengthFt, units)}.`, rule: 'conductor-sizing' , parts: [[`${iw.kind === 'ac' ? 'accable' : 'cable'}:${iw.gauge}`, iw.lengthFt * (iw.kind === 'ac' ? 1 : 2)]] });
-    }
-  }
+  // 4. Connection by connection: where each wire goes, its size, and the fuse or breaker on it
+  changes.push(...compareWithIdeal(existing, ideal, units).changes);
   const order = { safety: 0, recommended: 1, improvement: 2 };
   return changes.sort((a, b) => order[a.priority] - order[b.priority]);
 }

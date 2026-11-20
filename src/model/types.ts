@@ -139,6 +139,8 @@ export interface LayerSettings {
   fuses?: boolean;
   signal: boolean;
   grounding: boolean;
+  /** Existing boat: mark the wires that differ from the ideal design. Undefined = shown. */
+  idealDiff?: boolean;
   labels: {
     gauge: boolean;
     protection: boolean;

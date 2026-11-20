@@ -12,6 +12,8 @@ export type WireData = {
   labels: LayerSettings['labels'];
   amps?: number;
   protection?: string;
+  /** Existing boat: why this wire differs from the ideal design, when it does and the marking is on. */
+  differs?: string;
 };
 export type WireFlowEdge = Edge<WireData, 'wire'>;
 
@@ -106,7 +108,9 @@ function WireEdgeImpl(props: EdgeProps<WireFlowEdge>) {
   const label = wireLabel(data);
   const width = wireWidth(w);
   return (
-    <>
+    // A wire marked as different from the ideal design says how on hover (the app-wide tooltip).
+    <g data-tip={data.differs}>
+      {data.differs && <path className="wire-differs" d={path} fill="none" stroke="var(--warn)" strokeWidth={width + 7} strokeOpacity={0.45} strokeDasharray="7 5" strokeLinejoin="round" />}
       {selected && <path d={path} fill="none" stroke="var(--accent)" strokeWidth={width + 6} strokeOpacity={0.35} />}
       <BaseEdge
         id={id}
@@ -127,7 +131,7 @@ function WireEdgeImpl(props: EdgeProps<WireFlowEdge>) {
           </div>
         </EdgeLabelRenderer>
       )}
-    </>
+    </g>
   );
 }
 

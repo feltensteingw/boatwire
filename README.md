@@ -101,6 +101,7 @@ src/engine/     generate.ts  equipment + scenario → ideal Design; sets the ord
                 audit.ts     rule checks on any Design (net tracing in graph.ts)
                 calc.ts      ampacity, voltage drop, protection sizing, run lengths
                 reports.ts   wire schedule, BOM, scenario metrics, upgrade plan
+                compare.ts   existing drawing vs ideal design, connection by connection (for the upgrade plan)
                 energy.ts    daily load budget and bank sizing
                 rules.ts     plain-English "why" text for every rule
 src/layout/     ELK (elkjs) layered orthogonal layout, run in a Web Worker; manual layout for drawings

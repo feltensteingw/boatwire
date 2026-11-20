@@ -125,3 +125,38 @@ test('existing boat: quick-add parts, move a wire end, and notes', async ({ page
   await expect(page.locator('.react-flow__node')).toHaveCount(6);
   expect(errors).toEqual([]);
 });
+
+test('existing boat: a wire moved away from where the ideal design has it is marked and named in the upgrade plan', async ({ page }) => {
+  const errors = await openFresh(page);
+  await page.getByRole('button', { name: 'Existing boat', exact: true }).click();
+  await page.getByRole('button', { name: /Start from the ideal design/ }).click();
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await expect.poll(async () => (await storedProject(page)).existing?.wires.length ?? 0).toBeGreaterThan(10);
+  // an unchanged copy has no differences
+  await expect(page.locator('.wire-differs')).toHaveCount(0);
+
+  // rewire one wire: the alternator fuse to the start battery's bus instead of the main bus
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('boatwire:v1')!);
+    const ws = s.state.project.existing.wires as { from: { node: string; term: string }; to: { node: string; term: string } }[];
+    const w = ws.find((x) => x.from.node === 'alt-fuse' && x.to.node === 'pos-bus')!;
+    w.to = { node: 'start-bus', term: 's1' };
+    localStorage.setItem('boatwire:v1', JSON.stringify(s));
+  });
+  await page.reload();
+  await expect(page.locator('.wire-differs')).toHaveCount(1);
+  await expect(page.locator('.diff-hint')).toContainText('1 wire is marked');
+
+  // the marking can be switched off
+  await page.locator('.layerbar label.toggle', { hasText: 'Differences' }).click();
+  await expect(page.locator('.wire-differs')).toHaveCount(0);
+  await page.locator('.layerbar label.toggle', { hasText: 'Differences' }).click();
+  await expect(page.locator('.wire-differs')).toHaveCount(1);
+
+  await page.locator('.toolbar .status').click();
+  const improvements = page.locator('.chg-improvement');
+  await expect(improvements).toContainText('Alternator output fuse: connected to Start positive bus on the boat; the ideal design connects it to Main positive bus');
+  // a different route that passes the check is never a safety item
+  await expect(page.locator('.chg-safety')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
