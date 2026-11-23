@@ -10,6 +10,9 @@ import { joinTerminals } from './connect';
 
 const LEAD = new Set(['flooded', 'agm', 'gel']);
 
+/** Negative terminals that return a charging source's current (SOURCE_TERMS lists the positives). */
+const NEG_SOURCE_TERMS: Record<string, string[]> = { alternator: ['neg'], charger: ['neg'], mppt: ['batneg'], controller: ['neg'], dcdc: ['outneg'], converter: ['outneg'] };
+
 /** Parts that join two battery banks for charging. Load currents are not added up through them. */
 export const CHARGE_LINKS: ReadonlySet<string> = new Set(['acr', 'isolator']);
 
@@ -419,10 +422,15 @@ export function estimateCurrents(design: Design, acVolts = 120): Map<string, num
         out.acSrc = true;
         out.src += Number(d.watts ?? 0) / acVolts;
       } else if (t === 'charger' && r.term === 'acin') out.load += (Number(d.amps ?? 0) * V) / (acVolts * 0.85);
+      else if (t === 'inverter-charger' && r.term === 'acin') {
+        // on shore power it passes its AC loads through and charges at the same time
+        const through = walk(g, { node: r.node.id, term: 'acout' }, ['ac']).filter((x) => x.node.type === 'ac-load');
+        out.load += through.reduce((s, x) => s + loadAmps(x.node), 0) + (Number(d.amps ?? 0) * V) / (acVolts * 0.85);
+      }
       else if (AC_SOURCE_TERMS[t]?.includes(r.term)) {
         out.acSrc = true;
         out.src += Number(d.amps ?? d.rating ?? 0);
-      } else if (SOURCE_TERMS[t]?.includes(r.term) || t === 'solar-panel' || t === 'wind-gen' || t === 'hydro-gen') out.src += Number(d.amps ?? d.rating ?? 0);
+      } else if (SOURCE_TERMS[t]?.includes(r.term) || NEG_SOURCE_TERMS[t]?.includes(r.term) || t === 'solar-panel' || t === 'wind-gen' || t === 'hydro-gen') out.src += Number(d.amps ?? d.rating ?? 0);
       else if (t === 'load' || t === 'engine' || t === 'ac-load') out.load += loadAmps(r.node);
       else if (t === 'converter' || t === 'dcdc') out.load += Number(d.rating ?? 0) * 0.6;
     }
@@ -438,7 +446,8 @@ export function estimateCurrents(design: Design, acVolts = 120): Map<string, num
     } else {
       const a = side(w.from, w);
       const b = side(w.to, w);
-      if (w.kind === 'ac' && a.acSrc !== b.acSrc) amps = (a.acSrc ? b : a).load;
+      // an AC circuit carries the loads beyond it, but no more than the sources feeding it can give
+      if (w.kind === 'ac' && a.acSrc !== b.acSrc) amps = Math.min((a.acSrc ? b : a).load, (a.acSrc ? a : b).src || Infinity);
       // Away from the battery the wire carries the loads out or the charge in, whichever is larger.
       else if (a.bat && !b.bat) amps = Math.max(b.load, b.src);
       else if (b.bat && !a.bat) amps = Math.max(a.load, a.src);
