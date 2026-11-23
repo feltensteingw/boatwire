@@ -43,6 +43,10 @@ function wire(d: Design, kind: WireKind, a: [number, string], b: [number, string
   d.wires.push({ id: `w${seq++}`, kind, domain: kind === 'ac' ? 'ac' : 'dc', from: { node: `n${a[0]}`, term: a[1] }, to: { node: `n${b[0]}`, term: b[1] }, lengthFt, ...extra });
 }
 const sizingErrors = (d: Design, acVolts = 120) => audit(d, { acVolts }).filter((f) => f.severity === 'error' && SIZING_RULES.has(f.rule)).map((f) => `${f.rule}: ${f.message}`);
+/** What a wire can carry, parallel runs included. */
+const carries = (w: Wire) => ampacity(w.gauge!, w.inEngineSpace, w.kind === 'ac', w.bundledWith) * (w.cable?.match(/^(\d+)× /) ? Number(w.cable.split('×')[0]) : 1);
+const by = (d: Design, a: string, b: string) => d.wires.find((w) => (w.from.node === a && w.to.node === b) || (w.from.node === b && w.to.node === a));
+const fuseOn = (d: Design, id: string) => d.wires.map((w) => (w.from.node === id ? w.to.node : w.to.node === id ? w.from.node : undefined)).map((x) => d.nodes.find((n) => n.id === x)).filter((n) => n?.type === 'fuse');
 
 describe('Size wires and fuses', () => {
   it('a bare circuit drawn with no fuse and no sizes comes out passing the check', () => {
@@ -235,10 +239,6 @@ describe('current estimates for a hand drawing (shared by the check and sizing)'
 });
 
 describe('Size wires & fuses: cases from the independent review', () => {
-  /** What a wire can carry, parallel runs included. */
-  const carries = (w: Wire) => ampacity(w.gauge!, w.inEngineSpace, w.kind === 'ac', w.bundledWith) * (w.cable?.match(/^(\d+)× /) ? Number(w.cable.split('×')[0]) : 1);
-  const by = (d: Design, a: string, b: string) => d.wires.find((w) => (w.from.node === a && w.to.node === b) || (w.from.node === b && w.to.node === a));
-  const fuseOn = (d: Design, id: string) => d.wires.map((w) => (w.from.node === id ? w.to.node : w.to.node === id ? w.from.node : undefined)).map((x) => d.nodes.find((n) => n.id === x)).filter((n) => n?.type === 'fuse');
 
   it('a feed to a DC panel or a second bus gets its own fuse at the bus, sized for its own wire', () => {
     // 0 battery, 1 bus, 2 inverter, 3 panel, 4 load on the panel, 5 sub-bus, 6 and 7 loads on it
@@ -354,7 +354,7 @@ describe('Size wires & fuses: cases from the independent review', () => {
     expect(estimateCurrents(d, 120).get(d.wires[1].id)).toBe(30);
   });
 
-  it('a tie between two buses that each have a battery is fused at both ends', () => {
+  it('a tie between two buses that each have a battery is protected from both ends', () => {
     const d = draw(['battery', 'bus-pos', 'battery', 'bus-pos', 'load', 'load'], { 0: { chemistry: 'agm' }, 2: { chemistry: 'agm' }, 4: { amps: 20 }, 5: { amps: 20 } });
     wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
     wire(d, 'pos', [2, 'pos'], [3, 's1'], 1);
@@ -362,10 +362,57 @@ describe('Size wires & fuses: cases from the independent review', () => {
     wire(d, 'pos', [1, 's3'], [4, 'pos'], 6);
     wire(d, 'pos', [3, 's3'], [5, 'pos'], 6);
     sizeDrawing(d);
+    // fused where it leaves bus A, and sized for battery 1's own fuse, which feeds it from bus B
     const tie = d.wires.find((w) => w.lengthFt > 8)!;
-    const ends = [tie.from.node, tie.to.node].map((id) => d.nodes.find((n) => n.id === id)!);
-    expect(ends.map((n) => n.type)).toEqual(['fuse', 'fuse']);
-    for (const f of ends) expect(carries(tie)).toBeGreaterThanOrEqual(f.data.rating as number);
+    const fuses = d.nodes.filter((n) => n.type === 'fuse');
+    expect([tie.from.node, tie.to.node].some((id) => fuses.some((f) => f.id === id))).toBe(true);
+    for (const f of fuses) expect(carries(tie)).toBeGreaterThanOrEqual(f.data.rating as number);
+  });
+
+  it('two banks on one bus, each fused at its battery: no extra fuse, and each feed carries the other fuse', () => {
+    const d = draw(['battery', 'fuse', 'battery', 'fuse', 'bus-pos', 'load'], { 0: { chemistry: 'agm' }, 1: { rating: 150 }, 2: { chemistry: 'agm' }, 3: { rating: 150 }, 5: { amps: 60 } });
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 0.5);
+    wire(d, 'pos', [2, 'pos'], [3, 'in'], 0.5);
+    wire(d, 'pos', [1, 'out'], [4, 's1'], 3);
+    wire(d, 'pos', [3, 'out'], [4, 's2'], 3);
+    wire(d, 'pos', [4, 's3'], [5, 'pos'], 6);
+    const r = sizeDrawing(d);
+    // only the load's own branch fuse: nothing between the battery fuses and the bus
+    expect(r.changes.filter((c) => c.startsWith('Added'))).toEqual(['Added a fuse where DC load leaves Positive busbar.']);
+    for (const [a, b] of [['n1', 'n4'], ['n3', 'n4']]) expect(carries(by(d, a, b)!)).toBeGreaterThanOrEqual(150);
+  });
+
+  it('an emergency link from the house bus to the start bus is a cranking circuit from both ends', () => {
+    // house bank + 3000 W inverter on one bus; start battery + 150 A starter on the other; a 12 ft link
+    const d = draw(['battery', 'bus-pos', 'inverter', 'battery', 'bus-pos', 'engine'], { 0: { chemistry: 'agm' }, 2: { watts: 3000 }, 3: { chemistry: 'agm' }, 5: { amps: 150 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
+    wire(d, 'pos', [1, 's2'], [2, 'dcpos'], 4);
+    wire(d, 'pos', [3, 'pos'], [4, 's1'], 1);
+    wire(d, 'pos', [4, 's2'], [5, 'pos'], 4);
+    wire(d, 'pos', [1, 's3'], [4, 's3'], 12);
+    sizeDrawing(d);
+    const link = d.wires.find((w) => w.lengthFt === 12)!;
+    expect([link.from.node, link.to.node]).toEqual(['n1', 'n4']); // no fuse at either end
+  });
+});
+
+describe('a 24 to 12 V converter', () => {
+  it('its output negative on a shared negative bus carries its own output, not the whole boat', () => {
+    const d = draw(['battery', 'bus-neg', 'converter', 'load', 'load'], { 0: { chemistry: 'agm' }, 2: { rating: 30 }, 3: { amps: 100 }, 4: { amps: 5, volts: 12 } });
+    d.systemVoltage = 24;
+    wire(d, 'neg', [0, 'neg'], [1, 's1'], 1, { gauge: '2/0' });
+    wire(d, 'neg', [2, 'outneg'], [1, 's2'], 3, { gauge: '10' });
+    wire(d, 'neg', [3, 'neg'], [1, 's3'], 6, { gauge: '4' });
+    expect(estimateCurrents(d).get(d.wires[1].id)).toBe(30);
+  });
+
+  it('the voltage drop on its 12 V feed is measured at 12 V', () => {
+    // 25 A over 15 ft of 14 AWG: about 8 % at 24 V, about 16 % at 12 V
+    const d = draw(['converter', 'bus-pos', 'load'], { 0: { rating: 30 }, 2: { amps: 25, volts: 12 } });
+    d.systemVoltage = 24;
+    wire(d, 'pos', [0, 'out'], [1, 's1'], 15, { gauge: '14' });
+    wire(d, 'pos', [1, 's2'], [2, 'pos'], 1, { gauge: '10' });
+    expect(audit(d).filter((f) => f.rule === 'conductor-sizing' && f.message.includes('voltage drop')).length).toBe(1);
   });
 
   it('a long run with its fuse at the device end also gets a fuse at the bus', () => {

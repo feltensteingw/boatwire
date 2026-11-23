@@ -69,6 +69,8 @@ const INLINE = new Set(['switch', 'contactor', 'bilge-switch']);
 const PANELS = new Set(['dc-panel', 'fuse-block', 'ac-panel']);
 
 type End = 'from' | 'to';
+/** Stands for a fuse that is there but not rated yet. */
+const UNRATED = 1e9;
 const other = (e: End): End => (e === 'from' ? 'to' : 'from');
 
 /**
@@ -186,6 +188,42 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     return reach.some((r) => r.node.type === 'engine' && r.term === 'pos') && reach.every((r) => (r.node.type === 'engine' && r.term === 'pos') || r.node.type === 'battery');
   };
   const isDevice = (n: DNode) => n.type === 'fuse' || n.type === 'breaker';
+  /**
+   * What can feed a wire from beyond one of its ends: for each battery there, the smallest fuse or
+   * breaker on the way to it. A battery reached with none on the way makes the wire unprotected from
+   * that side.
+   */
+  function backFeed(w: Wire, end: End): { unprotected: boolean; ratings: number[] } {
+    const out = { unprotected: false, ratings: [] as number[] };
+    const start = g.node.get(w[end].node);
+    if (!start) return out;
+    const best = new Map<string, number>([[start.id, Infinity]]);
+    const stack: [DNode, number][] = [[start, Infinity]];
+    while (stack.length) {
+      const [n, lim0] = stack.pop()!;
+      let lim = lim0;
+      if (n.type === 'battery') {
+        if (lim === Infinity) out.unprotected = true;
+        else out.ratings.push(lim);
+        continue;
+      }
+      // a fuse not rated yet (one this run has just added) still protects; its size comes later
+      if (isDevice(n)) lim = Math.min(lim, typeof n.data.rating === 'number' ? n.data.rating : UNRATED);
+      if (n.id !== start.id && (!NODE_DEFS[n.type].conducts || CHARGE_LINKS.has(n.type))) continue;
+      for (const t of n.terminals) {
+        for (const x of g.at.get(key(n.id, t.id)) ?? []) {
+          if (x.kind !== 'pos' || x.id === w.id) continue;
+          const o = g.node.get(x.from.node === n.id ? x.to.node : x.from.node);
+          if (!o) continue;
+          // revisit only on a less-protected path, so the worst case wins
+          if ((best.get(o.id) ?? -1) >= lim) continue;
+          best.set(o.id, lim);
+          stack.push([o, lim]);
+        }
+      }
+    }
+    return out;
+  }
   /** A bus or other part where several feeds meet, so a wire leaving it needs its own fuse there. */
   const junction = (n: DNode, term: string) =>
     NODE_DEFS[n.type].conducts && !isDevice(n) && !PANELS.has(n.type) && !CHARGE_LINKS.has(n.type) && !(INLINE.has(n.type) && (g.at.get(key(n.id, term)) ?? []).filter((x) => x.kind === 'pos').length === 1);
@@ -203,12 +241,15 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     // The end it is fed from. A fuse already at the far end counts only on a short link (a fuse
     // mounted at the bus): on a longer run the run itself is not protected for its own size.
     const shortToDevice = isDevice(D) && w.lengthFt * 12 <= BATTERY_FUSE_MAX_IN;
-    if (junction(U, w[at].term) && !shortToDevice && !cranking(w, other(at))) {
+    // A cranking circuit is one from both ends: no fuse of its own at either (as in the ideal design).
+    const crank = cranking(w, other(at)) || cranking(w, at);
+    if (junction(U, w[at].term) && !shortToDevice && !crank) {
       const why = isDevice(D) ? `where the run to ${name(D)} leaves ${name(U)} (a fuse at the far end of a run does not protect the run)` : `where ${name(D)}${D.type === 'load' ? '' : "'s feed"} leaves ${name(U)}`;
       branches.push({ w, at, why });
     }
-    // The other end too, when a battery can also feed the wire from there (a tie between two buses).
-    if (junction(D, w[other(at)].term) && beyond(w, other(at)).some((r) => r.node.type === 'battery') && !cranking(w, at)) {
+    // The other end too, when a battery can feed the wire from there with no fuse on the way (a tie
+    // between two buses). Through a fuse it is covered by that fuse instead: see backFeed below.
+    if (junction(D, w[other(at)].term) && !crank && backFeed(w, other(at)).unprotected) {
       branches.push({ w, at: other(at), why: `at the ${name(D)} end of the tie to ${name(U)}, which a battery feeds from both ends` });
     }
   }
@@ -379,6 +420,26 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const back = passThrough(U, w[at].term).flatMap((t) => (g.at.get(key(U.id, t)) ?? []).filter((x) => x.kind === 'pos' && x.id !== w.id && up.get(x.id) !== undefined && x[other(up.get(x.id)!)].node === U.id));
     return own.concat(back.flatMap((x) => cover(x, depth + 1)));
   };
+  /**
+   * A battery beyond the far end of a wire can push fault current into it through its own fuse: the
+   * wire must carry that fuse's rating as well (a tie between two buses, a second bank on one bus).
+   */
+  const feedFromBeyond = (w: Wire): { rating: number; id: string }[] => {
+    const at = up.get(w.id);
+    if (!at || w.kind !== 'pos' || cranking(w, at) || cranking(w, other(at))) return [];
+    const U = nodeOf(w[at].node)!;
+    const D = nodeOf(w[other(at)].node)!;
+    // The end it is fed from is already covered by cover() when it is a fuse, a breaker, a panel
+    // position or a switch; a bare bus there (the fuse of a tie went in at the other end) is not.
+    // Nor is a bus with its fuse mounted on a short link at the far end: that link is accepted as is.
+    const shortToDevice = isDevice(D) && w.lengthFt * 12 <= BATTERY_FUSE_MAX_IN;
+    const ends: End[] = [other(at)];
+    if (junction(U, w[at].term) && !shortToDevice) ends.push(at);
+    return ends
+      .flatMap((e) => backFeed(w, e).ratings)
+      .filter((r) => r < UNRATED)
+      .map((r) => ({ rating: r, id: '' }));
+  };
   // A negative has no fuse of its own; it is sized like the positive of the same component, so the
   // return can carry whatever that positive's fuse lets through.
   const pairedCover = (w: Wire) =>
@@ -394,7 +455,7 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     });
   for (const w of d.wires) {
     if (!(w.kind === 'pos' || w.kind === 'neg' || w.kind === 'ac')) continue;
-    const covers = w.kind === 'neg' ? pairedCover(w) : cover(w);
+    const covers = w.kind === 'neg' ? pairedCover(w) : cover(w).concat(feedFromBeyond(w));
     // In a focus, a wire outside it is still resized when a fuse it hangs on was raised or set here.
     if (!wireInScope(w) && !covers.some((c) => changed.has(c.id))) continue;
     const a = current(w);

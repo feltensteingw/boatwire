@@ -323,8 +323,14 @@ export function circuitVolts(g: Graph, w: Wire, V: number, acV: number): number 
   const ends = [w.from, w.to].map((e) => g.node.get(e.node));
   const load = ends.find((n) => n?.type === 'load');
   if (load) return Number(load.data.volts ?? V);
-  const reach = [w.from, w.to].flatMap((e) => walk(g, e, [w.kind], { stopAt: CHARGE_LINKS }).concat(ends.filter((n): n is DNode => !!n).map((node) => ({ node, term: '', protectedPath: false, switched: false, selected: false, via: [] }))));
+  const reach = [w.from, w.to].flatMap((e) => {
+    const n = g.node.get(e.node);
+    return walk(g, e, [w.kind], { stopAt: CHARGE_LINKS }).concat(n ? [{ node: n, term: e.term, protectedPath: false, switched: false, selected: false, via: [] }] : []);
+  });
   if (reach.some((r) => r.node.type === 'battery')) return V;
+  // the 12 V side of a 24-to-12 V converter
+  const conv = reach.find((r) => r.node.type === 'converter' && (r.term === 'out' || r.term === 'outneg'));
+  if (conv) return Number(conv.node.data.outVolts ?? 12);
   const panel = reach.map((r) => r.node).find((n) => n.type === 'solar-panel' && Number(n.data.amps) > 0 && Number(n.data.watts) > 0);
   return panel ? Number(panel.data.watts) / Number(panel.data.amps) : V;
 }
@@ -408,8 +414,9 @@ export function estimateCurrents(design: Design, acVolts = 120): Map<string, num
       const t = r.node.type;
       const d = r.node.data;
       if (t === 'battery') out.bat = true;
-      else if (t === 'converter' && (r.term === 'out' || r.term === 'outneg')) {
+      else if (t === 'converter' && r.term === 'out') {
         // a 24-to-12 V converter feeds its 12 V side as a battery does: the loads there set the current
+        // (its output negative is an ordinary source return: on a shared negative bus it is not a battery)
         out.bat = true;
         out.src += Number(d.rating ?? 0);
       }
