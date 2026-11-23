@@ -23,7 +23,7 @@ import { autoLayout, cachedLayout, manualLayout, sameFootprint, viewShift, type 
 import type { Design, Finding, Wire } from '../model/types';
 import { focusNodes, inFocus } from '../engine/focus';
 import { FocusPicker } from './FocusPicker';
-import { severityByNode, useUnits } from '../state/derived';
+import { acVoltsOf, severityByNode, useUnits } from '../state/derived';
 import { useStore } from '../state/store';
 import { SymbolNode, type SymbolFlowNode } from './symbols';
 import { UnderlayControls, UnderlayImage } from './Underlay';
@@ -69,7 +69,9 @@ export function Diagram(props: Props) {
 }
 
 function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }: Props) {
-  const layers = useStore((s) => s.layers);
+  const storeLayers = useStore((s) => s.layers);
+  // A report or exported picture shows the whole boat, whatever is in focus on screen.
+  const layers = useMemo(() => (readOnly && storeLayers.focus && storeLayers.focus !== 'all' ? { ...storeLayers, focus: 'all' as const } : storeLayers), [readOnly, storeLayers]);
   const nonce = useStore((s) => s.layoutNonce);
   const selection = useStore((s) => s.selection);
   const select = useStore((s) => s.select);
@@ -149,7 +151,8 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }:
 
   const units = useUnits();
   const severities = useMemo(() => severityByNode(findings), [findings]);
-  const currents = useMemo(() => estimateCurrents(design), [design]);
+  const acVolts = useStore((s) => acVoltsOf(s.project));
+  const currents = useMemo(() => estimateCurrents(design, acVolts), [design, acVolts]);
   // On the hand drawing a focus fades what is outside it (the ideal design hides it in the layout).
   // A part with no wires yet stays clear: it has just been added and is about to be wired in.
   const faded = useMemo(() => {

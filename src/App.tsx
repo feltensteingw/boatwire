@@ -26,7 +26,7 @@ import { useMenu } from './ui/useMenu';
 import { NewBoatWizard, useNewBoat } from './ui/NewBoat';
 import { isUntouched } from './model/examples';
 import { lenUnit } from './model/units';
-import { redo, undo, useHistory } from './state/history';
+import { redo, startNewStep, undo, useHistory } from './state/history';
 import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
 import { parseProject } from './model/validate';
 import { toast } from './ui/toastStore';
@@ -633,7 +633,10 @@ function ExistingView() {
               const result = sizeDrawing(d, { acVolts: acVoltsOf(project), units: project.profile.units, only: focusNodes(d, focus) });
               const c = result.counts;
               const changed = c.fusesAdded + c.rated + c.raised + c.sized + c.upsized > 0;
-              if (changed) setExisting({ ...copy, nodes: d.nodes, wires: d.wires });
+              if (changed) {
+                startNewStep(); // never merged with the owner's last edit, so Undo takes back exactly this
+                setExisting({ ...copy, nodes: d.nodes, wires: d.wires });
+              }
               setSizing({ result, scope: focus === 'all' ? '' : (FOCUS_OPTIONS.find((o) => o.id === focus)?.label ?? ''), changed });
             }}
           >

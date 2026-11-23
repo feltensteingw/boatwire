@@ -39,7 +39,11 @@ const BRIDGES = new Set<NodeType>(['charger', 'inverter', 'inverter-charger']);
  */
 export function focusNodes(design: Design, focus: Focus | undefined): Set<string> | undefined {
   if (!focus || focus === 'all') return undefined;
-  if (focus === 'ac') return new Set(design.nodes.filter((n) => n.domain === 'ac' || BRIDGES.has(n.type)).map((n) => n.id));
+  if (focus === 'ac') {
+    // also a DC-type part wired into the AC side, such as a breaker drawn as the shore main
+    const onAc = new Set(design.wires.filter((w) => w.kind === 'ac').flatMap((w) => [w.from.node, w.to.node]));
+    return new Set(design.nodes.filter((n) => n.domain === 'ac' || BRIDGES.has(n.type) || onAc.has(n.id)).map((n) => n.id));
+  }
   const seedTypes = new Set(SEEDS[focus]);
   const byId = new Map(design.nodes.map((n) => [n.id, n]));
   const out = new Set<string>();
@@ -47,6 +51,9 @@ export function focusNodes(design: Design, focus: Focus | undefined): Set<string
   for (const s of seeds) out.add(s.id);
   // A bridge's AC side is not part of a DC focus: only its DC wires are followed (the wire kinds below).
   const passes = (n: DNode) => NODE_DEFS[n.type].conducts && (focus === 'charging' || !CHARGE_LINKS.has(n.type));
+  // The negative runs go back only to the batteries a part's positive runs reach: the shared negative
+  // bus would otherwise bring in every bank on the boat.
+  const reachedOnPos = new Map<string, Set<string>>();
   for (const kind of ['pos', 'neg'] as WireKind[]) {
     const adj = new Map<string, string[]>();
     for (const w of design.wires) {
@@ -65,6 +72,11 @@ export function focusNodes(design: Design, focus: Focus | undefined): Set<string
         const n = byId.get(id);
         if (!n) continue;
         if (id !== s.id && (n.type === 'battery' || seedTypes.has(n.type))) {
+          const mine = reachedOnPos.get(s.id);
+          if (kind === 'pos') {
+            if (!mine) reachedOnPos.set(s.id, new Set([id]));
+            else mine.add(id);
+          } else if (n.type === 'battery' && mine?.size && !mine.has(id)) continue;
           for (let p: string | null = id; p !== null; p = parent.get(p) ?? null) out.add(p);
           // The end of this run: a battery does not conduct to its other wires, and another
           // starting component follows its own runs.
