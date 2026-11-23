@@ -421,16 +421,32 @@ describe('cranking circuits are exempt, branches off a start bus are not', () =>
     expect(by(d, 'n1', 'n2')).toBeDefined();
   });
 
-  it('a house bus with an inverter and an emergency link to a start bus: the inverter is fused, the link is not', () => {
-    const d = draw(['battery', 'bus-pos', 'inverter', 'battery', 'bus-pos', 'engine'], { 0: { chemistry: 'agm' }, 2: { watts: 3000 }, 3: { chemistry: 'agm' }, 5: { amps: 150 } });
+  it('a house bus with an inverter and an emergency parallel switch to a start bus: the inverter is fused, the switch link is not', () => {
+    const d = draw(['battery', 'bus-pos', 'inverter', 'battery', 'bus-pos', 'engine', 'switch'], { 0: { chemistry: 'agm' }, 2: { watts: 3000 }, 3: { chemistry: 'agm' }, 5: { amps: 150 } });
     wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
     wire(d, 'pos', [1, 's2'], [2, 'dcpos'], 4);
     wire(d, 'pos', [3, 'pos'], [4, 's1'], 1);
     wire(d, 'pos', [4, 's2'], [5, 'pos'], 4);
-    wire(d, 'pos', [1, 's3'], [4, 's3'], 12);
+    wire(d, 'pos', [1, 's3'], [6, 'in'], 6);
+    wire(d, 'pos', [6, 'out'], [4, 's3'], 6);
     sizeDrawing(d);
     expect(fuseOn(d, 'n2').length).toBe(1);
-    expect(by(d, 'n1', 'n4')).toBeDefined();
+    expect(by(d, 'n1', 'n6')).toBeDefined();
+    expect(by(d, 'n6', 'n4')).toBeDefined();
+  });
+
+  it('a permanent tie wired straight from a start bus to a house bus is protected like any tie', () => {
+    const d = draw(['battery', 'bus-pos', 'engine', 'battery', 'bus-pos', 'load'], { 0: { chemistry: 'agm' }, 2: { amps: 150 }, 3: { chemistry: 'agm' }, 5: { amps: 60 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
+    wire(d, 'pos', [1, 's2'], [2, 'pos'], 4);
+    wire(d, 'pos', [3, 'pos'], [4, 's1'], 1);
+    wire(d, 'pos', [4, 's2'], [5, 'pos'], 6);
+    wire(d, 'pos', [1, 's3'], [4, 's3'], 10);
+    sizeDrawing(d);
+    const tie = d.wires.find((w) => w.lengthFt > 8)!;
+    const fuses = d.nodes.filter((n) => n.type === 'fuse');
+    expect([tie.from.node, tie.to.node].some((id) => fuses.some((f) => f.id === id))).toBe(true);
+    for (const f of fuses.filter((f) => fuseOn(d, 'n0').includes(f) || fuseOn(d, 'n3').includes(f))) expect(carries(tie)).toBeGreaterThanOrEqual(f.data.rating as number);
   });
 });
 

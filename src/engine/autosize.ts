@@ -189,11 +189,16 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
   };
   /**
    * Is this wire a cranking circuit? Either what it feeds is only starters and batteries (a starter
-   * cable), or it is a link with a battery at each end and one end is a start side (an emergency
-   * parallel between a house bus and a start bus). An ordinary branch off a start bus (an alternator,
-   * a load, a charging relay) has no battery beyond its far end, so it is not one.
+   * cable), or it is one side of an emergency parallel: a link through a switch, with a battery at
+   * each end and one end a start side. An ordinary branch off a start bus (an alternator, a load, a
+   * charging relay) has no battery beyond its far end, so it is not one; nor is a permanent tie wired
+   * straight from bus to bus, which carries load current all the time.
    */
-  const crankingLink = (w: Wire, at: End) => cranking(w, other(at)) || (beyond(w, other(at)).some((r) => r.node.type === 'battery') && cranking(w, at));
+  const crankingLink = (w: Wire, at: End) => {
+    if (cranking(w, other(at))) return true;
+    const viaSwitch = [w.from, w.to].some((e) => g.node.get(e.node)?.type === 'switch');
+    return viaSwitch && beyond(w, other(at)).some((r) => r.node.type === 'battery') && cranking(w, at);
+  };
   const isDevice = (n: DNode) => n.type === 'fuse' || n.type === 'breaker';
   /**
    * What can feed a wire from beyond one of its ends: for each battery there, the smallest fuse or
