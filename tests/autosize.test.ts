@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { audit, estimateCurrents } from '../src/engine/audit';
+import { ampacity } from '../src/engine/calc';
 import { sizeDrawing } from '../src/engine/autosize';
 import { existingFromIdeal, paletteNode } from '../src/engine/existing';
 import { focusNodes } from '../src/engine/focus';
@@ -47,8 +48,6 @@ describe('Size wires and fuses', () => {
   it('a bare circuit drawn with no fuse and no sizes comes out passing the check', () => {
     // battery → positive bus → cabin lights, and the negative back
     const d = draw(['battery', 'bus-pos', 'load', 'bus-neg'], { 0: { chemistry: 'agm' }, 2: { amps: 8 } });
-    d.nodes[1].terminals.push({ id: 's1', pol: 'pos', side: 'E' }, { id: 's2', pol: 'pos', side: 'E' });
-    d.nodes[3].terminals.push({ id: 's1', pol: 'neg', side: 'E' }, { id: 's2', pol: 'neg', side: 'E' });
     wire(d, 'pos', [0, 'pos'], [1, 's1'], 3);
     wire(d, 'pos', [1, 's2'], [2, 'pos'], 15);
     wire(d, 'neg', [2, 'neg'], [3, 's1'], 15);
@@ -115,7 +114,9 @@ describe('Size wires and fuses', () => {
     const power = d.wires.filter((w) => w.kind === 'pos' || w.kind === 'neg' || w.kind === 'ac');
     const out = power.filter((w) => !only.has(w.from.node) || !only.has(w.to.node));
     expect(out.length).toBeGreaterThan(10);
-    expect(out.filter((w) => w.gauge)).toEqual([]);
+    // only a wire outside that hangs on a fuse or breaker inside it, whose rating was just set, is sized
+    expect(out.filter((w) => w.gauge && !only.has(w.from.node) && !only.has(w.to.node))).toEqual([]);
+    expect(out.filter((w) => w.gauge).length).toBeLessThan(4);
     const inside = power.filter((w) => only.has(w.from.node) && only.has(w.to.node));
     expect(inside.filter((w) => !w.gauge).map((w) => w.id)).toEqual([]);
   });
@@ -228,5 +229,126 @@ describe('current estimates for a hand drawing (shared by the check and sizing)'
     expect(d.nodes[1].data.fuseClass).toBe('Class T');
     expect(sizingErrors(d)).toEqual([]);
     expect(r.notes).toEqual([]);
+  });
+});
+
+describe('Size wires & fuses: cases from the independent review', () => {
+  /** What a wire can carry, parallel runs included. */
+  const carries = (w: Wire) => ampacity(w.gauge!, w.inEngineSpace, w.kind === 'ac', w.bundledWith) * (w.cable?.match(/^(\d+)× /) ? Number(w.cable.split('×')[0]) : 1);
+  const by = (d: Design, a: string, b: string) => d.wires.find((w) => (w.from.node === a && w.to.node === b) || (w.from.node === b && w.to.node === a));
+  const fuseOn = (d: Design, id: string) => d.wires.map((w) => (w.from.node === id ? w.to.node : w.to.node === id ? w.from.node : undefined)).map((x) => d.nodes.find((n) => n.id === x)).filter((n) => n?.type === 'fuse');
+
+  it('a feed to a DC panel or a second bus gets its own fuse at the bus, sized for its own wire', () => {
+    // 0 battery, 1 bus, 2 inverter, 3 panel, 4 load on the panel, 5 sub-bus, 6 and 7 loads on it
+    const d = draw(['battery', 'bus-pos', 'inverter', 'dc-panel', 'load', 'bus-pos', 'load', 'load'], { 0: { chemistry: 'agm' }, 2: { watts: 2000 }, 4: { amps: 10 }, 6: { amps: 8 }, 7: { amps: 6 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 2);
+    wire(d, 'pos', [1, 's2'], [2, 'dcpos'], 4);
+    wire(d, 'pos', [1, 's3'], [3, 'in'], 10);
+    wire(d, 'pos', [3, 'b1'], [4, 'pos'], 10);
+    wire(d, 'pos', [1, 's4'], [5, 's1'], 10);
+    wire(d, 'pos', [5, 's2'], [6, 'pos'], 6);
+    wire(d, 'pos', [5, 's3'], [7, 'pos'], 6);
+    sizeDrawing(d);
+    // the panel feed and the sub-bus feed each start at a fuse on the main bus
+    for (const id of ['n3', 'n5']) {
+      const feed = d.wires.find((w) => [w.from.node, w.to.node].includes(id) && (w.from.term === 'in' || w.to.term === 'in' || w.from.term === 's1' || w.to.term === 's1'))!;
+      const f = d.nodes.find((n) => n.type === 'fuse' && [feed.from.node, feed.to.node].includes(n.id))!;
+      expect(f, id).toBeDefined();
+      expect(carries(feed)).toBeGreaterThanOrEqual(f.data.rating as number);
+      expect(f.data.rating).toBeLessThanOrEqual(30);
+    }
+    expect(sizingErrors(d)).toEqual([]);
+  });
+
+  it('a battery wired straight to a panel or fuse block gets a battery fuse', () => {
+    const d = draw(['battery', 'fuse-block', 'load'], { 0: { chemistry: 'agm' }, 2: { amps: 4 } });
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 1);
+    wire(d, 'pos', [1, 'f1'], [2, 'pos'], 6);
+    sizeDrawing(d);
+    expect(fuseOn(d, 'n0').length).toBe(1);
+  });
+
+  it('the main negative carries the charge current coming back, and matches the battery fuse', () => {
+    const d = draw(['battery', 'bus-pos', 'bus-neg', 'alternator', 'charger', 'mppt', 'load'], { 0: { chemistry: 'agm' }, 3: { amps: 150 }, 4: { amps: 40 }, 5: { amps: 30 }, 6: { amps: 5 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 2);
+    wire(d, 'neg', [0, 'neg'], [2, 's1'], 2);
+    for (const [i, p, n] of [[3, 'b', 'neg'], [4, 'out1', 'neg'], [5, 'bat', 'batneg'], [6, 'pos', 'neg']] as [number, string, string][]) {
+      wire(d, 'pos', [i, p], [1, `s${i}`], 6);
+      wire(d, 'neg', [i, n], [2, `s${i}`], 6);
+    }
+    expect(estimateCurrents(d).get(d.wires[1].id)).toBeGreaterThanOrEqual(220);
+    sizeDrawing(d);
+    const batFuse = fuseOn(d, 'n0')[0]!;
+    const mainNeg = by(d, 'n0', 'n2')!;
+    expect(carries(mainNeg)).toBeGreaterThanOrEqual(batFuse.data.rating as number);
+    expect(sizingErrors(d)).toEqual([]);
+  });
+
+  it('a wire after a switch is sized for the fuse in front of the switch', () => {
+    const d = draw(['battery', 'bus-pos', 'switch', 'load', 'switch', 'engine'], { 0: { chemistry: 'agm' }, 3: { amps: 33 }, 5: { amps: 150 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 2);
+    wire(d, 'pos', [1, 's2'], [2, 'in'], 4);
+    wire(d, 'pos', [2, 'out'], [3, 'pos'], 8);
+    wire(d, 'pos', [0, 'pos'], [4, 'in'], 2);
+    wire(d, 'pos', [4, 'out'], [5, 'pos'], 6);
+    sizeDrawing(d);
+    const loadFuse = fuseOn(d, 'n2')[0]!;
+    expect(carries(by(d, 'n2', 'n3')!)).toBeGreaterThanOrEqual(loadFuse.data.rating as number);
+    const startFuse = d.nodes.find((n) => n.type === 'fuse' && by(d, n.id, 'n4'))!;
+    expect(startFuse.data.rating).toBe(300);
+    expect(carries(by(d, 'n4', 'n5')!)).toBeGreaterThanOrEqual(300);
+  });
+
+  it('in a focus, a raised fuse also enlarges the wires on it outside the focus', () => {
+    // battery → 50 A fuse → bus with a 100 A alternator; the same fuse also feeds a DC panel on 6 AWG
+    const d = draw(['battery', 'fuse', 'bus-pos', 'alternator', 'dc-panel', 'load'], { 0: { chemistry: 'agm' }, 1: { rating: 50 }, 3: { amps: 100 }, 5: { amps: 5 } });
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 0.5, { gauge: '6' });
+    wire(d, 'pos', [1, 'out'], [2, 's1'], 2, { gauge: '6' });
+    wire(d, 'pos', [3, 'b'], [2, 's2'], 6, { gauge: '4' });
+    wire(d, 'pos', [1, 'out'], [4, 'in'], 6, { gauge: '6' });
+    wire(d, 'pos', [4, 'b1'], [5, 'pos'], 6, { gauge: '14' });
+    const before = sizingErrors(d).length;
+    sizeDrawing(d, { only: focusNodes(d, 'charging') });
+    expect(sizingErrors(d).length).toBeLessThanOrEqual(before);
+    expect(sizingErrors(d).filter((e) => e.includes('protected by'))).toEqual([]);
+  });
+
+  it('a panel position its load would trip is raised', () => {
+    const d = draw(['battery', 'fuse', 'dc-panel', 'load'], { 0: { chemistry: 'agm' }, 1: { rating: undefined }, 3: { amps: 25 } });
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 0.5);
+    wire(d, 'pos', [1, 'out'], [2, 'in'], 4);
+    wire(d, 'pos', [2, 'b1'], [3, 'pos'], 6);
+    const r = sizeDrawing(d);
+    expect(d.nodes[2].terminals.find((t) => t.id === 'b1')!.rating).toBe(40); // 25 A × 1.25 = 31 A: the next DC breaker after 30 A
+    expect(r.counts.raised).toBe(1);
+  });
+
+  it('a 24 to 12 V converter fed from a bus gets a fuse on its input', () => {
+    const d = draw(['battery', 'bus-pos', 'converter'], { 0: { chemistry: 'agm' }, 2: { rating: 20 } });
+    d.systemVoltage = 24;
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 2);
+    wire(d, 'pos', [1, 's2'], [2, 'in'], 6);
+    const r = sizeDrawing(d);
+    expect(r.counts.fusesAdded).toBe(2);
+    expect(fuseOn(d, 'n2').length).toBe(1);
+  });
+
+  it("an inverter/charger's shore feed carries what it passes through and its charging", () => {
+    const d = draw(['shore-inlet', 'elci', 'inverter-charger', 'ac-panel', 'ac-load'], { 0: { amps: 30 }, 2: { watts: 2000, amps: 60 }, 4: { amps: 8 } });
+    wire(d, 'ac', [0, 'l'], [1, 'in'], 6);
+    wire(d, 'ac', [1, 'out'], [2, 'acin'], 10);
+    wire(d, 'ac', [2, 'acout'], [3, 'in'], 4);
+    wire(d, 'ac', [3, 'b1'], [4, 'l'], 10);
+    // 8 A passed through + 60 A × 12 V / (120 V × 0.85) of charging ≈ 15 A
+    expect(estimateCurrents(d, 120).get(d.wires[1].id)).toBeCloseTo(8 + (60 * 12) / (120 * 0.85), 6);
+  });
+
+  it('an AC circuit never carries more than its shore inlet can give', () => {
+    const d = draw(['shore-inlet', 'elci', 'ac-panel', 'ac-load', 'ac-load'], { 0: { amps: 30 }, 3: { amps: 20 }, 4: { amps: 18 } });
+    wire(d, 'ac', [0, 'l'], [1, 'in'], 6);
+    wire(d, 'ac', [1, 'out'], [2, 'in'], 10);
+    wire(d, 'ac', [2, 'b1'], [3, 'l'], 10);
+    wire(d, 'ac', [2, 'b2'], [4, 'l'], 10);
+    expect(estimateCurrents(d, 120).get(d.wires[1].id)).toBe(30);
   });
 });

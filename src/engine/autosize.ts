@@ -48,6 +48,7 @@ const PV_CURRENT_FACTOR = 1.1 * 1.25;
  * fuse on its own positive (PV− with PV+, BAT− with BAT+), not for the biggest fuse on the part.
  */
 const NEG_PAIR: Record<string, Record<string, string[]>> = {
+  battery: { neg: ['pos'] },
   load: { neg: ['pos'] },
   engine: { neg: ['pos'] },
   alternator: { neg: ['b'] },
@@ -63,37 +64,46 @@ const NEG_PAIR: Record<string, Record<string, string[]>> = {
 
 /** Parts a feed passes straight through on its way to a load (they protect nothing). */
 const INLINE = new Set(['switch', 'contactor', 'bilge-switch']);
+/** Parts whose output positions carry their own rating (the input does not protect anything). */
+const PANELS = new Set(['dc-panel', 'fuse-block', 'ac-panel']);
+
+type End = 'from' | 'to';
+const other = (e: End): End => (e === 'from' ? 'to' : 'from');
 
 /**
- * Where a component's own feed first meets the rest of the system. Every load and every charging
- * source needs its own fuse or breaker there, at the bus or battery end: a branch protected only by a
- * big main fuse further back is not protected for its own (smaller) wire. Follows the feed through a
- * switch or contactor. Returns the wire and end that need the fuse, or nothing when a fuse, breaker
- * or rated panel position is already the first thing reached (or the feed is not a simple chain).
+ * Which end of each positive wire is nearer a battery: a walk out from every battery along positive
+ * wires, through buses, switches and fuses but not through a charging relay or isolator (each side of
+ * one is fed from its own bank). Wires the walk never reaches (between solar panels and their
+ * controller, say) are not in the map.
  */
-function branchEnd(g: Graph, n: DNode, term: string): { w: Wire; at: 'from' | 'to' } | undefined {
-  let cur = { node: n.id, term };
-  for (let hop = 0; hop < 8; hop++) {
-    const ws = (g.at.get(key(cur.node, cur.term)) ?? []).filter((w) => w.kind === 'pos');
-    if (ws.length !== 1) return undefined;
-    const w = ws[0];
-    const at = w.from.node === cur.node && w.from.term === cur.term ? 'to' : 'from';
-    const fe = w[at];
-    const far = g.node.get(fe.node);
-    if (!far || NODE_DEFS[far.type].protective || far.type === 'battery') return undefined;
-    if (INLINE.has(far.type)) {
-      const through = passThrough(far, fe.term);
-      // anything else on that terminal makes it a junction: the fuse goes there
-      if (through.length !== 1 || (g.at.get(key(far.id, fe.term)) ?? []).filter((x) => x.kind === 'pos').length > 1) return { w, at };
-      cur = { node: far.id, term: through[0] };
-      continue;
-    }
-    // A charging relay or isolator is fused on its own sides; a non-conducting part ends the feed.
-    if (!NODE_DEFS[far.type].conducts || far.type === 'acr' || far.type === 'isolator') return undefined;
-    return { w, at }; // a bus, or another junction
+function upstreamEnds(g: Graph, d: Design): Map<string, End> {
+  const up = new Map<string, End>();
+  const seen = new Set<string>();
+  const queue: string[] = [];
+  for (const n of d.nodes) {
+    if (n.type !== 'battery') continue;
+    seen.add(n.id);
+    queue.push(n.id);
   }
-  return undefined;
+  while (queue.length) {
+    const id = queue.shift()!;
+    const n = g.node.get(id)!;
+    const terms = n.type === 'battery' ? ['pos'] : n.terminals.map((t) => t.id);
+    for (const t of terms) {
+      for (const w of g.at.get(key(id, t)) ?? []) {
+        if (w.kind !== 'pos' || up.has(w.id)) continue;
+        const here: End = w.from.node === id && w.from.term === t ? 'from' : 'to';
+        up.set(w.id, here);
+        const next = g.node.get(w[other(here)].node);
+        if (!next || seen.has(next.id)) continue;
+        seen.add(next.id);
+        if (NODE_DEFS[next.type].conducts && !CHARGE_LINKS.has(next.type)) queue.push(next.id);
+      }
+    }
+  }
+  return up;
 }
+
 const runsOf = (w: Wire) => (w.cable?.match(/^(\d+)× /) ? Number(w.cable.split('×')[0]) : 1);
 
 export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
@@ -134,7 +144,7 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
   };
 
   // ---- 1. missing protection
-  // a. a battery positive cable to anything but a fuse or breaker
+  // a. a battery positive cable to anything but a fuse or breaker (a panel's input protects nothing)
   let g = buildGraph(d);
   for (const bat of d.nodes.filter((n) => n.type === 'battery' && inScope(n.id))) {
     for (const w of [...(g.at.get(key(bat.id, 'pos')) ?? [])]) {
@@ -142,23 +152,44 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
       const at = w.from.node === bat.id ? 'from' : 'to';
       const o = g.node.get(w[at === 'from' ? 'to' : 'from'].node)!;
       // two batteries joined in one bank: a link, not a feed (the check is to learn this, T28)
-      if (NODE_DEFS[o.type].protective || o.type === 'battery') continue;
+      if (o.type === 'fuse' || o.type === 'breaker' || o.type === 'elci' || o.type === 'battery') continue;
       insertFuse(w, at, `at ${name(bat)}, on its cable to ${name(o)}`);
     }
   }
-  // b. every load and charging source gets its own fuse where its feed meets a bus
+  // b. every branch gets its own fuse where it leaves a bus: a load, a charging source, a feed to a
+  //    panel, fuse block, sub-bus, charging relay or DC-DC charger. A branch protected only by a big
+  //    fuse further back is not protected for its own (smaller) wire. Not a starter cable, which
+  //    needs no fuse of its own (it is still fused at the battery, above).
   g = buildGraph(d);
-  for (const n of d.nodes.filter((x) => inScope(x.id))) {
-    const terms = n.type === 'load' ? ['pos'] : (SOURCE_TERMS[n.type] ?? []).filter((t) => n.terminals.some((x) => x.id === t));
-    for (const t of terms) {
-      const b = branchEnd(g, n, t);
-      if (!b || !wireInScope(b.w)) continue;
-      const far = g.node.get(b.w[b.at].node);
-      insertFuse(b.w, b.at, n.type === 'load' ? `for ${name(n)}, where its feed meets ${name(far)}` : `on ${name(n)}'s output, where it meets ${name(far)}`);
-      g = buildGraph(d);
+  let up = upstreamEnds(g, d);
+  const ratePositions: { n: DNode; term: string }[] = [];
+  const starterOnly = (w: Wire, downEnd: End) => {
+    const e = w[downEnd];
+    const n = g.node.get(e.node)!;
+    const reach = NODE_DEFS[n.type].conducts ? walk(g, e, ['pos'], { exclude: w.id }).concat(passThrough(n, e.term).flatMap((t) => walk(g, { node: n.id, term: t }, ['pos'], { exclude: w.id }))) : [{ node: n, term: e.term }];
+    return reach.length > 0 && reach.every((r) => r.node.type === 'engine' && r.term === 'pos');
+  };
+  const branches: { w: Wire; at: End; why: string }[] = [];
+  for (const w of d.wires) {
+    const at = up.get(w.id);
+    if (!at || !wireInScope(w)) continue;
+    const U = g.node.get(w[at].node)!;
+    const D = g.node.get(w[other(at)].node)!;
+    if (U.type === 'battery' || D.type === 'battery') continue; // a battery cable: handled above
+    if (U.type === 'fuse' || U.type === 'breaker' || D.type === 'fuse' || D.type === 'breaker') continue;
+    if (PANELS.has(U.type)) {
+      if (w[at].term !== 'in') ratePositions.push({ n: U, term: w[at].term });
+      continue;
     }
+    if (!NODE_DEFS[U.type].conducts) continue;
+    // straight through a switch or contactor with nothing else on that terminal: the fuse further back covers it
+    if (INLINE.has(U.type) && (g.at.get(key(U.id, w[at].term)) ?? []).filter((x) => x.kind === 'pos').length === 1) continue;
+    if (starterOnly(w, other(at))) continue;
+    branches.push({ w, at, why: `where ${name(D)}${D.type === 'load' ? '' : "'s feed"} leaves ${name(U)}` });
   }
-  // c. a charging source that still reaches a battery with no fuse: fuse its cable at the far end
+  for (const b of branches) insertFuse(b.w, b.at, b.why);
+  // c. a charging source that still reaches a battery with no fuse (it is not wired to any battery
+  //    through a bus, e.g. an alternator straight into an isolator): fuse its cable at the far end
   g = buildGraph(d);
   for (const n of d.nodes.filter((x) => inScope(x.id))) {
     for (const t of SOURCE_TERMS[n.type] ?? []) {
@@ -167,31 +198,18 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
       if (!unprotected) continue;
       const w = (g.at.get(key(n.id, t)) ?? []).find((x) => x.kind === 'pos' && wireInScope(x));
       if (!w) continue;
-      const farEnd = w.from.node === n.id && w.from.term === t ? 'to' : 'from';
+      const farEnd: End = w.from.node === n.id && w.from.term === t ? 'to' : 'from';
       const far = g.node.get(w[farEnd].node);
-      if (far && NODE_DEFS[far.type].protective) continue; // e.g. an unrated panel position: rated below
+      if (far && NODE_DEFS[far.type].protective) continue;
       insertFuse(w, farEnd, `on ${name(n)}'s output, at the ${name(far)} end`);
       g = buildGraph(d);
     }
   }
-  // d. a load that still has no fuse or breaker between it and the battery, or hangs on an unrated
-  //    panel or fuse-block position
+  // d. every rated position on a panel or fuse block that something hangs on is checked too
   g = buildGraph(d);
-  const ratePositions: { n: DNode; term: string }[] = [];
-  for (const n of d.nodes.filter((x) => x.type === 'load' && inScope(x.id))) {
-    const toBat = walk(g, { node: n.id, term: 'pos' }, ['pos']).filter((r) => r.node.type === 'battery');
-    if (!toBat.some((r) => !r.protectedPath)) continue;
-    const w = (g.at.get(key(n.id, 'pos')) ?? []).find((x) => x.kind === 'pos' && wireInScope(x));
-    if (!w) continue;
-    const farEnd = w.from.node === n.id ? 'to' : 'from';
-    const far = g.node.get(w[farEnd].node)!;
-    if (far.type === 'dc-panel' || far.type === 'fuse-block') {
-      // a position on a panel or fuse block: its rating is the protection
-      if (w[farEnd].term !== 'in') ratePositions.push({ n: far, term: w[farEnd].term });
-      continue;
-    }
-    insertFuse(w, farEnd, `for ${name(n)}, at the ${name(far)} end of its feed`);
-    g = buildGraph(d);
+  up = upstreamEnds(g, d);
+  for (const n of d.nodes.filter((x) => PANELS.has(x.type) && inScope(x.id))) {
+    for (const t of n.terminals) if (t.id !== 'in' && (g.at.get(key(n.id, t.id)) ?? []).length) ratePositions.push({ n, term: t.id });
   }
   // AC loads with no breaker need an AC panel position; there is no inline AC breaker to add.
   for (const n of d.nodes.filter((x) => x.type === 'ac-load' && inScope(x.id))) {
@@ -239,8 +257,10 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     return most;
   };
 
+  /** Devices (and panel positions, "id|term") whose rating this run set or raised. */
+  const changed = new Set<string>();
   /** Rate a device, or one position of a panel. Returns nothing; records the change. */
-  const rate = (n: DNode, through: number | undefined, kind: ProtectionKind, label: string, get: () => number | undefined, set: (r: number) => void) => {
+  const rate = (n: DNode, through: number | undefined, kind: ProtectionKind, label: string, get: () => number | undefined, set: (r: number) => void, id = n.id) => {
     if (through === undefined || through <= 0) {
       if (get() === undefined) res.notes.push(`${label}: no rating set, because the current through it is not known. Enter the current of what it feeds, then size again.`);
       return;
@@ -260,10 +280,12 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const was = get();
     if (was === undefined) {
       set(need);
+      changed.add(id);
       res.counts.rated++;
       res.changes.push(`${label}: set to ${need} A (about ${Math.round(through)} A through it).`);
     } else if (was < through) {
       set(need);
+      changed.add(id);
       res.counts.raised++;
       res.changes.push(`${label}: raised from ${was} A to ${need} A; about ${Math.round(through)} A through it would blow ${was} A.`);
     }
@@ -287,6 +309,7 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const r = Number(inlet?.data.amps ?? 0);
     if (r > 0) {
       n.data.rating = r;
+      changed.add(n.id);
       res.counts.rated++;
       res.changes.push(`${name(n)}: set to ${r} A, the rating of ${name(inlet)}.`);
     } else res.notes.push(`${name(n)}: no rating set; connect it to the shore inlet and enter the inlet's rating.`);
@@ -298,29 +321,55 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const t = n.terminals.find((x) => x.id === term);
     if (!t) continue;
     const kind: ProtectionKind = n.type === 'ac-panel' ? 'breaker-ac' : n.type === 'dc-panel' ? 'breaker-dc' : 'fuse';
-    rate(n, sumAt(n, term), kind, `${name(n)} position ${t.label ?? t.id}`, () => t.rating, (r) => {
-      t.rating = r;
-      t.label = `${r} A`;
-    });
+    rate(
+      n,
+      sumAt(n, term),
+      kind,
+      `${name(n)} position ${t.label ?? t.id}`,
+      () => t.rating,
+      (r) => {
+        t.rating = r;
+        t.label = `${r} A`;
+      },
+      key(n.id, term),
+    );
   }
 
   // ---- 3. wire sizes
   g = buildGraph(d);
+  up = upstreamEnds(g, d);
   const nodeOf = (id: string) => g.node.get(id);
+  /**
+   * The fuses and breakers a positive wire is held to: one on either end of it (as the check sees
+   * it), or the one further back when the wire leaves a switch or contactor that only passes the feed
+   * through. Each with the id the ratings above use for it.
+   */
+  const cover = (w: Wire, depth = 0): { rating: number; id: string }[] => {
+    const own = protectionOf(w, nodeOf).map((p) => ({ rating: p.rating, id: PANELS.has(p.n.type) ? key(p.n.id, w.from.node === p.n.id ? w.from.term : w.to.term) : p.n.id }));
+    const at = up.get(w.id);
+    if (!at || depth > 6) return own;
+    const U = nodeOf(w[at].node);
+    if (!U || !INLINE.has(U.type)) return own;
+    const back = passThrough(U, w[at].term).flatMap((t) => (g.at.get(key(U.id, t)) ?? []).filter((x) => x.kind === 'pos' && x.id !== w.id && up.get(x.id) !== undefined && x[other(up.get(x.id)!)].node === U.id));
+    return own.concat(back.flatMap((x) => cover(x, depth + 1)));
+  };
+  // A negative has no fuse of its own; it is sized like the positive of the same component, so the
+  // return can carry whatever that positive's fuse lets through.
+  const pairedCover = (w: Wire) =>
+    [w.from, w.to].flatMap((e) => {
+      const n = nodeOf(e.node);
+      const pos = n ? NEG_PAIR[n.type]?.[e.term] ?? [] : [];
+      return pos.flatMap((t) => (g.at.get(key(e.node, t)) ?? []).filter((x) => x.kind === 'pos').flatMap((x) => cover(x)));
+    });
   for (const w of d.wires) {
-    if (!(w.kind === 'pos' || w.kind === 'neg' || w.kind === 'ac') || !wireInScope(w)) continue;
+    if (!(w.kind === 'pos' || w.kind === 'neg' || w.kind === 'ac')) continue;
+    const covers = w.kind === 'neg' ? pairedCover(w) : cover(w);
+    // In a focus, a wire outside it is still resized when a fuse it hangs on was raised or set here.
+    if (!wireInScope(w) && !covers.some((c) => changed.has(c.id))) continue;
     const a = current(w);
     const ends = [nodeOf(w.from.node), nodeOf(w.to.node)];
     const names = `${name(ends[0])} → ${name(ends[1])}`;
-    // A negative has no fuse of its own; it is sized like the positive of the same component, so the
-    // return can carry whatever that positive's fuse lets through.
-    const pairedFuses = () =>
-      [w.from, w.to].flatMap((e) => {
-        const n = nodeOf(e.node);
-        const pos = n ? NEG_PAIR[n.type]?.[e.term] ?? [] : [];
-        return pos.flatMap((t) => (g.at.get(key(e.node, t)) ?? []).filter((x) => x.kind === 'pos').flatMap((x) => protectionOf(x, nodeOf).map((p) => p.rating)));
-      });
-    const fuse = Math.max(0, ...(w.kind === 'neg' ? pairedFuses() : protectionOf(w, nodeOf).map((p) => p.rating)));
+    const fuse = Math.max(0, ...covers.map((c) => c.rating));
     // the small ground lead of a charging relay or isolator carries next to nothing: smallest size
     const controlLead = [w.from, w.to].some((e) => e.term === 'neg' && CHARGE_LINKS.has(nodeOf(e.node)?.type ?? ''));
     if ((a === undefined || a <= 0) && !fuse && !controlLead) {
