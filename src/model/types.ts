@@ -129,7 +129,12 @@ export interface EnergyAssumptions {
   engineHoursPerDay: number;
 }
 
+/** One part of the wiring job to look at on its own (see src/engine/focus.ts). */
+export type Focus = 'all' | 'charging' | 'start' | 'loads' | 'ac';
+
 export interface LayerSettings {
+  /** Show one part of the job only. Undefined = the whole boat. */
+  focus?: Focus;
   dc: boolean;
   ac: boolean;
   negatives: 'full' | 'buses' | 'hidden';

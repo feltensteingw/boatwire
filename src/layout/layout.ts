@@ -1,4 +1,5 @@
 import type { ElkNode, ElkExtendedEdge } from 'elkjs/lib/elk-api.js';
+import { focusNodes } from '../engine/focus';
 import { isBridge } from '../model/nodeDefs';
 import type { Design, DNode, LayerSettings, Polarity, Wire } from '../model/types';
 
@@ -100,7 +101,10 @@ export function baseSize(n: DNode): { w: number; h: number } {
 
 /** Which nodes and wires are visible under the current layer settings. */
 export function visibleSubset(design: Design, layers: LayerSettings) {
-  const nodeVisible = (n: DNode) => n.type === 'note' || (n.domain === 'dc' ? layers.dc : layers.ac) || (isBridge(n) && (layers.dc || layers.ac));
+  // A focus hides everything outside it. (The hand drawing dims instead: see manualLayout.)
+  const focus = focusNodes(design, layers.focus);
+  const inFocus = (n: DNode) => !focus || focus.has(n.id);
+  const nodeVisible = (n: DNode) => n.type === 'note' || (inFocus(n) && ((n.domain === 'dc' ? layers.dc : layers.ac) || (isBridge(n) && (layers.dc || layers.ac))));
   let nodes = design.nodes.filter(nodeVisible);
   let allWires = design.wires;
   // Optionally fold inline fuses into their wires: in-wire + fuse + out-wire → one wire.
@@ -454,7 +458,9 @@ export function viewShift(before: Layout, after: Layout, center: { x: number; y:
 
 /** Layout for hand-drawn designs: user positions, one port per terminal. */
 export function manualLayout(design: Design, layers: LayerSettings): Layout {
-  const { nodes, wires, negHidden, hiddenCircuits } = visibleSubset(design, layers);
+  // On a hand drawing a focus dims the rest instead of hiding it (Diagram marks it), so nothing
+  // being drawn disappears from under the pointer.
+  const { nodes, wires, negHidden, hiddenCircuits } = visibleSubset(design, { ...layers, focus: 'all' });
   const laid: LaidNode[] = nodes.map((n, i) => {
     const base = baseSize(n);
     const bySide: Record<Side, typeof n.terminals> = { W: [], E: [], N: [], S: [] };

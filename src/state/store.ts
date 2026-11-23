@@ -22,6 +22,7 @@ export type ReportTab = 'findings' | 'changes' | 'wires' | 'bom' | 'energy' | 'f
 export type Selection = { kind: 'node' | 'wire'; id: string; design: 'ideal' | 'existing' } | null;
 
 export const DEFAULT_LAYERS: LayerSettings = {
+  focus: 'all',
   dc: true,
   ac: true,
   negatives: 'full',
