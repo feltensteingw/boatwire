@@ -187,6 +187,13 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const reach = beyond(w, end);
     return reach.some((r) => r.node.type === 'engine' && r.term === 'pos') && reach.every((r) => (r.node.type === 'engine' && r.term === 'pos') || r.node.type === 'battery');
   };
+  /**
+   * Is this wire a cranking circuit? Either what it feeds is only starters and batteries (a starter
+   * cable), or it is a link with a battery at each end and one end is a start side (an emergency
+   * parallel between a house bus and a start bus). An ordinary branch off a start bus (an alternator,
+   * a load, a charging relay) has no battery beyond its far end, so it is not one.
+   */
+  const crankingLink = (w: Wire, at: End) => cranking(w, other(at)) || (beyond(w, other(at)).some((r) => r.node.type === 'battery') && cranking(w, at));
   const isDevice = (n: DNode) => n.type === 'fuse' || n.type === 'breaker';
   /**
    * What can feed a wire from beyond one of its ends: for each battery there, the smallest fuse or
@@ -242,7 +249,7 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     // mounted at the bus): on a longer run the run itself is not protected for its own size.
     const shortToDevice = isDevice(D) && w.lengthFt * 12 <= BATTERY_FUSE_MAX_IN;
     // A cranking circuit is one from both ends: no fuse of its own at either (as in the ideal design).
-    const crank = cranking(w, other(at)) || cranking(w, at);
+    const crank = crankingLink(w, at);
     if (junction(U, w[at].term) && !shortToDevice && !crank) {
       const why = isDevice(D) ? `where the run to ${name(D)} leaves ${name(U)} (a fuse at the far end of a run does not protect the run)` : `where ${name(D)}${D.type === 'load' ? '' : "'s feed"} leaves ${name(U)}`;
       branches.push({ w, at, why });
@@ -426,7 +433,7 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
    */
   const feedFromBeyond = (w: Wire): { rating: number; id: string }[] => {
     const at = up.get(w.id);
-    if (!at || w.kind !== 'pos' || cranking(w, at) || cranking(w, other(at))) return [];
+    if (!at || w.kind !== 'pos' || crankingLink(w, at)) return [];
     const U = nodeOf(w[at].node)!;
     const D = nodeOf(w[other(at)].node)!;
     // The end it is fed from is already covered by cover() when it is a fuse, a breaker, a panel

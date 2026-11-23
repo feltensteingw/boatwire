@@ -396,6 +396,44 @@ describe('Size wires & fuses: cases from the independent review', () => {
   });
 });
 
+describe('cranking circuits are exempt, branches off a start bus are not', () => {
+  /** start battery → start bus → 150 A engine, plus one more part on the bus. */
+  const startBus = (type: NodeType, data: DNode['data'], term: string) => {
+    const d = draw(['battery', 'bus-pos', 'engine', type, 'battery'], { 0: { chemistry: 'agm' }, 2: { amps: 150 }, 3: data, 4: { chemistry: 'agm' } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
+    wire(d, 'pos', [1, 's2'], [2, 'pos'], 4);
+    wire(d, 'pos', [1, 's3'], [3, term], 6);
+    if (type === 'acr') wire(d, 'pos', [3, 'b'], [4, 'pos'], 6);
+    sizeDrawing(d);
+    return d;
+  };
+  for (const [type, data, term] of [['alternator', { amps: 100 }, 'b'], ['load', { amps: 5 }, 'pos'], ['acr', { rating: 120 }, 'a']] as [NodeType, DNode['data'], string][]) {
+    it(`a ${type} on the start bus gets its own fuse there`, () => {
+      const d = startBus(type, data, term);
+      const feed = d.wires.find((w) => w.from.node === 'n3' || w.to.node === 'n3')!;
+      const f = d.nodes.find((n) => n.type === 'fuse' && (feed.from.node === n.id || feed.to.node === n.id));
+      expect(f).toBeDefined();
+      expect(carries(feed)).toBeGreaterThanOrEqual(f!.data.rating as number);
+    });
+  }
+  it('the starter cable itself gets no fuse of its own at the bus', () => {
+    const d = startBus('load', { amps: 5 }, 'pos');
+    expect(by(d, 'n1', 'n2')).toBeDefined();
+  });
+
+  it('a house bus with an inverter and an emergency link to a start bus: the inverter is fused, the link is not', () => {
+    const d = draw(['battery', 'bus-pos', 'inverter', 'battery', 'bus-pos', 'engine'], { 0: { chemistry: 'agm' }, 2: { watts: 3000 }, 3: { chemistry: 'agm' }, 5: { amps: 150 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
+    wire(d, 'pos', [1, 's2'], [2, 'dcpos'], 4);
+    wire(d, 'pos', [3, 'pos'], [4, 's1'], 1);
+    wire(d, 'pos', [4, 's2'], [5, 'pos'], 4);
+    wire(d, 'pos', [1, 's3'], [4, 's3'], 12);
+    sizeDrawing(d);
+    expect(fuseOn(d, 'n2').length).toBe(1);
+    expect(by(d, 'n1', 'n4')).toBeDefined();
+  });
+});
+
 describe('a 24 to 12 V converter', () => {
   it('its output negative on a shared negative bus carries its own output, not the whole boat', () => {
     const d = draw(['battery', 'bus-neg', 'converter', 'load', 'load'], { 0: { chemistry: 'agm' }, 2: { rating: 30 }, 3: { amps: 100 }, 4: { amps: 5, volts: 12 } });
