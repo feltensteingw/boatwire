@@ -14,11 +14,11 @@ import { uid } from '../model/examples';
 import { GAUGES, VDROP } from '../model/standards';
 import type { Design, DNode, Finding, Wire, WireEnd } from '../model/types';
 import { fmtLen, fmtSize, type Units } from '../model/units';
-import { audit, CHARGE_LINKS, circuitVolts, estimateCurrents, protectionOf } from './audit';
+import { audit, CHARGE_LINKS, circuitVolts, estimateCurrents, feedProtection, INLINE, otherEnd as other, upstreamEnds, type End } from './audit';
 import { ampacity, fuseClassFor, gaugeIndex, nextStandard, PROTECTION_SIZES, protectionFor, protectionNeeded, sizeConductor, type ProtectionKind } from './calc';
 import { BATTERY_FUSE_MAX_IN } from '../model/standards';
 import { BATTERY_FUSE_DRAFT_FT } from './existing';
-import { buildGraph, key, passThrough, SOURCE_TERMS, walk, type Graph } from './graph';
+import { buildGraph, key, passThrough, SOURCE_TERMS, walk } from './graph';
 
 export interface SizeResult {
   /** One line per change, in the order made, for the owner to read. */
@@ -63,50 +63,11 @@ const NEG_PAIR: Record<string, Record<string, string[]>> = {
   charger: { neg: ['out1', 'out2', 'out3'] },
 };
 
-/** Parts a feed passes straight through on its way to a load (they protect nothing). */
-const INLINE = new Set(['switch', 'contactor', 'bilge-switch']);
 /** Parts whose output positions carry their own rating (the input does not protect anything). */
 const PANELS = new Set(['dc-panel', 'fuse-block', 'ac-panel']);
 
-type End = 'from' | 'to';
 /** Stands for a fuse that is there but not rated yet. */
 const UNRATED = 1e9;
-const other = (e: End): End => (e === 'from' ? 'to' : 'from');
-
-/**
- * Which end of each positive wire is nearer a battery: a walk out from every battery along positive
- * wires, through buses, switches and fuses but not through a charging relay or isolator (each side of
- * one is fed from its own bank). Wires the walk never reaches (between solar panels and their
- * controller, say) are not in the map.
- */
-function upstreamEnds(g: Graph, d: Design): Map<string, End> {
-  const up = new Map<string, End>();
-  const seen = new Set<string>();
-  const queue: string[] = [];
-  // a 24-to-12 V converter's output feeds its 12 V side as a battery feeds the rest
-  for (const n of d.nodes) {
-    if (n.type !== 'battery' && n.type !== 'converter') continue;
-    seen.add(n.id);
-    queue.push(n.id);
-  }
-  while (queue.length) {
-    const id = queue.shift()!;
-    const n = g.node.get(id)!;
-    const terms = n.type === 'battery' ? ['pos'] : n.type === 'converter' ? ['out'] : n.terminals.map((t) => t.id);
-    for (const t of terms) {
-      for (const w of g.at.get(key(id, t)) ?? []) {
-        if (w.kind !== 'pos' || up.has(w.id)) continue;
-        const here: End = w.from.node === id && w.from.term === t ? 'from' : 'to';
-        up.set(w.id, here);
-        const next = g.node.get(w[other(here)].node);
-        if (!next || seen.has(next.id)) continue;
-        seen.add(next.id);
-        if (NODE_DEFS[next.type].conducts && !CHARGE_LINKS.has(next.type)) queue.push(next.id);
-      }
-    }
-  }
-  return up;
-}
 
 const runsOf = (w: Wire) => (w.cable?.match(/^(\d+)× /) ? Number(w.cable.split('×')[0]) : 1);
 
@@ -423,15 +384,8 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
    * it), or the one further back when the wire leaves a switch or contactor that only passes the feed
    * through. Each with the id the ratings above use for it.
    */
-  const cover = (w: Wire, depth = 0): { rating: number; id: string }[] => {
-    const own = protectionOf(w, nodeOf).map((p) => ({ rating: p.rating, id: PANELS.has(p.n.type) ? key(p.n.id, w.from.node === p.n.id ? w.from.term : w.to.term) : p.n.id }));
-    const at = up.get(w.id);
-    if (!at || depth > 6) return own;
-    const U = nodeOf(w[at].node);
-    if (!U || !INLINE.has(U.type)) return own;
-    const back = passThrough(U, w[at].term).flatMap((t) => (g.at.get(key(U.id, t)) ?? []).filter((x) => x.kind === 'pos' && x.id !== w.id && up.get(x.id) !== undefined && x[other(up.get(x.id)!)].node === U.id));
-    return own.concat(back.flatMap((x) => cover(x, depth + 1)));
-  };
+  const cover = (w: Wire): { rating: number; id: string }[] =>
+    feedProtection(w, g, up).map((p) => ({ rating: p.rating, id: PANELS.has(p.n.type) ? key(p.n.id, p.wire.from.node === p.n.id ? p.wire.from.term : p.wire.to.term) : p.n.id }));
   /**
    * A battery beyond the far end of a wire can push fault current into it through its own fuse: the
    * wire must carry that fuse's rating as well (a tie between two buses, a second bank on one bus).

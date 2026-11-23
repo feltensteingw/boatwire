@@ -199,6 +199,21 @@ const CASES: Case[] = [
     good: (d) => d.wire([d.add('fuse', 'Feeder fuse', { rating: 10 }), 'out'], [d.add('load', 'Cabin lights', { amps: 5 }), 'pos'], { gauge: '16' }),
   },
   {
+    rule: 'branch-protection', severity: 'error', when: 'a wire after a switch is smaller than the fuse in front of the switch', says: /protected by 50 A but .* is only rated 35 A/,
+    bad: (d) => {
+      const { feed } = d.fusedBattery('House bank', { chemistry: 'agm' }, { rating: 50, fuseClass: 'MRBF' });
+      const sw = d.add('switch', 'Battery switch');
+      d.wire(feed, [sw, 'in'], { gauge: HEAVY });
+      d.wire([sw, 'out'], [d.add('load', 'Cabin lights', { amps: 5 }), 'pos'], { gauge: '14' });
+    },
+    good: (d) => {
+      const { feed } = d.fusedBattery('House bank', { chemistry: 'agm' }, { rating: 30, fuseClass: 'MRBF' });
+      const sw = d.add('switch', 'Battery switch');
+      d.wire(feed, [sw, 'in'], { gauge: HEAVY });
+      d.wire([sw, 'out'], [d.add('load', 'Cabin lights', { amps: 5 }), 'pos'], { gauge: '14' });
+    },
+  },
+  {
     rule: 'branch-protection', severity: 'error', when: 'an AC appliance has no breaker', says: /has no AC breaker/,
     bad: (d) => d.wire([d.add('inverter', 'Inverter', { watts: 1500 }), 'acout'], [d.add('ac-load', 'Water heater', { watts: 1200 }), 'l'], { gauge: '12' }),
     good: (d) => {
@@ -379,5 +394,39 @@ describe('design check rules', () => {
     expect([...inSource].filter((r) => !covered.has(r)).sort()).toEqual([]);
     // and no case here is for a rule that no longer exists
     expect([...covered].filter((r) => !inSource.has(r)).sort()).toEqual([]);
+  });
+});
+
+describe('a wire after a switch is held to the fuse in front of the switch', () => {
+  /** House bank → fuse → switch(es) → wire under test → load. */
+  const drawing = (o: { fuse: number; gauge: string; switches?: number; notes?: string[] }) => {
+    const d = new Drawing();
+    let feed = d.fusedBattery('House bank', { chemistry: 'agm' }, { rating: o.fuse, fuseClass: 'MRBF' }).feed;
+    for (let i = 0; i < (o.switches ?? 1); i++) {
+      const sw = d.add(i === 0 ? 'switch' : 'contactor', i === 0 ? 'Battery switch' : 'Contactor');
+      d.wire(feed, [sw, 'in'], { gauge: HEAVY });
+      feed = [sw, 'out'];
+    }
+    const w = d.wire(feed, [d.add('load', 'Cabin lights', { amps: 5 }), 'pos'], { gauge: o.gauge, notes: o.notes });
+    return { d: d.d, w };
+  };
+  const protection = (x: { d: Design; w: Wire }) => audit(x.d).filter((f) => f.rule === 'branch-protection' && f.wires?.includes(x.w.id));
+
+  it('names the fuse in front of the switch and the wire it is too big for', () => {
+    const x = drawing({ fuse: 50, gauge: '14' });
+    const f = protection(x);
+    expect(f).toHaveLength(1);
+    expect(f[0].message).toMatch(/Battery switch → Cabin lights: protected by 50 A but 14 AWG.* is only rated 35 A\./);
+    expect(f[0].nodes).toEqual([x.d.nodes.find((n) => n.type === 'fuse')!.id]);
+  });
+  it('follows the feed back through more than one switch or contactor', () => {
+    expect(protection(drawing({ fuse: 50, gauge: '14', switches: 2 }))).toHaveLength(1);
+  });
+  it('passes when the wire can carry the fuse rating', () => {
+    expect(protection(drawing({ fuse: 30, gauge: '14' }))).toEqual([]);
+    expect(protection(drawing({ fuse: 50, gauge: '10' }))).toEqual([]);
+  });
+  it('leaves a starter cable exempt', () => {
+    expect(protection(drawing({ fuse: 50, gauge: '14', notes: ['starter-exempt'] }))).toEqual([]);
   });
 });

@@ -35,6 +35,64 @@ export function protectionOf(w: Wire, node: (id: string) => DNode | undefined): 
   return out;
 }
 
+/** Parts a feed passes straight through on its way to a load (they protect nothing). */
+export const INLINE: ReadonlySet<string> = new Set(['switch', 'contactor', 'bilge-switch']);
+
+export type End = 'from' | 'to';
+export const otherEnd = (e: End): End => (e === 'from' ? 'to' : 'from');
+
+/**
+ * Which end of each positive wire is nearer a battery: a walk out from every battery along positive
+ * wires, through buses, switches and fuses but not through a charging relay or isolator (each side of
+ * one is fed from its own bank). Wires the walk never reaches (between solar panels and their
+ * controller, say) are not in the map.
+ */
+export function upstreamEnds(g: Graph, d: Design): Map<string, End> {
+  const up = new Map<string, End>();
+  const seen = new Set<string>();
+  const queue: string[] = [];
+  // a 24-to-12 V converter's output feeds its 12 V side as a battery feeds the rest
+  for (const n of d.nodes) {
+    if (n.type !== 'battery' && n.type !== 'converter') continue;
+    seen.add(n.id);
+    queue.push(n.id);
+  }
+  while (queue.length) {
+    const id = queue.shift()!;
+    const n = g.node.get(id)!;
+    const terms = n.type === 'battery' ? ['pos'] : n.type === 'converter' ? ['out'] : n.terminals.map((t) => t.id);
+    for (const t of terms) {
+      for (const w of g.at.get(key(id, t)) ?? []) {
+        if (w.kind !== 'pos' || up.has(w.id)) continue;
+        const here: End = w.from.node === id && w.from.term === t ? 'from' : 'to';
+        up.set(w.id, here);
+        const next = g.node.get(w[otherEnd(here)].node);
+        if (!next || seen.has(next.id)) continue;
+        seen.add(next.id);
+        if (NODE_DEFS[next.type].conducts && !CHARGE_LINKS.has(next.type)) queue.push(next.id);
+      }
+    }
+  }
+  return up;
+}
+
+/**
+ * The fuses and breakers a wire is held to: one on either end of it (protectionOf), or, when the
+ * wire leaves a switch or contactor that only passes the feed through, the one further back that
+ * feeds that switch. Each with the wire it sits on (for a panel, that wire's end names the position).
+ */
+export function feedProtection(w: Wire, g: Graph, up: Map<string, End>, depth = 0): { n: DNode; rating: number; wire: Wire }[] {
+  const own = protectionOf(w, (id) => g.node.get(id)).map((p) => ({ ...p, wire: w }));
+  const at = up.get(w.id);
+  if (!at || depth > 6) return own;
+  const U = g.node.get(w[at].node);
+  if (!U || !INLINE.has(U.type)) return own;
+  const back = passThrough(U, w[at].term).flatMap((t) =>
+    (g.at.get(key(U.id, t)) ?? []).filter((x) => x.kind === 'pos' && x.id !== w.id && up.get(x.id) !== undefined && x[otherEnd(up.get(x.id)!)].node === U.id),
+  );
+  return own.concat(back.flatMap((x) => feedProtection(x, g, up, depth + 1)));
+}
+
 // Wording for a length BoatWire guessed from locations, as opposed to one the user entered.
 const guess = (w: Wire) => (w.lengthEstimated ? 'about ' : '');
 const guessed = (w: Wire) => (w.lengthEstimated ? ' (estimated from their locations; enter the measured length)' : '');
@@ -51,6 +109,7 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
   const batteries = design.nodes.filter((n) => n.type === 'battery');
   const label = (n: DNode) => n.label;
   const amps = estimateCurrents(design, acV);
+  const up = upstreamEnds(g, design);
 
   // 1. Battery fuse within 7 in
   for (const bat of batteries) {
@@ -237,7 +296,9 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
     if (a !== undefined && a > amp) {
       add('error', 'conductor-sizing', `${names}: ${cable} carries ~${Math.round(a)} A, above its ${Math.round(amp)} A ampacity.`, `Use a larger conductor${outOfBundle}.`, undefined, [w.id]);
     }
-    const over = protectionOf(w, (id) => g.node.get(id)).find((p) => p.rating > amp * 1.0001);
+    // A starter cable needs no fuse. Any other wire is held to the fuse on its end or, when it leaves
+    // a switch or contactor, to the fuse in front of that switch.
+    const over = (w.notes?.includes('starter-exempt') ? [] : feedProtection(w, g, up)).find((p) => p.rating > amp * 1.0001);
     if (over) {
       add('error', 'branch-protection', `${names}: protected by ${over.rating} A but ${cable} is only rated ${Math.round(amp)} A.`, `Use a smaller fuse/breaker or a larger wire${outOfBundle}.`, [over.n.id], [w.id]);
     }
