@@ -16,6 +16,7 @@ import type { Design, DNode, Finding, Wire, WireEnd } from '../model/types';
 import { fmtLen, fmtSize, type Units } from '../model/units';
 import { audit, CHARGE_LINKS, circuitVolts, estimateCurrents, protectionOf } from './audit';
 import { ampacity, fuseClassFor, gaugeIndex, nextStandard, PROTECTION_SIZES, protectionFor, protectionNeeded, sizeConductor, type ProtectionKind } from './calc';
+import { BATTERY_FUSE_MAX_IN } from '../model/standards';
 import { BATTERY_FUSE_DRAFT_FT } from './existing';
 import { buildGraph, key, passThrough, SOURCE_TERMS, walk, type Graph } from './graph';
 
@@ -80,15 +81,16 @@ function upstreamEnds(g: Graph, d: Design): Map<string, End> {
   const up = new Map<string, End>();
   const seen = new Set<string>();
   const queue: string[] = [];
+  // a 24-to-12 V converter's output feeds its 12 V side as a battery feeds the rest
   for (const n of d.nodes) {
-    if (n.type !== 'battery') continue;
+    if (n.type !== 'battery' && n.type !== 'converter') continue;
     seen.add(n.id);
     queue.push(n.id);
   }
   while (queue.length) {
     const id = queue.shift()!;
     const n = g.node.get(id)!;
-    const terms = n.type === 'battery' ? ['pos'] : n.terminals.map((t) => t.id);
+    const terms = n.type === 'battery' ? ['pos'] : n.type === 'converter' ? ['out'] : n.terminals.map((t) => t.id);
     for (const t of terms) {
       for (const w of g.at.get(key(id, t)) ?? []) {
         if (w.kind !== 'pos' || up.has(w.id)) continue;
@@ -130,7 +132,8 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     d.nodes.push(fuse);
     fresh.add(fuse.id);
     if (only) only.add(fuse.id);
-    const linkFt = endNode.type === 'battery' ? BATTERY_FUSE_DRAFT_FT : 1;
+    // mounted at the battery or bus, within the 7 in a battery fuse must be (the owner is asked to measure it)
+    const linkFt = endNode.type === 'battery' || endNode.type === 'bus-pos' ? BATTERY_FUSE_DRAFT_FT : 1;
     const link: Wire = { ...structuredClone(w), id: uid('w'), lengthFt: linkFt, lengthEstimated: true };
     delete link.vdropPct;
     link[at === 'from' ? 'from' : 'to'] = end;
@@ -163,12 +166,29 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
   g = buildGraph(d);
   let up = upstreamEnds(g, d);
   const ratePositions: { n: DNode; term: string }[] = [];
-  const starterOnly = (w: Wire, downEnd: End) => {
-    const e = w[downEnd];
+  /** What a wire reaches beyond one of its ends (not back through itself). */
+  const beyond = (w: Wire, end: End) => {
+    const e = w[end];
     const n = g.node.get(e.node)!;
-    const reach = NODE_DEFS[n.type].conducts ? walk(g, e, ['pos'], { exclude: w.id }).concat(passThrough(n, e.term).flatMap((t) => walk(g, { node: n.id, term: t }, ['pos'], { exclude: w.id }))) : [{ node: n, term: e.term }];
-    return reach.length > 0 && reach.every((r) => r.node.type === 'engine' && r.term === 'pos');
+    if (!NODE_DEFS[n.type].conducts) return [{ node: n, term: e.term }];
+    if (CHARGE_LINKS.has(n.type)) return [{ node: n, term: e.term }];
+    const opts = { exclude: w.id, stopAt: CHARGE_LINKS };
+    return walk(g, e, ['pos'], opts).concat(passThrough(n, e.term).flatMap((t) => walk(g, { node: n.id, term: t }, ['pos'], opts)));
   };
+  /**
+   * A cranking circuit: beyond this end there are only engine starters and batteries (a starter
+   * cable, or an emergency parallel switch between two start batteries). Marine practice exempts
+   * cranking conductors from a fuse of their own, and so does the ideal design.
+   */
+  const cranking = (w: Wire, end: End) => {
+    if (w.notes?.includes('starter-exempt')) return true;
+    const reach = beyond(w, end);
+    return reach.some((r) => r.node.type === 'engine' && r.term === 'pos') && reach.every((r) => (r.node.type === 'engine' && r.term === 'pos') || r.node.type === 'battery');
+  };
+  const isDevice = (n: DNode) => n.type === 'fuse' || n.type === 'breaker';
+  /** A bus or other part where several feeds meet, so a wire leaving it needs its own fuse there. */
+  const junction = (n: DNode, term: string) =>
+    NODE_DEFS[n.type].conducts && !isDevice(n) && !PANELS.has(n.type) && !CHARGE_LINKS.has(n.type) && !(INLINE.has(n.type) && (g.at.get(key(n.id, term)) ?? []).filter((x) => x.kind === 'pos').length === 1);
   const branches: { w: Wire; at: End; why: string }[] = [];
   for (const w of d.wires) {
     const at = up.get(w.id);
@@ -176,16 +196,21 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const U = g.node.get(w[at].node)!;
     const D = g.node.get(w[other(at)].node)!;
     if (U.type === 'battery' || D.type === 'battery') continue; // a battery cable: handled above
-    if (U.type === 'fuse' || U.type === 'breaker' || D.type === 'fuse' || D.type === 'breaker') continue;
     if (PANELS.has(U.type)) {
       if (w[at].term !== 'in') ratePositions.push({ n: U, term: w[at].term });
       continue;
     }
-    if (!NODE_DEFS[U.type].conducts) continue;
-    // straight through a switch or contactor with nothing else on that terminal: the fuse further back covers it
-    if (INLINE.has(U.type) && (g.at.get(key(U.id, w[at].term)) ?? []).filter((x) => x.kind === 'pos').length === 1) continue;
-    if (starterOnly(w, other(at))) continue;
-    branches.push({ w, at, why: `where ${name(D)}${D.type === 'load' ? '' : "'s feed"} leaves ${name(U)}` });
+    // The end it is fed from. A fuse already at the far end counts only on a short link (a fuse
+    // mounted at the bus): on a longer run the run itself is not protected for its own size.
+    const shortToDevice = isDevice(D) && w.lengthFt * 12 <= BATTERY_FUSE_MAX_IN;
+    if (junction(U, w[at].term) && !shortToDevice && !cranking(w, other(at))) {
+      const why = isDevice(D) ? `where the run to ${name(D)} leaves ${name(U)} (a fuse at the far end of a run does not protect the run)` : `where ${name(D)}${D.type === 'load' ? '' : "'s feed"} leaves ${name(U)}`;
+      branches.push({ w, at, why });
+    }
+    // The other end too, when a battery can also feed the wire from there (a tie between two buses).
+    if (junction(D, w[other(at)].term) && beyond(w, other(at)).some((r) => r.node.type === 'battery') && !cranking(w, at)) {
+      branches.push({ w, at: other(at), why: `at the ${name(D)} end of the tie to ${name(U)}, which a battery feeds from both ends` });
+    }
   }
   for (const b of branches) insertFuse(b.w, b.at, b.why);
   // c. a charging source that still reaches a battery with no fuse (it is not wired to any battery
@@ -293,12 +318,13 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
   for (const n of d.nodes.filter((x) => (x.type === 'fuse' || x.type === 'breaker') && inScope(x.id))) {
     const through = Math.max(sumAt(n, 'in') ?? -1, sumAt(n, 'out') ?? -1);
     const bat = batteryAt(n);
-    const kind: ProtectionKind = n.type === 'breaker' ? 'breaker-dc' : bat ? 'feeder-fuse' : 'fuse';
+    // fuse sizes go on up to the largest Class T (an 800 A inverter fuse), as the ideal design's do
+    const kind: ProtectionKind = n.type === 'breaker' ? 'breaker-dc' : 'feeder-fuse';
     const label = `${name(n)}${fresh.has(n.id) ? ' (new)' : ''}`;
     rate(n, through < 0 ? undefined : through, kind, label, () => (typeof n.data.rating === 'number' ? n.data.rating : undefined), (r) => (n.data.rating = r));
     const r = n.data.rating;
     if (n.type === 'fuse' && typeof r === 'number') {
-      const cls = fuseClassFor(r, { atBattery: !!bat, lithium: bat?.data.chemistry === 'lifepo4' });
+      const cls = fuseClassFor(r, { atBattery: !!bat, lithium: bat?.data.chemistry === 'lifepo4', mainFeeder: true });
       if (!n.data.fuseClass) n.data.fuseClass = cls;
       n.sublabel = `${r} A ${n.data.fuseClass}`;
     } else if (typeof r === 'number') n.sublabel = `${r} A`;
@@ -358,6 +384,11 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
   const pairedCover = (w: Wire) =>
     [w.from, w.to].flatMap((e) => {
       const n = nodeOf(e.node);
+      if (n?.type === 'shunt') {
+        // the main negative through a battery monitor shunt carries what the battery's positive does
+        const bats = (g.at.get(key(n.id, 'bat')) ?? []).map((x) => nodeOf(x.from.node === n.id ? x.to.node : x.from.node)).filter((b): b is DNode => b?.type === 'battery');
+        return bats.flatMap((b) => (g.at.get(key(b.id, 'pos')) ?? []).filter((x) => x.kind === 'pos').flatMap((x) => cover(x)));
+      }
       const pos = n ? NEG_PAIR[n.type]?.[e.term] ?? [] : [];
       return pos.flatMap((t) => (g.at.get(key(e.node, t)) ?? []).filter((x) => x.kind === 'pos').flatMap((x) => cover(x)));
     });

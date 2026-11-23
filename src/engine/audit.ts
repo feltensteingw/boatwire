@@ -408,6 +408,11 @@ export function estimateCurrents(design: Design, acVolts = 120): Map<string, num
       const t = r.node.type;
       const d = r.node.data;
       if (t === 'battery') out.bat = true;
+      else if (t === 'converter' && (r.term === 'out' || r.term === 'outneg')) {
+        // a 24-to-12 V converter feeds its 12 V side as a battery does: the loads there set the current
+        out.bat = true;
+        out.src += Number(d.rating ?? 0);
+      }
       else if (CHARGE_LINKS.has(t)) {
         // its negative is only the relay's or isolator's own small ground lead
         if (r.term !== 'neg') out.src += typeof d.rating === 'number' ? d.rating : alternatorAmps;

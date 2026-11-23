@@ -128,7 +128,9 @@ describe('Size wires and fuses', () => {
       it(b.name, () => {
         const d = stripped(ideal);
         const acVolts = acVoltsOf(b.project);
-        sizeDrawing(d, { acVolts, units: b.project.profile.units });
+        const r = sizeDrawing(d, { acVolts, units: b.project.profile.units });
+        // the ideal design is already fused everywhere sizing would add one
+        expect(r.changes.filter((c) => c.startsWith('Added'))).toEqual([]);
         expect(audit(d, { acVolts }).filter((f) => f.severity === 'error' && SIZING_RULES.has(f.rule)).map((f) => `${f.rule}: ${f.message}`)).toEqual([]);
       });
     }
@@ -350,5 +352,82 @@ describe('Size wires & fuses: cases from the independent review', () => {
     wire(d, 'ac', [2, 'b1'], [3, 'l'], 10);
     wire(d, 'ac', [2, 'b2'], [4, 'l'], 10);
     expect(estimateCurrents(d, 120).get(d.wires[1].id)).toBe(30);
+  });
+
+  it('a tie between two buses that each have a battery is fused at both ends', () => {
+    const d = draw(['battery', 'bus-pos', 'battery', 'bus-pos', 'load', 'load'], { 0: { chemistry: 'agm' }, 2: { chemistry: 'agm' }, 4: { amps: 20 }, 5: { amps: 20 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
+    wire(d, 'pos', [2, 'pos'], [3, 's1'], 1);
+    wire(d, 'pos', [1, 's2'], [3, 's2'], 10);
+    wire(d, 'pos', [1, 's3'], [4, 'pos'], 6);
+    wire(d, 'pos', [3, 's3'], [5, 'pos'], 6);
+    sizeDrawing(d);
+    const tie = d.wires.find((w) => w.lengthFt > 8)!;
+    const ends = [tie.from.node, tie.to.node].map((id) => d.nodes.find((n) => n.id === id)!);
+    expect(ends.map((n) => n.type)).toEqual(['fuse', 'fuse']);
+    for (const f of ends) expect(carries(tie)).toBeGreaterThanOrEqual(f.data.rating as number);
+  });
+
+  it('a long run with its fuse at the device end also gets a fuse at the bus', () => {
+    // 100 A main → bus → 15 ft → 10 A fuse → load
+    const d = draw(['battery', 'fuse', 'bus-pos', 'fuse', 'load'], { 0: { chemistry: 'agm' }, 1: { rating: 100 }, 3: { rating: 10 }, 4: { amps: 5 } });
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 0.5);
+    wire(d, 'pos', [1, 'out'], [2, 's1'], 2);
+    wire(d, 'pos', [2, 's2'], [3, 'in'], 15);
+    wire(d, 'pos', [3, 'out'], [4, 'pos'], 1);
+    const r = sizeDrawing(d);
+    expect(r.counts.fusesAdded).toBe(1);
+    const run = d.wires.find((w) => w.lengthFt > 10)!;
+    const front = d.nodes.find((n) => n.id === run.from.node || n.id === run.to.node)!;
+    expect(carries(run)).toBeGreaterThanOrEqual(Math.max(...[run.from.node, run.to.node].map((id) => Number(d.nodes.find((n) => n.id === id)!.data.rating ?? 0))));
+    expect(front.type).toBe('fuse');
+  });
+
+  it('a short link from a bus to a fuse there needs no second fuse', () => {
+    const d = draw(['battery', 'fuse', 'bus-pos', 'fuse', 'load'], { 0: { chemistry: 'agm' }, 1: { rating: 100 }, 3: { rating: 10 }, 4: { amps: 5 } });
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 0.5);
+    wire(d, 'pos', [1, 'out'], [2, 's1'], 2);
+    wire(d, 'pos', [2, 's2'], [3, 'in'], 0.5);
+    wire(d, 'pos', [3, 'out'], [4, 'pos'], 15);
+    expect(sizeDrawing(d).counts.fusesAdded).toBe(0);
+  });
+
+  it('loads on the 12 V side of a 24 to 12 V converter get their own fuses and are sized for their own current', () => {
+    const d = draw(['battery', 'bus-pos', 'converter', 'bus-pos', 'load', 'load'], { 0: { chemistry: 'agm' }, 2: { rating: 20 }, 4: { amps: 3, volts: 12 }, 5: { amps: 2, volts: 12 } });
+    d.systemVoltage = 24;
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
+    wire(d, 'pos', [1, 's2'], [2, 'in'], 3);
+    wire(d, 'pos', [2, 'out'], [3, 's1'], 1);
+    wire(d, 'pos', [3, 's2'], [4, 'pos'], 6);
+    wire(d, 'pos', [3, 's3'], [5, 'pos'], 6);
+    sizeDrawing(d);
+    for (const id of ['n4', 'n5']) {
+      const feed = d.wires.find((w) => w.from.node === id || w.to.node === id)!;
+      const f = d.nodes.find((n) => n.type === 'fuse' && (feed.from.node === n.id || feed.to.node === n.id))!;
+      expect(f.data.rating).toBeLessThanOrEqual(5);
+      expect(feed.gauge).toBe('16');
+    }
+  });
+
+  it('the main negative through a battery monitor shunt matches the battery fuse', () => {
+    const d = draw(['battery', 'bus-pos', 'bus-neg', 'shunt', 'alternator'], { 0: { chemistry: 'agm' }, 4: { amps: 150 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 1);
+    wire(d, 'neg', [0, 'neg'], [3, 'bat'], 1);
+    wire(d, 'neg', [3, 'sys'], [2, 's1'], 2);
+    wire(d, 'pos', [4, 'b'], [1, 's2'], 6);
+    wire(d, 'neg', [4, 'neg'], [2, 's2'], 6);
+    sizeDrawing(d);
+    const batFuse = fuseOn(d, 'n0')[0]!;
+    expect(carries(by(d, 'n3', 'n2')!)).toBeGreaterThanOrEqual(batFuse.data.rating as number);
+  });
+
+  it('a very large inverter gets a Class T fuse above 600 A', () => {
+    const d = draw(['battery', 'bus-pos', 'inverter'], { 0: { chemistry: 'agm' }, 2: { watts: 5000 } });
+    wire(d, 'pos', [0, 'pos'], [1, 's1'], 0.5);
+    wire(d, 'pos', [1, 's2'], [2, 'dcpos'], 4);
+    sizeDrawing(d);
+    const inv = d.nodes.find((n) => n.type === 'fuse' && by(d, n.id, 'n2'))!;
+    expect(inv.data.rating).toBe(800);
+    expect(inv.data.fuseClass).toBe('Class T');
   });
 });
