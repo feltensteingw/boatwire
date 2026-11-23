@@ -102,7 +102,7 @@ function build(units: Units): Record<string, RuleInfo> {
   },
   'branch-protection': {
     title: 'Branch circuit protection',
-    why: 'Each circuit has its own breaker or fuse rated about 125% of the load, and never more than the wire\'s ampacity, so the device protects the wire.',
+    why: 'Each circuit has its own breaker or fuse rated about 125% of the load, and never more than the wire\'s ampacity, so the device protects the wire. A wire leaving a switch or contactor is protected by the fuse or breaker in front of that switch, so it is held to that rating.',
     ref: REFS.E11,
   },
   'unswitched': {
