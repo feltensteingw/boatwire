@@ -97,7 +97,7 @@ export function walk(
   g: Graph,
   start: { node: string; term: string },
   kinds: Wire['kind'][],
-  opts: { stopAtSwitch?: boolean; exclude?: string } = {},
+  opts: { stopAtSwitch?: boolean; exclude?: string; stopAt?: ReadonlySet<string> } = {},
 ): Reach[] {
   const out: Reach[] = [];
   const seen = new Set<string>();
@@ -114,7 +114,7 @@ export function walk(
       if (seen.has(sk)) continue;
       seen.add(sk);
       const through = passThrough(n, o.term);
-      if (through.length === 0 || (opts.stopAtSwitch && n.type === 'switch')) {
+      if (through.length === 0 || (opts.stopAtSwitch && n.type === 'switch') || opts.stopAt?.has(n.type)) {
         out.push({ node: n, term: o.term, protectedPath: s.prot, switched: s.sw, selected: s.sel, via: s.via });
         continue;
       }

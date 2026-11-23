@@ -10,6 +10,12 @@ import { joinTerminals } from './connect';
 
 const LEAD = new Set(['flooded', 'agm', 'gel']);
 
+/** Negative terminals that return a charging source's current (SOURCE_TERMS lists the positives). */
+const NEG_SOURCE_TERMS: Record<string, string[]> = { alternator: ['neg'], charger: ['neg'], mppt: ['batneg'], controller: ['neg'], dcdc: ['outneg'], converter: ['outneg'] };
+
+/** Parts that join two battery banks for charging. Load currents are not added up through them. */
+export const CHARGE_LINKS: ReadonlySet<string> = new Set(['acr', 'isolator']);
+
 /**
  * The fuses and breakers whose output a wire is connected to, with their ratings: what the check
  * holds the wire's ampacity against. None for a negative or a starter cable, which need no fuse.
@@ -44,7 +50,7 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
 
   const batteries = design.nodes.filter((n) => n.type === 'battery');
   const label = (n: DNode) => n.label;
-  const amps = estimateCurrents(design);
+  const amps = estimateCurrents(design, acV);
 
   // 1. Battery fuse within 7 in
   for (const bat of batteries) {
@@ -236,7 +242,7 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
       add('error', 'branch-protection', `${names}: protected by ${over.rating} A but ${cable} is only rated ${Math.round(amp)} A.`, `Use a smaller fuse/breaker or a larger wire${outOfBundle}.`, [over.n.id], [w.id]);
     }
     if (a !== undefined && w.lengthFt > 0) {
-      const volts = w.domain === 'ac' ? acV : Number(ends.find((x) => x.n?.type === 'load')?.n?.data.volts ?? V);
+      const volts = circuitVolts(g, w, V, acV);
       const vd = w.vdropPct ?? vdropPct(a, w.lengthFt, w.gauge, volts);
       const critical = ends.some((x) => x.n?.data.critical === true);
       const limit = w.vdropLimit ?? (critical ? VDROP.critical : VDROP.nonCritical);
@@ -307,6 +313,28 @@ export function audit(design: Design, opts: { acVolts?: number; units?: Units } 
   return out;
 }
 
+/**
+ * The voltage a wire's voltage drop is measured against: the AC voltage, a load's own voltage (a
+ * 12 V load on a 24 V boat), a solar array's working voltage (Vmp) between the panels and their
+ * controller, or else the system voltage.
+ */
+export function circuitVolts(g: Graph, w: Wire, V: number, acV: number): number {
+  if (w.domain === 'ac' || w.kind === 'ac') return acV;
+  const ends = [w.from, w.to].map((e) => g.node.get(e.node));
+  const load = ends.find((n) => n?.type === 'load');
+  if (load) return Number(load.data.volts ?? V);
+  const reach = [w.from, w.to].flatMap((e) => {
+    const n = g.node.get(e.node);
+    return walk(g, e, [w.kind], { stopAt: CHARGE_LINKS }).concat(n ? [{ node: n, term: e.term, protectedPath: false, switched: false, selected: false, via: [] }] : []);
+  });
+  if (reach.some((r) => r.node.type === 'battery')) return V;
+  // the 12 V side of a 24-to-12 V converter
+  const conv = reach.find((r) => r.node.type === 'converter' && (r.term === 'out' || r.term === 'outneg'));
+  if (conv) return Number(conv.node.data.outVolts ?? 12);
+  const panel = reach.map((r) => r.node).find((n) => n.type === 'solar-panel' && Number(n.data.amps) > 0 && Number(n.data.watts) > 0);
+  return panel ? Number(panel.data.watts) / Number(panel.data.amps) : V;
+}
+
 /** Is an external regulator wired to the alternator's field terminal? */
 function hasRegulator(g: Graph, alt: DNode): boolean {
   return (g.at.get(key(alt.id, 'field')) ?? []).some((w) => g.node.get(w.from.node === alt.id ? w.to.node : w.from.node)?.type === 'regulator');
@@ -347,60 +375,97 @@ function walkGround(g: Graph, inletId: string): boolean {
   return false;
 }
 
+
 /**
- * Estimate the current in each wire that has no explicit amps: the side of
- * the wire away from the batteries determines it (sum of loads, or source
- * output for charging conductors).
+ * Estimate the current in each wire that has no explicit amps: the side of the wire away from the
+ * batteries (DC) or away from the AC sources (AC) determines it: the sum of the loads there, or the
+ * output of the charging sources there.
+ *
+ * - Loads are not added up through a charging relay or battery isolator: what flows through one is
+ *   charge current, its rating, or failing that the output of the alternators.
+ * - On the AC side an inverter's output is its watts at the AC voltage (its `amps` is its DC charge
+ *   current), a battery charger draws its output from the AC side, and a shore-power or generator
+ *   cable carries the source's own rating.
  */
-export function estimateCurrents(design: Design): Map<string, number> {
+export function estimateCurrents(design: Design, acVolts = 120): Map<string, number> {
   const g = buildGraph(design);
   const res = new Map<string, number>();
   const V = design.systemVoltage;
+  const alternatorAmps = design.nodes.filter((n) => n.type === 'alternator').reduce((t, n) => t + Number(n.data.amps ?? 0), 0);
   const loadAmps = (n: DNode): number => {
     if (typeof n.data.amps === 'number') return n.data.amps;
-    if (typeof n.data.watts === 'number') return n.data.watts / V;
+    if (typeof n.data.watts === 'number') return n.data.watts / Number(n.data.volts ?? V);
     return 0;
   };
-  const side = (e: { node: string; term: string }, w: Wire) => {
+  type Side = { bat: boolean; acSrc: boolean; load: number; src: number };
+  const side = (e: { node: string; term: string }, w: Wire): Side => {
     const n = g.node.get(e.node);
-    if (!n) return { bat: false, load: 0, src: 0 };
+    const out: Side = { bat: false, acSrc: false, load: 0, src: 0 };
+    if (!n) return out;
     const kinds: Wire['kind'][] = [w.kind];
     let reach: Reach[];
-    if (!NODE_DEFS[n.type].conducts) {
+    if (!NODE_DEFS[n.type].conducts || CHARGE_LINKS.has(n.type)) {
       reach = [{ node: n, term: e.term, protectedPath: false, switched: false, selected: false, via: [] }];
     } else {
-      reach = walk(g, e, kinds, { exclude: w.id });
-      for (const t of passThrough(n, e.term)) reach.push(...walk(g, { node: n.id, term: t }, kinds, { exclude: w.id }));
+      reach = walk(g, e, kinds, { exclude: w.id, stopAt: CHARGE_LINKS });
+      for (const t of passThrough(n, e.term)) reach.push(...walk(g, { node: n.id, term: t }, kinds, { exclude: w.id, stopAt: CHARGE_LINKS }));
     }
-    let bat = false;
-    let load = 0;
-    let src = 0;
     for (const r of reach) {
       const t = r.node.type;
-      if (t === 'battery') bat = true;
+      const d = r.node.data;
+      if (t === 'battery') out.bat = true;
+      else if (t === 'converter' && r.term === 'out') {
+        // a 24-to-12 V converter feeds its 12 V side as a battery does: the loads there set the current
+        // (its output negative is an ordinary source return: on a shared negative bus it is not a battery)
+        out.bat = true;
+        out.src += Number(d.rating ?? 0);
+      }
+      else if (CHARGE_LINKS.has(t)) {
+        // its negative is only the relay's or isolator's own small ground lead
+        if (r.term !== 'neg') out.src += typeof d.rating === 'number' ? d.rating : alternatorAmps;
+      }
       else if ((t === 'inverter' || t === 'inverter-charger') && (r.term === 'dcpos' || r.term === 'dcneg')) {
         // The DC side of an inverter is a load when inverting. An inverter/charger is also a source
         // when charging. This case must come before the general "source" case below, which would
         // otherwise count only the (much smaller) charge current.
-        load += inverterDcAmps(Number(r.node.data.watts ?? 0), V);
-        if (t === 'inverter-charger') src += Number(r.node.data.amps ?? 0);
-      } else if (SOURCE_TERMS[t]?.includes(r.term) || AC_SOURCE_TERMS[t]?.includes(r.term) || t === 'solar-panel' || t === 'wind-gen' || t === 'hydro-gen') src += Number(r.node.data.amps ?? r.node.data.rating ?? 0);
-      else if (t === 'load' || t === 'engine' || t === 'ac-load') load += loadAmps(r.node);
-      else if (t === 'converter' || t === 'dcdc') load += Number(r.node.data.rating ?? 0) * 0.6;
+        out.load += inverterDcAmps(Number(d.watts ?? 0), V);
+        if (t === 'inverter-charger') out.src += Number(d.amps ?? 0);
+      } else if ((t === 'inverter' || t === 'inverter-charger') && r.term === 'acout') {
+        out.acSrc = true;
+        out.src += Number(d.watts ?? 0) / acVolts;
+      } else if (t === 'charger' && r.term === 'acin') out.load += (Number(d.amps ?? 0) * V) / (acVolts * 0.85);
+      else if (t === 'inverter-charger' && r.term === 'acin') {
+        // on shore power it passes its AC loads through and charges at the same time
+        const through = walk(g, { node: r.node.id, term: 'acout' }, ['ac']).filter((x) => x.node.type === 'ac-load');
+        out.load += through.reduce((s, x) => s + loadAmps(x.node), 0) + (Number(d.amps ?? 0) * V) / (acVolts * 0.85);
+      }
+      else if (AC_SOURCE_TERMS[t]?.includes(r.term)) {
+        out.acSrc = true;
+        out.src += Number(d.amps ?? d.rating ?? 0);
+      } else if (SOURCE_TERMS[t]?.includes(r.term) || NEG_SOURCE_TERMS[t]?.includes(r.term) || t === 'solar-panel' || t === 'wind-gen' || t === 'hydro-gen') out.src += Number(d.amps ?? d.rating ?? 0);
+      else if (t === 'load' || t === 'engine' || t === 'ac-load') out.load += loadAmps(r.node);
+      else if (t === 'converter' || t === 'dcdc') out.load += Number(d.rating ?? 0) * 0.6;
     }
-    return { bat, load, src };
+    return out;
   };
   for (const w of design.wires) {
     if (w.amps !== undefined || w.kind === 'sig' || w.kind === 'gnd') continue;
-    const a = side(w.from, w);
-    const b = side(w.to, w);
     let amps: number | undefined;
-    // Away from the battery the wire carries the loads out or the charge in, whichever is larger.
-    if (a.bat && !b.bat) amps = Math.max(b.load, b.src);
-    else if (b.bat && !a.bat) amps = Math.max(a.load, a.src);
-    else amps = Math.max(a.load, b.load, a.src, b.src) || undefined;
+    const source = [w.from, w.to].map((e) => g.node.get(e.node)).find((n) => n && (n.type === 'shore-inlet' || n.type === 'generator'));
+    if (w.kind === 'ac' && source) {
+      // the cable from a shore inlet or generator carries what the source can deliver
+      amps = Number(source.data.amps ?? source.data.rating ?? 0) || undefined;
+    } else {
+      const a = side(w.from, w);
+      const b = side(w.to, w);
+      // an AC circuit carries the loads beyond it, but no more than the sources feeding it can give
+      if (w.kind === 'ac' && a.acSrc !== b.acSrc) amps = Math.min((a.acSrc ? b : a).load, (a.acSrc ? a : b).src || Infinity);
+      // Away from the battery the wire carries the loads out or the charge in, whichever is larger.
+      else if (a.bat && !b.bat) amps = Math.max(b.load, b.src);
+      else if (b.bat && !a.bat) amps = Math.max(a.load, a.src);
+      else amps = Math.max(a.load, b.load, a.src, b.src) || undefined;
+    }
     if (amps !== undefined) res.set(w.id, amps);
   }
   return res;
 }
-

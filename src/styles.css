@@ -3188,3 +3188,55 @@ table.bal-list tfoot td {
     break-inside: avoid;
   }
 }
+
+/* ---------- Focus (one part of the job) and "Size wires & fuses" ---------- */
+.draw-tools select.focus-pick {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  padding: 4px 6px;
+}
+.draw-tools select.focus-pick.focus-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.react-flow__node.out-of-focus,
+.react-flow__edge.out-of-focus {
+  opacity: 0.2;
+}
+.modal.sizing {
+  width: min(640px, calc(100vw - 32px));
+  max-height: min(80vh, 720px);
+  overflow: auto;
+}
+.modal.sizing h4 {
+  margin: 14px 0 4px;
+}
+.modal.sizing .sz-summary {
+  font-weight: 600;
+}
+.modal.sizing .sz-list {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.modal.sizing .sz-list li.sev-error::marker {
+  color: var(--err);
+}
+.modal.sizing .sz-list li.sev-warning::marker {
+  color: var(--warn);
+}
+.modal.sizing .hint {
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  /* narrow screens: the focus picker and "Select area" stack, clear of the trace-over button */
+  .draw-tools {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

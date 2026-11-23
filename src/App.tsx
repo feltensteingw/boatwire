@@ -3,11 +3,13 @@ import { arrangePositions, autoLayout } from './layout/layout';
 import { existingFromEquipment, existingFromIdeal, equipmentNode, paletteNode } from './engine/existing';
 import { activeScenario } from './engine/scenario';
 import { compareWithIdeal } from './engine/compare';
+import { sizeDrawing, type SizeResult } from './engine/autosize';
+import { FOCUS_OPTIONS, focusNodes } from './engine/focus';
 import { generateIdeal } from './engine/generate';
 import { billOfMaterials, wireSchedule } from './engine/reports';
 import { NODE_DEFS } from './model/nodeDefs';
 import type { NodeType } from './model/types';
-import { useExisting, useFindings, useIdeal } from './state/derived';
+import { acVoltsOf, useExisting, useFindings, useIdeal } from './state/derived';
 import { DEFAULT_LAYERS, useStore, type View } from './state/store';
 import { Diagram } from './ui/Diagram';
 import { Inspector } from './ui/Inspector';
@@ -24,7 +26,7 @@ import { useMenu } from './ui/useMenu';
 import { NewBoatWizard, useNewBoat } from './ui/NewBoat';
 import { isUntouched } from './model/examples';
 import { lenUnit } from './model/units';
-import { redo, undo, useHistory } from './state/history';
+import { redo, startNewStep, undo, useHistory } from './state/history';
 import { ErrorBoundary, RecoveryBanner } from './ui/ErrorBoundary';
 import { parseProject } from './model/validate';
 import { toast } from './ui/toastStore';
@@ -33,6 +35,7 @@ import { UNDERLAY_ACCEPT, underlayFromFile } from './ui/underlayFile';
 import { freeSpot } from './engine/drawing';
 import { PART_MIME } from './ui/Diagram';
 import { viewCentre } from './ui/viewCentre';
+import { SizeDialog } from './ui/SizeDialog';
 
 // Compare and Reports load on first use to keep the initial download small.
 const Compare = lazy(() => import('./ui/Compare').then((m) => ({ default: m.Compare })));
@@ -482,6 +485,8 @@ function ExistingView() {
   const setView = useStore((s) => s.setView);
   const setReportTab = useStore((s) => s.setReportTab);
   const [busy, setBusy] = useState(false);
+  const [sizing, setSizing] = useState<{ result: SizeResult; scope: string; changed: boolean } | null>(null);
+  const focus = useStore((s) => s.layers.focus ?? 'all');
   const traceRef = useRef<HTMLInputElement>(null);
 
   if (!existing) {
@@ -617,6 +622,26 @@ function ExistingView() {
           >
             Auto-arrange
           </button>
+          <button
+            data-tip={`Set the wire sizes and fuses${focus === 'all' ? '' : ' of the part in focus'} so the design check passes: adds a fuse where a battery, charging source or load has none, rates fuses and breakers with no rating, and sizes or enlarges wires for their current, fuse and voltage drop. It never makes a wire smaller. You can undo it.`}
+            onClick={() => {
+              const src = useStore.getState().project.existing;
+              if (!src) return;
+              const copy = structuredClone(src);
+              // the drawing is checked at the boat's voltage, whatever it was drawn at
+              const d = { ...copy, systemVoltage: project.profile.systemVoltage };
+              const result = sizeDrawing(d, { acVolts: acVoltsOf(project), units: project.profile.units, only: focusNodes(d, focus) });
+              const c = result.counts;
+              const changed = c.fusesAdded + c.rated + c.raised + c.sized + c.upsized > 0;
+              if (changed) {
+                startNewStep(); // never merged with the owner's last edit, so Undo takes back exactly this
+                setExisting({ ...copy, nodes: d.nodes, wires: d.wires });
+              }
+              setSizing({ result, scope: focus === 'all' ? '' : (FOCUS_OPTIONS.find((o) => o.id === focus)?.label ?? ''), changed });
+            }}
+          >
+            Size wires &amp; fuses
+          </button>
           <span className="spacer" />
           <button
             className={`status ${errs ? 'bad' : warns ? 'meh' : 'good'}`}
@@ -667,6 +692,21 @@ function ExistingView() {
         <Diagram design={existing} findings={findings} mode="manual" differs={differs} />
       </div>
       <Inspector design={existing} findings={findings} editable />
+      {sizing && (
+        <SizeDialog
+          result={sizing.result}
+          scope={sizing.scope}
+          onClose={() => setSizing(null)}
+          onUndo={
+            sizing.changed
+              ? () => {
+                  undo();
+                  setSizing(null);
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

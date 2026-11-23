@@ -63,6 +63,11 @@ export class History {
     if (this.past.length > HISTORY_LIMIT) this.past.shift();
   }
 
+  /** The next change starts a step of its own, however soon it comes. */
+  cut() {
+    this.lastAt = -Infinity;
+  }
+
   /** Step back. Returns the state to restore and what was undone, or null at the start of history. */
   undo(current: Snapshot): { snapshot: Snapshot; label: string } | null {
     const step = this.past.pop();
@@ -147,6 +152,11 @@ const current = (): Snapshot => {
   const s = useStore.getState();
   return { project: s.project, cloudId: s.cloudId, cloudBase: s.cloudBase };
 };
+
+/** Make the next change its own undo step (a one-click action such as "Size wires & fuses"). */
+export function startNewStep() {
+  history.cut();
+}
 
 export function undo() {
   restore(history.undo(current()), 'Undid');

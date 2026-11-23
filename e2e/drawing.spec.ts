@@ -185,3 +185,44 @@ test('existing boat: a wire moved away from where the ideal design has it is mar
   await expect(page.locator('.chg-safety')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('existing boat: "Size wires & fuses" adds the missing fuse and sizes a bare circuit, and one undo takes it back', async ({ page }) => {
+  const errors = await openFresh(page);
+  // a battery wired straight to a load, no fuse, no sizes
+  await blankDrawing(page, ['battery', 'load']);
+  await wire(page, [0, 'pos'], [1, 'pos']);
+  await wire(page, [0, 'neg'], [1, 'neg']);
+  await expect(page.locator('.toolbar .status')).toContainText(/[1-9] errors?/);
+
+  await page.getByRole('button', { name: 'Size wires & fuses' }).click();
+  const dialog = page.locator('.modal.sizing');
+  await expect(dialog).toContainText('1 fuse added');
+  await expect(dialog).toContainText('wires sized');
+  await dialog.getByRole('button', { name: 'OK' }).click();
+  await expect(page.locator('.toolbar .status')).toContainText('0 errors');
+  const d = (await storedProject(page)).existing;
+  expect(d.nodes.map((n: { type: string }) => n.type).sort()).toEqual(['battery', 'fuse', 'load']);
+  expect(d.wires.filter((w: { kind: string; gauge?: string }) => w.kind !== 'sig' && !w.gauge)).toEqual([]);
+
+  // one undo puts the drawing back as it was
+  await undo(page);
+  await expect.poll(async () => (await storedProject(page)).existing.nodes.length).toBe(2);
+  expect(errors).toEqual([]);
+});
+
+test('focus: the ideal design shows only the charging, and the drawing fades the rest', async ({ page }) => {
+  const errors = await openFresh(page);
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  const all = await page.locator('.react-flow__node').count();
+  await page.getByLabel('Focus on one part of the wiring').selectOption('charging');
+  await expect(page.locator('.react-flow__node', { hasText: 'Alternator' }).first()).toBeVisible();
+  await expect.poll(() => page.locator('.react-flow__node').count()).toBeLessThan(all);
+  await expect(page.locator('.react-flow__node', { hasText: 'Cabin lights' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Existing boat', exact: true }).click();
+  await page.getByRole('button', { name: /Start from the ideal design/ }).click();
+  await expect(page.locator('.react-flow__node.out-of-focus').first()).toBeVisible();
+  await expect(page.locator('.react-flow__node.out-of-focus', { hasText: 'Cabin lights (LED)' }).first()).toBeVisible();
+  await expect(page.locator('.react-flow__node.out-of-focus', { hasText: 'Alternator' })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

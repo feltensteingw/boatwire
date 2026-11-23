@@ -125,7 +125,9 @@ function describeDrawing(a: Design | undefined, b: Design | undefined): Change |
     }
     return changedNodes.length === 1 ? { label: `Edited ${called(changedNodes[0])}`, mergeKey: `node:${changedNodes[0].id}` } : { label: 'Edited the drawing' };
   }
-  const changedWire = b.wires.find((w) => !same(w, a.wires.find((x) => x.id === w.id)));
+  const changedWires = b.wires.filter((w) => !same(w, a.wires.find((x) => x.id === w.id)));
+  if (changedWires.length > 1) return { label: `Edited ${changedWires.length} wires` };
+  const changedWire = changedWires[0];
   if (changedWire) {
     const was = a.wires.find((x) => x.id === changedWire.id)!;
     if (!same(was.from, changedWire.from) || !same(was.to, changedWire.to)) return { label: 'Moved a wire end' };

@@ -20,8 +20,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { joinTerminals } from '../engine/connect';
 import { estimateCurrents } from '../engine/audit';
 import { autoLayout, cachedLayout, manualLayout, sameFootprint, viewShift, type Layout } from '../layout/layout';
-import type { Design, Finding } from '../model/types';
-import { severityByNode, useUnits } from '../state/derived';
+import type { Design, Finding, Wire } from '../model/types';
+import { focusNodes, inFocus } from '../engine/focus';
+import { FocusPicker } from './FocusPicker';
+import { acVoltsOf, severityByNode, useUnits } from '../state/derived';
 import { useStore } from '../state/store';
 import { SymbolNode, type SymbolFlowNode } from './symbols';
 import { UnderlayControls, UnderlayImage } from './Underlay';
@@ -67,7 +69,9 @@ export function Diagram(props: Props) {
 }
 
 function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }: Props) {
-  const layers = useStore((s) => s.layers);
+  const storeLayers = useStore((s) => s.layers);
+  // A report or exported picture shows the whole boat, whatever is in focus on screen.
+  const layers = useMemo(() => (readOnly && storeLayers.focus && storeLayers.focus !== 'all' ? { ...storeLayers, focus: 'all' as const } : storeLayers), [readOnly, storeLayers]);
   const nonce = useStore((s) => s.layoutNonce);
   const selection = useStore((s) => s.selection);
   const select = useStore((s) => s.select);
@@ -86,7 +90,8 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }:
   const containerRef = useRef<HTMLDivElement>(null);
   const which = mode === 'auto' ? 'ideal' : 'existing';
 
-  const structural = `${layers.panelLoads}|${layers.fuses}|${layers.dc}|${layers.ac}|${layers.negatives}|${layers.signal}|${layers.grounding}`;
+  // A focus changes what the ideal design shows; on the hand drawing it only fades, so the view stays put.
+  const structural = `${layers.panelLoads}|${layers.fuses}|${layers.dc}|${layers.ac}|${layers.negatives}|${layers.signal}|${layers.grounding}|${mode === 'auto' ? (layers.focus ?? 'all') : ''}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -146,7 +151,16 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }:
 
   const units = useUnits();
   const severities = useMemo(() => severityByNode(findings), [findings]);
-  const currents = useMemo(() => estimateCurrents(design), [design]);
+  const acVolts = useStore((s) => acVoltsOf(s.project));
+  const currents = useMemo(() => estimateCurrents(design, acVolts), [design, acVolts]);
+  // On the hand drawing a focus fades what is outside it (the ideal design hides it in the layout).
+  // A part with no wires yet stays clear: it has just been added and is about to be wired in.
+  const faded = useMemo(() => {
+    const set = mode === 'manual' ? focusNodes(design, layers.focus) : undefined;
+    if (!set) return undefined;
+    const wired = new Set(design.wires.flatMap((w) => [w.from.node, w.to.node]));
+    return { node: (id: string) => wired.has(id) && !set.has(id), wire: (w: Wire) => !inFocus(set, w) };
+  }, [design, layers.focus, mode]);
 
   useEffect(() => {
     if (!layout) return;
@@ -170,6 +184,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }:
           position: { x: ln.x, y: ln.y },
           data: { laid: ln, severity: severities.get(ln.id), showParts: layers.labels.parts, manual: mode === 'manual' },
           selected: selection ? selection.kind === 'node' && selection.id === ln.id : picked.has(ln.id),
+          className: faded?.node(ln.id) ? 'out-of-focus' : undefined,
           width: ln.w,
           height: ln.h,
           ...(measured ? { measured } : {}),
@@ -177,7 +192,7 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }:
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, severities, layers.labels.parts, mode]);
+  }, [layout, severities, layers.labels.parts, mode, faded]);
 
   /**
    * How a wire is drawn when it is (or is not) selected. On the existing-boat drawing the one wire
@@ -213,12 +228,13 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }:
           sourceHandle: le.sourcePort,
           targetHandle: le.targetPort,
           data: { wire: w, points: le.points, labels: layers.labels, amps: w.amps ?? currents.get(w.id), protection, units, differs: differs?.get(w.id) },
+          className: faded?.wire(w) ? 'out-of-focus' : undefined,
           ...wireState(le.id, w.kind === 'sig', selection?.kind === 'wire' && selection.id === le.id),
         };
       }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, layers.labels, currents, units, differs]);
+  }, [layout, layers.labels, currents, units, differs, faded]);
 
   // reflect external selection (e.g. clicking a finding)
   useEffect(() => {
@@ -530,17 +546,20 @@ function DiagramInner({ design, findings, mode, readOnly, onSnapshot, differs }:
         {interactive && <MiniMap pannable zoomable nodeColor={(n) => ((n as SymbolFlowNode).data.laid.node.domain === 'ac' ? 'var(--w-ac)' : 'var(--mini)')} />}
         {underlay && <UnderlayImage u={underlay} />}
         {editing && <UnderlayControls u={underlay} />}
-        {editing && (
+        {interactive && (
           <Panel position="top-left" className="draw-tools">
-            <button
-              className={boxMode ? 'on' : ''}
-              aria-pressed={boxMode}
-              data-tip="Select several components: drag a box around them on the empty canvas. With a keyboard you can also hold Shift and drag, or Shift-click components one by one."
-              onClick={() => setBoxMode((v) => !v)}
-            >
-              Select area
-            </button>
-            {pickedNodes.length + pickedWires.length > 1 && (
+            <FocusPicker manual={mode === 'manual'} />
+            {editing && (
+              <button
+                className={boxMode ? 'on' : ''}
+                aria-pressed={boxMode}
+                data-tip="Select several components: drag a box around them on the empty canvas. With a keyboard you can also hold Shift and drag, or Shift-click components one by one."
+                onClick={() => setBoxMode((v) => !v)}
+              >
+                Select area
+              </button>
+            )}
+            {editing && pickedNodes.length + pickedWires.length > 1 && (
               <span className="picked" role="status">
                 <b>{pickedSummary}</b>
                 {pickedNodes.length > 0 && (

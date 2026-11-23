@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { estimateCurrents } from '../engine/audit';
+import { circuitVolts, estimateCurrents } from '../engine/audit';
+import { buildGraph } from '../engine/graph';
 import { ampacity, fmtGauge, gaugeSpec, vdropPct } from '../engine/calc';
 import { ruleInfo } from '../engine/rules';
 import { growTerminal, NODE_DEFS } from '../model/nodeDefs';
@@ -394,9 +395,11 @@ function WireInspector({ wire, design, findings, editable }: { wire: Wire; desig
   const N = new Map(design.nodes.map((n) => [n.id, n]));
   const a = N.get(wire.from.node);
   const b = N.get(wire.to.node);
-  const est = useMemo(() => estimateCurrents(design), [design]);
+  const acVolts = acVoltsOf(project);
+  const est = useMemo(() => estimateCurrents(design, acVolts), [design, acVolts]);
   const amps = wire.amps ?? est.get(wire.id);
-  const volts = wire.domain === 'ac' ? acVoltsOf(project) : Number([a, b].find((n) => n?.type === 'load')?.data.volts ?? design.systemVoltage);
+  // the same voltage the check measures the drop against (a 12 V load, a solar array's Vmp, the AC voltage)
+  const volts = useMemo(() => circuitVolts(buildGraph(design), wire, design.systemVoltage, acVolts), [design, wire, acVolts]);
   const vd = wire.gauge && amps !== undefined ? vdropPct(amps, wire.lengthFt, wire.gauge, volts) : undefined;
   // Bundling applies to DC conductors that carry current; the check ignores it on other wires.
   const bundles = wire.kind === 'pos' || wire.kind === 'neg';

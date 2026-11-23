@@ -226,10 +226,13 @@ const SECTIONS: Section[] = [
   {
     id: 'layers',
     title: 'Show / hide and labels',
-    keywords: 'layers dc ac negatives panel loads fuses control grounds labels wire size amps length vdrop voltage drop fuse rating parts reset clutter simplify',
+    keywords: 'layers focus charging engine starting starter dc loads ac mains one part subsystem dc ac negatives panel loads fuses control grounds labels wire size amps length vdrop voltage drop fuse rating parts reset clutter simplify',
     body: (
       <>
         <p>The bar above the diagram controls what's drawn, so you can go from the whole system down to just the part you care about. Nothing is deleted; it's only hidden.</p>
+        <p>
+          <b>Focus</b>, at the top left of the diagram, picks one part of the job: <i>Charging</i> (alternators, chargers, solar, wind, DC-DC chargers, charging relays and isolators, with the fuses, buses and switches between them and the batteries), <i>Engine starting</i>, <i>DC loads</i> or <i>AC mains</i>. The ideal design then shows only that part. On your Existing boat drawing the rest is faded instead, and <b>Size wires &amp; fuses</b> works on that part only.
+        </p>
         <table className="g-table">
           <tbody>
             <tr><td><b>DC / AC</b></td><td>Show the battery system, the mains system, or both. At least one stays on.</td></tr>
@@ -333,7 +336,7 @@ const SECTIONS: Section[] = [
   {
     id: 'existing',
     title: 'Existing boat & upgrade plan',
-    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag bundle bundled loom conduit sheath engine space',
+    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag bundle bundled loom conduit sheath engine space size wires fuses automatic sizing auto size focus',
     body: (
       <>
         <p>Use this when you're improving a boat you already own. Draw the wiring as it really is; BoatWire checks it and lists the changes needed to reach the ideal design.</p>
@@ -365,6 +368,9 @@ const SECTIONS: Section[] = [
           <li>To move a wire to a different terminal, click the wire, then drag the round grip beside either end onto the new terminal. BoatWire refuses a move that would join, say, positive to negative.</li>
           <li>A <b>Note</b> is free text for anything BoatWire has no symbol for. Notes show on the drawing and in exported pictures. They are not part of the checks or the reports.</li>
           <li>Press <kbd>Delete</kbd> to remove the selection. <b>Auto-arrange</b> tidies the layout.</li>
+          <li>
+            <b>Size wires &amp; fuses</b> finishes a drawing for you, so you can draw just the parts and the connections, for example only the charging system, and let BoatWire work out the rest. It adds a fuse where a battery, charging source or load has none (at the battery, or where the circuit meets a bus), rates every fuse and breaker that has no rating, and sizes every wire for its current, its fuse and its voltage drop. A window lists every change, and one <b>Undo</b> takes them all back. It never makes a wire smaller, and only raises a rating you entered if the circuit would blow it. With a <b>Focus</b> chosen it works on that part only. What it cannot fix, such as a missing battery switch or galvanic isolator, stays in the design check.
+          </li>
         </ul>
         <h4>Working on several components at once</h4>
         <ul>
