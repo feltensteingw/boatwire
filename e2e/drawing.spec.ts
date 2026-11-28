@@ -210,6 +210,40 @@ test('existing boat: "Size wires & fuses" adds the missing fuse and sizes a bare
   expect(errors).toEqual([]);
 });
 
+test('existing boat: what sizing added or changed is tagged on the drawing, kept on reload, and cleared by an edit or "Clear marks"', async ({ page }) => {
+  const errors = await openFresh(page);
+  await blankDrawing(page, ['battery', 'load']);
+  await wire(page, [0, 'pos'], [1, 'pos']);
+  await wire(page, [0, 'neg'], [1, 'neg']);
+  await page.getByRole('button', { name: 'Size wires & fuses' }).click();
+  await page.locator('.modal.sizing').getByRole('button', { name: 'OK' }).click();
+
+  // the new fuse is tagged NEW; the wires that had no size are tagged SET; the legend explains
+  await expect(page.locator('.react-flow__node .fix-tag.fix-added')).toHaveText(['NEW']);
+  await expect(page.locator('.wlabel .fix-tag.fix-set')).toHaveCount(2);
+  await expect(page.locator('.wlabel .fix-tag.fix-added')).toHaveCount(1);
+  await page.locator('.react-flow__pane').click({ position: { x: 600, y: 40 } });
+  await expect(page.locator('.fix-legend')).toContainText('Added: fit this part or wire');
+
+  // kept with the boat
+  await page.reload();
+  await expect(page.locator('.react-flow__node .fix-tag.fix-added')).toHaveCount(1);
+
+  // editing a tagged wire makes it the owner's own: its tag goes
+  const negative = (await storedProject(page)).existing.wires.findIndex((w: { kind: string }) => w.kind === 'neg');
+  await page.locator('.react-flow__edge').nth(negative).click({ force: true });
+  await page.locator('.inspector .field', { hasText: 'Conductor size' }).locator('select').selectOption('4');
+  await expect(page.locator('.wlabel .fix-tag.fix-set')).toHaveCount(1);
+
+  // Clear marks removes the rest and keeps the sizes
+  await page.getByRole('button', { name: 'Clear marks' }).click();
+  await expect(page.locator('.fix-tag')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Clear marks' })).toHaveCount(0);
+  const d = (await storedProject(page)).existing;
+  expect(d.wires.filter((w: { kind: string; gauge?: string }) => w.kind !== 'sig' && !w.gauge)).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test('focus: the ideal design shows only the charging, and the drawing fades the rest', async ({ page }) => {
   const errors = await openFresh(page);
   await expect(page.locator('.react-flow__node').first()).toBeVisible();

@@ -1,4 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import { nodeMarkText } from './fixMarkText';
 import { memo, type MouseEvent } from 'react';
 import { NODE_DEFS } from '../model/nodeDefs';
 import type { DNode, Severity } from '../model/types';
@@ -265,7 +266,13 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
   const n = laid.node;
   const isBus = n.type === 'bus-pos' || n.type === 'bus-neg' || n.type === 'ac-ground-bus';
   const isPanel = n.type === 'dc-panel' || n.type === 'ac-panel' || n.type === 'fuse-block';
-  const cls = ['sym', `t-${n.type}`, `d-${n.domain}`, selected ? 'sel' : '', severity ? `sev-${severity}` : '', n.equipmentId ? 'equip' : ''].join(' ');
+  const cls = ['sym', `t-${n.type}`, `d-${n.domain}`, selected ? 'sel' : '', severity ? `sev-${severity}` : '', n.equipmentId ? 'equip' : '', n.fixMark ? `fix-${n.fixMark.kind}` : ''].join(' ');
+  const fixText = n.fixMark ? nodeMarkText(n.fixMark, n) : undefined;
+  const fixTag = fixText && (
+    <span className={`fix-tag fix-${n.fixMark!.kind}`} data-tip={fixText.tip}>
+      {fixText.tag}
+    </span>
+  );
   const handles = laid.ports.map((pt) => (
     <Handle
       key={pt.id}
@@ -306,6 +313,7 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
         <div className="bus-bar" />
         <div className="bus-label">{n.label}</div>
         {severity && <span className={`badge ${severity}`} />}
+        {fixTag}
         {handles}
       </div>
     );
@@ -324,6 +332,7 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
           </div>
         ) : null}
         {severity && <span className={`badge ${severity}`} />}
+        {fixTag}
         {handles}
       </div>
     );
@@ -345,6 +354,7 @@ function SymbolNodeImpl({ data, selected }: NodeProps<SymbolFlowNode>) {
       {laid.negHidden && <span className="neg-stub" data-tip="This item has a negative return to the negative bus; it is hidden by the Negatives setting.">⏚</span>}
       {portLabels}
       {severity && <span className={`badge ${severity}`} data-tip={`Design check: ${severity}. Click the component for details.`} />}
+      {fixTag}
       {handles}
     </div>
   );

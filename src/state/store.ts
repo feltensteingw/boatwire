@@ -14,6 +14,7 @@ import { parseProject } from '../model/validate';
 import { removeZone } from '../model/zones';
 import { storable } from './imageStore';
 import { nudge, paste, reconnect, removeItems, type Clip } from '../engine/drawing';
+import { clearTouchedMarks } from '../engine/fixMarks';
 import { stashUnreadable, useRecovery } from './recovery';
 import type { CloudBase } from '../cloud/sync';
 
@@ -297,12 +298,17 @@ export const useStore = create<State>()(
         }),
 
       setExisting: (d) => set({ project: { ...get().project, existing: d }, selection: null }),
-      updateExisting: (fn) =>
+      updateExisting: (fn) => {
+        const before = get().project.existing;
         set({
           project: mutate(get().project, (p) => {
-            if (p.existing) fn(p.existing);
+            if (!p.existing) return;
+            fn(p.existing);
+            // a part or wire the owner has now changed is theirs: its "Size wires & fuses" mark goes
+            if (before) clearTouchedMarks(before, p.existing);
           }),
-        }),
+        });
+      },
       addExistingNode: (n) =>
         set({
           project: mutate(get().project, (p) => {
@@ -376,8 +382,10 @@ export const useStore = create<State>()(
       },
       reconnectExisting: (wireId, end, to) => {
         let result: { ok: true } | { ok: false; why: string } = { ok: false, why: 'There is no drawing.' };
+        const before = get().project.existing;
         const project = mutate(get().project, (p) => {
           if (p.existing) result = reconnect(p.existing, wireId, end, to);
+          if (p.existing && before) clearTouchedMarks(before, p.existing);
         });
         // only an accepted move changes the boat (and becomes an undo step)
         if (result.ok) set({ project });

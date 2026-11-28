@@ -51,7 +51,8 @@ export function SizeDialog({ result, scope, onClose, onUndo }: { result: SizeRes
         </>
       )}
       <p className="hint">
-        Sizes are worked out from the lengths on the drawing. Lengths BoatWire guessed from locations are marked "estimated" on each wire: enter the measured
+        Each change is tagged on the drawing (<span className="fix-tag fix-added">NEW</span> <span className="fix-tag fix-upgraded">was …</span> <span className="fix-tag fix-set">SIZE SET</span>), so you can see
+        what to buy or change and what you drew. The tags stay with the boat and print with the diagram until you press <b>Clear marks</b>. Sizes are worked out from the lengths on the drawing. Lengths BoatWire guessed from locations are marked "estimated" on each wire: enter the measured
         length and size again. Wires are never made smaller, and ratings you entered are only raised if the circuit would blow them. Every load is counted as
         running at once, so main feeders can come out larger than in the ideal design.
       </p>

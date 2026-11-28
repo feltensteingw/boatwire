@@ -10,7 +10,7 @@ import { DEFAULT_CURRENCY, priceDef, type PriceOverrides } from './prices';
 import { CATALOG_BY_KIND } from './catalog';
 import { blankProject, uid } from './examples';
 import { makeNode, NODE_DEFS } from './nodeDefs';
-import type { Design, DNode, EnergyAssumptions, Equipment, EquipmentKind, NodeType, Polarity, Project, PropValue, Scenario, Terminal, Underlay, Wire, WireKind, Zone } from './types';
+import type { Design, DNode, EnergyAssumptions, Equipment, EquipmentKind, FixMark, NodeType, Polarity, Project, PropValue, Scenario, Terminal, Underlay, Wire, WireKind, Zone } from './types';
 
 /** Format of the project data. Raise it, and add a step to MIGRATIONS, when the shape changes. */
 export const PROJECT_VERSION = 1;
@@ -175,6 +175,18 @@ function parsePrices(raw: unknown): PriceOverrides | undefined {
   return out.currency || out.rates ? out : undefined;
 }
 
+/** A "Size wires & fuses" mark, or nothing when it is missing or not one. */
+function fixMark(raw: unknown): FixMark | undefined {
+  if (!isObj(raw) || !['added', 'upgraded', 'set'].includes(raw.kind as string)) return undefined;
+  const m: FixMark = { kind: raw.kind as FixMark['kind'] };
+  if (typeof raw.wasGauge === 'string') m.wasGauge = raw.wasGauge;
+  if (typeof raw.wasRating === 'number') m.wasRating = raw.wasRating;
+  if (Array.isArray(raw.positions)) {
+    m.positions = raw.positions.filter(isObj).filter((p) => typeof p.term === 'string').map((p) => (typeof p.was === 'number' ? { term: p.term as string, was: p.was } : { term: p.term as string }));
+  }
+  return m;
+}
+
 function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[], opts: ParseOptions): Design | undefined {
   if (!isObj(raw) || !Array.isArray(raw.nodes)) return undefined;
   const nodes: DNode[] = [];
@@ -196,6 +208,8 @@ function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[], opts: Parse
     if (isObj(n.data)) node.data = { ...n.data } as DNode['data'];
     if (Array.isArray(n.notes)) node.notes = n.notes.filter((x): x is string => typeof x === 'string');
     if (isObj(n.pos)) node.pos = { x: num(n.pos.x, 0), y: num(n.pos.y, 0) };
+    const nodeMark = fixMark(n.fixMark);
+    if (nodeMark) node.fixMark = nodeMark;
     const terms: Terminal[] = [];
     const termIds = new Set<string>();
     for (const t of Array.isArray(n.terminals) ? n.terminals : []) {
@@ -233,6 +247,9 @@ function parseDrawing(raw: unknown, volts: 12 | 24, notes: string[], opts: Parse
     const kind = w.kind as WireKind;
     const wire: Wire = { ...(w as unknown as Wire), id, kind, domain: kind === 'ac' || kind === 'gnd' ? 'ac' : 'dc', from, to, lengthFt: Math.max(0, num(w.lengthFt, 3)) };
     if (wire.gauge !== undefined && typeof wire.gauge !== 'string') delete wire.gauge;
+    const wireMark = fixMark(w.fixMark);
+    if (wireMark) wire.fixMark = wireMark;
+    else delete wire.fixMark;
     const bundled = num(w.bundledWith, 0);
     if (bundled >= 1) wire.bundledWith = Math.floor(bundled);
     else delete wire.bundledWith;

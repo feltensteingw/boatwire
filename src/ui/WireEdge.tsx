@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { gaugeIndex, isUnsized } from '../engine/calc';
 import type { LayerSettings, Units, Wire } from '../model/types';
 import { cableLabel, fmtLen } from '../model/units';
+import { wireMarkText } from './fixMarkText';
 
 export type WireData = {
   wire: Wire;
@@ -107,10 +108,12 @@ function WireEdgeImpl(props: EdgeProps<WireFlowEdge>) {
   }
   const label = wireLabel(data);
   const width = wireWidth(w);
+  const fix = w.fixMark ? wireMarkText(w.fixMark, w, data.units ?? 'imperial') : undefined;
   return (
     // A wire marked as different from the ideal design says how on hover (the app-wide tooltip).
     <g data-tip={data.differs}>
       {data.differs && <path className="wire-differs" d={path} fill="none" stroke="var(--warn)" strokeWidth={width + 7} strokeOpacity={0.45} strokeDasharray="7 5" strokeLinejoin="round" />}
+      {w.fixMark && <path className={`wire-fix fix-${w.fixMark.kind}`} d={path} fill="none" strokeWidth={width + 8} strokeLinejoin="round" />}
       {selected && <path d={path} fill="none" stroke="var(--accent)" strokeWidth={width + 6} strokeOpacity={0.35} />}
       <BaseEdge
         id={id}
@@ -124,10 +127,15 @@ function WireEdgeImpl(props: EdgeProps<WireFlowEdge>) {
           strokeLinejoin: 'round',
         }}
       />
-      {label && (
+      {(label || fix) && (
         <EdgeLabelRenderer>
           <div className={`wlabel wl-${w.kind}${isUnsized(w) ? ' wl-unsized' : ''}`} style={{ transform: `translate(-50%, -115%) translate(${lx}px, ${ly}px)` }}>
             {label}
+            {fix && (
+              <span className={`fix-tag fix-${w.fixMark!.kind}`} data-tip={fix.tip}>
+                {fix.tag}
+              </span>
+            )}
           </div>
         </EdgeLabelRenderer>
       )}

@@ -5,6 +5,7 @@ import { activeScenario } from './engine/scenario';
 import { compareWithIdeal } from './engine/compare';
 import { sizeDrawing, type SizeResult } from './engine/autosize';
 import { FOCUS_OPTIONS, focusNodes } from './engine/focus';
+import { clearMarks, hasMarks } from './engine/fixMarks';
 import { generateIdeal } from './engine/generate';
 import { billOfMaterials, wireSchedule } from './engine/reports';
 import { NODE_DEFS } from './model/nodeDefs';
@@ -642,6 +643,15 @@ function ExistingView() {
           >
             Size wires &amp; fuses
           </button>
+          {hasMarks(existing) && (
+            <button
+              className="link"
+              data-tip="Remove the NEW, upgrade and SET tags that “Size wires & fuses” put on the drawing, for example once the work is done. The sizes and fuses stay. You can undo this."
+              onClick={() => updateExisting(clearMarks)}
+            >
+              Clear marks
+            </button>
+          )}
           <span className="spacer" />
           <button
             className={`status ${errs ? 'bad' : warns ? 'meh' : 'good'}`}

@@ -3240,3 +3240,96 @@ table.bal-list tfoot td {
     align-items: flex-start;
   }
 }
+
+/* ---------- "Size wires & fuses" marks: what BoatWire added, upgraded or filled in ---------- */
+:root {
+  --fix-added: var(--ok);
+  --fix-upgraded: var(--info);
+  --fix-set: var(--muted);
+}
+.fix-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  color: var(--panel);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.fix-tag.fix-added {
+  background: var(--fix-added);
+}
+.fix-tag.fix-upgraded {
+  background: var(--fix-upgraded);
+}
+.fix-tag.fix-set {
+  background: transparent;
+  color: var(--text);
+  border: 1px dashed var(--fix-set);
+}
+.sym > .fix-tag {
+  position: absolute;
+  top: -17px;
+  right: 6px;
+  margin: 0;
+  pointer-events: auto;
+}
+.sym.fix-added {
+  outline: 2px solid var(--fix-added);
+  outline-offset: 2px;
+}
+.sym.fix-upgraded {
+  outline: 2px solid var(--fix-upgraded);
+  outline-offset: 2px;
+}
+.sym.fix-set {
+  outline: 1px dashed var(--fix-set);
+  outline-offset: 2px;
+}
+/* a selected part shows the selection outline, tagged or not */
+.sym.sel.fix-added,
+.sym.sel.fix-upgraded,
+.sym.sel.fix-set {
+  outline: 3px solid var(--accent);
+  outline-style: solid;
+}
+/* wire labels let clicks through to the wire; the tag still shows its explanation on hover */
+.wlabel .fix-tag {
+  pointer-events: auto;
+}
+.wire-fix {
+  stroke-opacity: 0.35;
+  pointer-events: none;
+}
+.wire-fix.fix-added {
+  stroke: var(--fix-added);
+}
+.wire-fix.fix-upgraded {
+  stroke: var(--fix-upgraded);
+}
+.wire-fix.fix-set {
+  stroke: var(--fix-set);
+  stroke-dasharray: 3 4;
+}
+.legend > .fix-legend {
+  display: block;
+  margin-top: 10px;
+}
+.fix-legend > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+.fix-legend > div.hint {
+  display: block;
+}
+.fix-legend .fix-tag {
+  margin: 0 6px 0 0;
+  min-width: 46px;
+  text-align: center;
+}
