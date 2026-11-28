@@ -18,6 +18,7 @@ import { audit, CHARGE_LINKS, circuitVolts, estimateCurrents, protectionOf } fro
 import { ampacity, fuseClassFor, gaugeIndex, nextStandard, PROTECTION_SIZES, protectionFor, protectionNeeded, sizeConductor, type ProtectionKind } from './calc';
 import { BATTERY_FUSE_MAX_IN } from '../model/standards';
 import { BATTERY_FUSE_DRAFT_FT } from './existing';
+import { markItem } from './fixMarks';
 import { buildGraph, key, passThrough, SOURCE_TERMS, walk, type Graph } from './graph';
 
 export interface SizeResult {
@@ -133,10 +134,13 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     fuse.pos = { x: Math.round((p.x + (q.x - p.x) * 0.35) / 10) * 10, y: Math.round((p.y + (q.y - p.y) * 0.35) / 10) * 10 };
     d.nodes.push(fuse);
     fresh.add(fuse.id);
+    markItem(fuse, { kind: 'added' });
     if (only) only.add(fuse.id);
     // mounted at the battery or bus, within the 7 in a battery fuse must be (the owner is asked to measure it)
     const linkFt = endNode.type === 'battery' || endNode.type === 'bus-pos' ? BATTERY_FUSE_DRAFT_FT : 1;
     const link: Wire = { ...structuredClone(w), id: uid('w'), lengthFt: linkFt, lengthEstimated: true };
+    delete link.fixMark;
+    markItem(link, { kind: 'added' });
     delete link.vdropPct;
     link[at === 'from' ? 'from' : 'to'] = end;
     link[at === 'from' ? 'to' : 'from'] = { node: fuse.id, term: 'in' } as WireEnd;
@@ -356,13 +360,18 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
       return;
     }
     const was = get();
+    // the mark on the drawing: on the part, or for a panel position on its panel, naming the position
+    const term = id.includes('|') ? id.slice(id.indexOf('|') + 1) : undefined;
+    const mark = (kind: 'set' | 'upgraded') => markItem(n, term ? { kind, positions: [{ term, was }] } : kind === 'upgraded' ? { kind, wasRating: was } : { kind });
     if (was === undefined) {
       set(need);
+      mark('set');
       changed.add(id);
       res.counts.rated++;
       res.changes.push(`${label}: set to ${need} A (about ${Math.round(through)} A through it).`);
     } else if (was < through) {
       set(need);
+      mark('upgraded');
       changed.add(id);
       res.counts.raised++;
       res.changes.push(`${label}: raised from ${was} A to ${need} A; about ${Math.round(through)} A through it would blow ${was} A.`);
@@ -388,6 +397,7 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const r = Number(inlet?.data.amps ?? 0);
     if (r > 0) {
       n.data.rating = r;
+      markItem(n, { kind: 'set' });
       changed.add(n.id);
       res.counts.rated++;
       res.changes.push(`${name(n)}: set to ${r} A, the rating of ${name(inlet)}.`);
@@ -497,7 +507,9 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     };
     let { s, i, ok } = fit(runs);
     // A DC cable beyond the largest size is run as two or three in parallel, as the ideal design does.
-    for (let k = runs + 1; !ok && !ac && runs === 1 && !w.gauge && k <= 3; k++) {
+    // (also for a single cable already drawn: two smaller cables in parallel is still an upgrade)
+    const drawnRuns = runs;
+    for (let k = runs + 1; !ok && !ac && runs === 1 && k <= 3; k++) {
       const f = fit(k);
       if (f.ok) {
         ({ s, i, ok } = f);
@@ -509,7 +521,8 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
       continue;
     }
     const target = GAUGES[i].awg;
-    if (w.gauge && gaugeIndex(w.gauge) >= i) continue; // big enough already: never make a wire smaller
+    // big enough already: never make a wire smaller (more cables in parallel is never smaller)
+    if (w.gauge && runs === drawnRuns && gaugeIndex(w.gauge) >= i) continue;
     const why =
       bundled && i > gaugeIndex(s.gauge)
         ? `bundled with ${bundled} other wire${bundled === 1 ? '' : 's'}`
@@ -521,6 +534,7 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
               ? `its ${fuse} A ${ends.some((n) => n?.type === 'breaker' || n?.type === 'dc-panel' || n?.type === 'ac-panel') ? 'breaker' : 'fuse'}`
               : `~${Math.round(a ?? 0)} A`;
     const was = w.gauge;
+    markItem(w, was ? { kind: 'upgraded', wasGauge: w.cable?.match(/^\d+× /) ? w.cable : was } : { kind: 'set' });
     w.gauge = target;
     delete w.vdropPct; // the stored figure was for the old size
     if (runs > 1) {

@@ -55,13 +55,16 @@ export function paste(d: Design, clip: Clip, offset: { x: number; y: number }): 
     copy.pos = { x: snap((n.pos?.x ?? 0) + offset.x), y: snap((n.pos?.y ?? 0) + offset.y) };
     delete copy.equipmentId;
     delete copy.role;
+    delete copy.fixMark; // a copy is the owner's own part, not something BoatWire added
     d.nodes.push(copy);
   }
   for (const w of clip.wires) {
     const from = idOf.get(w.from.node);
     const to = idOf.get(w.to.node);
     if (!from || !to) continue;
-    d.wires.push({ ...structuredClone(w), id: uid('w'), from: { node: from, term: w.from.term }, to: { node: to, term: w.to.term } });
+    const copy: Wire = { ...structuredClone(w), id: uid('w'), from: { node: from, term: w.from.term }, to: { node: to, term: w.to.term } };
+    delete copy.fixMark;
+    d.wires.push(copy);
   }
   return [...idOf.values()];
 }

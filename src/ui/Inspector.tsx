@@ -13,6 +13,7 @@ import { EquipmentEditor } from './Sidebar';
 import { copyOf, GRID } from '../engine/drawing';
 import { Field, NumInput, Select, TextInput, Toggle } from './fields';
 import { FindingItem } from './Findings';
+import { hasMarks } from '../engine/fixMarks';
 
 export function Inspector({ design, findings, editable }: { design: Design; findings: Finding[]; editable: boolean }) {
   const selection = useStore((s) => s.selection);
@@ -25,13 +26,13 @@ export function Inspector({ design, findings, editable }: { design: Design; find
       ) : wire ? (
         <WireInspector wire={wire} design={design} findings={findings} editable={editable} />
       ) : (
-        <Overview findings={findings} />
+        <Overview findings={findings} marked={hasMarks(design)} />
       )}
     </aside>
   );
 }
 
-function Overview({ findings }: { findings: Finding[] }) {
+function Overview({ findings, marked }: { findings: Finding[]; marked: boolean }) {
   const errors = findings.filter((f) => f.severity === 'error');
   const warnings = findings.filter((f) => f.severity === 'warning');
   const infos = findings.filter((f) => f.severity === 'info');
@@ -49,13 +50,13 @@ function Overview({ findings }: { findings: Finding[] }) {
           <FindingItem key={f.id} f={f} />
         ))}
       </div>
-      <Legend />
+      <Legend marked={marked} />
       <p className="hint">Click any component or wire to see its ratings and why it's there.</p>
     </div>
   );
 }
 
-function Legend() {
+function Legend({ marked }: { marked: boolean }) {
   return (
     <div className="legend">
       <h4>Legend</h4>
@@ -75,6 +76,21 @@ function Legend() {
         <i className="lw sig" /> Control / signal
       </div>
       <div className="hint">Thicker lines are heavier cables.</div>
+      {marked && (
+        <div className="fix-legend">
+          <h4>Size wires &amp; fuses</h4>
+          <div>
+            <span className="fix-tag fix-added">NEW</span> Added: fit this part or wire
+          </div>
+          <div>
+            <span className="fix-tag fix-upgraded">was …</span> Upgrade: a larger wire or rating than drawn
+          </div>
+          <div>
+            <span className="fix-tag fix-set">SET</span> Had no size or rating: check what is fitted
+          </div>
+          <div className="hint">Everything without a tag is as you drew it. Editing a marked item removes its tag.</div>
+        </div>
+      )}
     </div>
   );
 }

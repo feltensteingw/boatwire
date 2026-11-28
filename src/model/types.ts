@@ -216,6 +216,23 @@ export interface Terminal {
 
 export type WireKind = 'pos' | 'neg' | 'ac' | 'gnd' | 'sig';
 
+/**
+ * Existing boat: what "Size wires & fuses" did to a part or wire the owner drew, so the drawing
+ * shows what to buy or change. Cleared when the owner edits that item, or with "Clear marks".
+ * - added: BoatWire put it in (a new fuse and its short link).
+ * - upgraded: it was there but too small: a larger wire, or a fuse, breaker or panel position raised.
+ * - set: it was there with no size or rating, and BoatWire filled one in.
+ */
+export interface FixMark {
+  kind: 'added' | 'upgraded' | 'set';
+  /** An upgraded wire's size before (AWG code, e.g. "14"), parallel runs included ("2× 1/0"). */
+  wasGauge?: string;
+  /** An upgraded fuse or breaker's rating before, in amps. */
+  wasRating?: number;
+  /** Panel or fuse-block positions raised: their label and rating before. */
+  positions?: { term: string; was?: number }[];
+}
+
 export interface DNode {
   id: string;
   type: NodeType;
@@ -241,6 +258,8 @@ export interface DNode {
     [k: string]: PropValue | undefined;
   };
   notes?: string[]; // rule ids that explain this node
+  /** Existing boat: what "Size wires & fuses" did to it. */
+  fixMark?: FixMark;
   /** Manual layout position (existing designs / user drags). */
   pos?: { x: number; y: number };
 }
@@ -281,6 +300,8 @@ export interface Wire {
   cable?: string;
   /** Equipment grounding conductor (shown only with the grounding layer). */
   equipmentGround?: boolean;
+  /** Existing boat: what "Size wires & fuses" did to it. */
+  fixMark?: FixMark;
   /** Display only: id of a hidden fuse this wire has been drawn through. */
   viaFuse?: string;
 }

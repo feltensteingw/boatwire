@@ -336,7 +336,7 @@ const SECTIONS: Section[] = [
   {
     id: 'existing',
     title: 'Existing boat & upgrade plan',
-    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag bundle bundled loom conduit sheath engine space size wires fuses automatic sizing auto size focus',
+    keywords: 'existing draw wire terminal connect palette add component place equipment upgrade plan changes delete upload trace underlay photo scan pdf image diagram select several box copy paste duplicate nudge arrow move wire end note label text quick add drag bundle bundled loom conduit sheath engine space size wires fuses automatic sizing auto size focus marks tags new upgrade clear marks',
     body: (
       <>
         <p>Use this when you're improving a boat you already own. Draw the wiring as it really is; BoatWire checks it and lists the changes needed to reach the ideal design.</p>
@@ -370,6 +370,7 @@ const SECTIONS: Section[] = [
           <li>Press <kbd>Delete</kbd> to remove the selection. <b>Auto-arrange</b> tidies the layout.</li>
           <li>
             <b>Size wires &amp; fuses</b> finishes a drawing for you, so you can draw just the parts and the connections, for example only the charging system, and let BoatWire work out the rest. It adds a fuse where a battery, charging source or load has none (at the battery, or where the circuit meets a bus), rates every fuse and breaker that has no rating, and sizes every wire for its current, its fuse and its voltage drop. A window lists every change, and one <b>Undo</b> takes them all back. It never makes a wire smaller, and only raises a rating you entered if the circuit would blow it. With a <b>Focus</b> chosen it works on that part only. What it cannot fix, such as a missing battery switch or galvanic isolator, stays in the design check.
+            Every change is tagged on the drawing, so you can tell what to buy or change from what you drew: <b>NEW</b> (green) is a part or wire it added, <b>was …</b> (blue) is a wire, fuse or breaker it made larger, with the size it was, and <b>SET</b> (dashed) had no size or rating, so check what is fitted. The tags are saved with the boat and print with the diagram. Editing a tagged item removes its tag; <b>Clear marks</b> removes them all and keeps the sizes.
           </li>
         </ul>
         <h4>Working on several components at once</h4>
