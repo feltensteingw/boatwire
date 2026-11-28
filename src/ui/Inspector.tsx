@@ -86,7 +86,7 @@ function Legend({ marked }: { marked: boolean }) {
             <span className="fix-tag fix-upgraded">was …</span> Upgrade: a larger wire or rating than drawn
           </div>
           <div>
-            <span className="fix-tag fix-set">SET</span> Had no size or rating: check what is fitted
+            <span className="fix-tag fix-set">… SET</span> Size or rating set where there was none: check what is fitted
           </div>
           <div className="hint">Everything without a tag is as you drew it. Editing a marked item removes its tag.</div>
         </div>

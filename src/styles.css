@@ -3290,6 +3290,17 @@ table.bal-list tfoot td {
   outline: 1px dashed var(--fix-set);
   outline-offset: 2px;
 }
+/* a selected part shows the selection outline, tagged or not */
+.sym.sel.fix-added,
+.sym.sel.fix-upgraded,
+.sym.sel.fix-set {
+  outline: 3px solid var(--accent);
+  outline-style: solid;
+}
+/* wire labels let clicks through to the wire; the tag still shows its explanation on hover */
+.wlabel .fix-tag {
+  pointer-events: auto;
+}
 .wire-fix {
   stroke-opacity: 0.35;
   pointer-events: none;

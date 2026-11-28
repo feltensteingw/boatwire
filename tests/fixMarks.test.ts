@@ -6,6 +6,7 @@ import { clearMarks, clearTouchedMarks, hasMarks, markItem } from '../src/engine
 import { blankProject } from '../src/model/examples';
 import type { Design, DNode, NodeType, Wire, WireKind } from '../src/model/types';
 import { parseProject } from '../src/model/validate';
+import { GAUGES } from '../src/model/standards';
 import { nodeMarkText, wireMarkText } from '../src/ui/fixMarkText';
 
 let seq = 0;
@@ -89,20 +90,34 @@ describe('"Size wires & fuses" marks what it changed', () => {
 });
 
 describe('marks after sizing', () => {
-  it('editing a marked item removes its mark; moving it does not', () => {
+  it('changing a marked item’s size or rating removes its mark; measuring, renaming or moving it does not', () => {
     const before = drawing();
     sizeDrawing(before);
     const after = structuredClone(before);
     const fuse = after.nodes.find((n) => n.fixMark?.kind === 'upgraded')!;
     const added = after.nodes.find((n) => n.fixMark?.kind === 'added')!;
-    const set = after.wires.find((w) => w.fixMark?.kind === 'set')!;
+    const [set, upgraded] = [after.wires.find((w) => w.fixMark?.kind === 'set')!, after.wires.find((w) => w.fixMark?.kind === 'upgraded')!];
     fuse.data.rating = 40;
     added.pos = { x: (added.pos?.x ?? 0) + 50, y: 7 };
-    set.lengthFt = 12;
+    added.label = 'Lights fuse';
+    set.gauge = '4';
+    upgraded.lengthFt = 12; // the measured length, as the summary window asks
+    upgraded.lengthEstimated = false;
     clearTouchedMarks(before, after);
     expect(fuse.fixMark).toBeUndefined();
     expect(added.fixMark).toEqual({ kind: 'added' });
     expect(set.fixMark).toBeUndefined();
+    expect(upgraded.fixMark).toEqual({ kind: 'upgraded', wasGauge: '18' });
+  });
+
+  it('adding a position to a marked panel keeps its mark', () => {
+    const before = draw(['dc-panel']);
+    markItem(before.nodes[0], { kind: 'upgraded', positions: [{ term: 'b1', was: 15 }] });
+    const after = structuredClone(before);
+    after.nodes[0].terminals.push({ id: 'b9', pol: 'pos', side: 'E', rating: 10 });
+    after.nodes[0].terminals.find((t) => t.id === 'b1')!.side = 'W';
+    clearTouchedMarks(before, after);
+    expect(after.nodes[0].fixMark).toBeDefined();
   });
 
   it('Clear marks removes every mark and keeps the sizes', () => {
@@ -157,5 +172,36 @@ describe('a drawn cable beyond the largest size', () => {
       expect(w.cable).toMatch(/^[23]× /);
       expect(w.fixMark).toEqual({ kind: 'upgraded', wasGauge: '2/0' });
     }
+  });
+});
+
+describe('panel positions and parallel cables', () => {
+  it('a panel with one position raised and two filled in lists all three, and keeps their names', () => {
+    const d = draw(['battery', 'fuse', 'dc-panel', 'load', 'load', 'load'], { 0: { chemistry: 'agm' }, 1: { rating: 100 }, 3: { amps: 25 }, 4: { amps: 8 }, 5: { amps: 8 } });
+    const panel = d.nodes[2];
+    for (const t of panel.terminals) if (t.id === 'b2' || t.id === 'b3') delete t.rating;
+    panel.terminals.find((t) => t.id === 'b1')!.label = '15 A · Fridge';
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 0.5, { gauge: '2' });
+    wire(d, 'pos', [1, 'out'], [2, 'in'], 4, { gauge: '2' });
+    wire(d, 'pos', [2, 'b1'], [3, 'pos'], 6, { gauge: '8' });
+    wire(d, 'pos', [2, 'b2'], [4, 'pos'], 6, { gauge: '12' });
+    wire(d, 'pos', [2, 'b3'], [5, 'pos'], 6, { gauge: '12' });
+    sizeDrawing(d);
+    expect(panel.fixMark?.kind).toBe('upgraded');
+    expect(panel.fixMark?.positions?.map((p) => p.term).sort()).toEqual(['b1', 'b2', 'b3']);
+    expect(panel.terminals.find((t) => t.id === 'b1')!.label).toBe('40 A · Fridge');
+    const tip = nodeMarkText(panel.fixMark!, panel).tip;
+    expect(tip).toContain('(was 15 A)');
+    expect(tip).toContain('no rating');
+  });
+
+  it('a drawn cable split into parallel cables never has less copper than it had', () => {
+    // a drawn 4/0 on a 450 A fuse
+    const d = draw(['battery', 'fuse', 'inverter'], { 0: { chemistry: 'lifepo4' }, 1: { rating: 450 }, 2: { watts: 3000 } });
+    wire(d, 'pos', [0, 'pos'], [1, 'in'], 0.5, { gauge: '4/0' });
+    wire(d, 'pos', [1, 'out'], [2, 'dcpos'], 6, { gauge: '4/0' });
+    sizeDrawing(d);
+    const cm = (w: Wire) => (GAUGES.find((g) => g.awg === w.gauge)!.cm) * (w.cable?.match(/^(\d+)× /) ? Number(w.cable.split('×')[0]) : 1);
+    for (const w of d.wires) expect(cm(w)).toBeGreaterThanOrEqual(GAUGES.find((g) => g.awg === '4/0')!.cm);
   });
 });

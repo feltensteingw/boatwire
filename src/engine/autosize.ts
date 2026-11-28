@@ -15,7 +15,7 @@ import { GAUGES, VDROP } from '../model/standards';
 import type { Design, DNode, Finding, Wire, WireEnd } from '../model/types';
 import { fmtLen, fmtSize, type Units } from '../model/units';
 import { audit, CHARGE_LINKS, circuitVolts, estimateCurrents, protectionOf } from './audit';
-import { ampacity, fuseClassFor, gaugeIndex, nextStandard, PROTECTION_SIZES, protectionFor, protectionNeeded, sizeConductor, type ProtectionKind } from './calc';
+import { ampacity, fuseClassFor, gaugeIndex, gaugeSpec, nextStandard, PROTECTION_SIZES, protectionFor, protectionNeeded, sizeConductor, type ProtectionKind } from './calc';
 import { BATTERY_FUSE_MAX_IN } from '../model/standards';
 import { BATTERY_FUSE_DRAFT_FT } from './existing';
 import { markItem } from './fixMarks';
@@ -418,7 +418,8 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
       () => t.rating,
       (r) => {
         t.rating = r;
-        t.label = `${r} A`;
+        // keep a name the owner gave the position ("15 A · Lights")
+        t.label = `${r} A${t.label?.includes('·') ? ' ·' + t.label.split('·')[1] : ''}`;
       },
       key(n.id, term),
     );
@@ -497,9 +498,12 @@ export function sizeDrawing(d: Design, opts: SizeOptions = {}): SizeResult {
     const limit = w.vdropLimit ?? (critical ? VDROP.critical : VDROP.nonCritical);
     const bundled = ac ? 0 : Math.max(0, Math.floor(w.bundledWith ?? 0));
     const carry = Math.max(a ?? 0, fuse);
+    // never less copper than was drawn, even when it is split into parallel cables
+    const drawnCm = w.gauge ? (gaugeSpec(w.gauge)?.cm ?? 0) * runsOf(w) : 0;
     const fit = (k: number) => {
       const s = sizeConductor({ designAmps: (a ?? 0) / k, protectAmps: carry / k, oneWayFt: w.lengthFt, volts, vdropLimit: limit, inEngineSpace: w.inEngineSpace, ac });
       let i = gaugeIndex(s.gauge);
+      while (k > runsOf(w) && i < GAUGES.length - 1 && GAUGES[i].cm * k < drawnCm) i++;
       // sizeConductor rates a cable on its own; one in a bundle carries less (DC only)
       while (bundled && i < GAUGES.length - 1 && ampacity(GAUGES[i].awg, w.inEngineSpace, false, bundled) < carry / k) i++;
       const ok = !s.overflow && ampacity(GAUGES[i].awg, w.inEngineSpace, ac, bundled) >= carry / k - 1e-9;

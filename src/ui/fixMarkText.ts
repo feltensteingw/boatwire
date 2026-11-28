@@ -13,11 +13,13 @@ export function wireMarkText(m: FixMark, w: Pick<Wire, 'kind'>, units: Units): {
 
 export function nodeMarkText(m: FixMark, n: Pick<DNode, 'terminals'>): { tag: string; tip: string } {
   if (m.kind === 'added') return { tag: 'NEW', tip: 'Added by "Size wires & fuses": a new fuse to fit, with the rating shown.' };
-  const positions = (m.positions ?? []).map((p) => {
-    const t = n.terminals.find((x) => x.id === p.term);
-    return `${t?.label ?? p.term}${p.was !== undefined ? ` (was ${p.was} A)` : ''}`;
-  });
-  if (m.kind === 'set') return { tag: 'RATING SET', tip: `This had no rating; "Size wires & fuses" set the rating it needs${positions.length ? `: ${positions.join(', ')}` : ''}. Check what is fitted.` };
+  const name = (term: string) => n.terminals.find((x) => x.id === term)?.label ?? term;
+  const raised = (m.positions ?? []).filter((p) => p.was !== undefined).map((p) => `${name(p.term)} (was ${p.was} A)`);
+  const filled = (m.positions ?? []).filter((p) => p.was === undefined).map((p) => name(p.term));
+  const check = filled.length ? ` Positions that had no rating, now set: ${filled.join(', ')}; check what is fitted.` : '';
+  if (raised.length) return { tag: 'UPGRADE', tip: `Upgrade: raise ${raised.join(', ')} to the rating shown.${check}` };
+  if (filled.length) return { tag: 'RATING SET', tip: `"Size wires & fuses" set the rating these positions need: ${filled.join(', ')}. Check what is fitted.` };
+  if (m.kind === 'set') return { tag: 'RATING SET', tip: 'This had no rating; "Size wires & fuses" set the rating it needs. Check what is fitted.' };
   if (m.wasRating !== undefined) return { tag: `was ${m.wasRating} A`, tip: `Upgrade: ${m.wasRating} A would blow at this circuit's current. Fit the rating shown.` };
-  return { tag: 'UPGRADE', tip: `Upgrade: raise ${positions.join(', ') || 'the rating'} to the rating shown.` };
+  return { tag: 'UPGRADE', tip: 'Upgrade: fit the rating shown.' };
 }

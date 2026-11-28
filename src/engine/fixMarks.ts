@@ -3,22 +3,30 @@
 
 import type { Design, DNode, FixMark, Wire } from '../model/types';
 
-/** Mark an item, keeping what is known from an earlier run: added stays added, "was" stays the first size. */
+/**
+ * Mark an item, keeping what is known from an earlier run: added stays added, set stays set, and
+ * "was" stays the first size. A panel's positions are all kept: an upgraded one has a "was", one
+ * that had no rating has none, and the panel counts as upgraded if any position was.
+ */
 export function markItem(item: DNode | Wire, mark: FixMark): void {
   const old = item.fixMark;
+  if (old?.kind === 'added') return;
+  if (mark.positions || old?.positions) {
+    const positions = mergePositions(old?.positions, mark.positions);
+    item.fixMark = { kind: positions.some((p) => p.was !== undefined) ? 'upgraded' : 'set', positions };
+    return;
+  }
   if (!old) {
     item.fixMark = mark;
     return;
   }
-  // added by BoatWire, or filled in where there was nothing: it stays that, whatever this run did
-  if (old.kind === 'added' || old.kind === 'set') return;
-  if (mark.kind !== 'upgraded') return;
+  // filled in where there was nothing: it stays that, whatever this run did
+  if (old.kind === 'set' || mark.kind !== 'upgraded') return;
   const next: FixMark = { kind: 'upgraded' };
   const wasGauge = old.wasGauge ?? mark.wasGauge;
   const wasRating = old.wasRating ?? mark.wasRating;
   if (wasGauge) next.wasGauge = wasGauge;
   if (wasRating !== undefined) next.wasRating = wasRating;
-  if (old.positions || mark.positions) next.positions = mergePositions(old.positions, mark.positions);
   item.fixMark = next;
 }
 
@@ -39,21 +47,32 @@ export function clearMarks(d: Design): void {
   for (const w of d.wires) delete w.fixMark;
 }
 
-/** What an item is, for telling whether the owner changed it: everything but its place and its mark. */
-const substance = (x: DNode | Wire) => {
-  const { fixMark: _m, pos: _p, ...rest } = x as DNode & Wire;
-  return JSON.stringify(rest);
-};
+/**
+ * What a mark is about, for telling whether the owner has since changed it: a wire's size and where
+ * it connects; a part's rating and fuse type, and the ratings of the positions it had. Not a length
+ * (the owner is asked to measure it), a name, a place on the canvas or a new panel position.
+ */
+const wireSubstance = (w: Wire) => JSON.stringify([w.gauge, w.cable, w.kind, w.from, w.to]);
+const nodeSubstance = (n: DNode, terms?: Set<string>) =>
+  JSON.stringify([n.type, n.data.rating, n.data.fuseClass, n.terminals.filter((t) => !terms || terms.has(t.id)).map((t) => [t.id, t.rating])]);
 
 /**
- * After an edit to the drawing, drop the mark from every marked item the edit changed: once the
- * owner has touched it, it is theirs. Moving a part on the canvas does not count.
+ * After an edit to the drawing, drop the mark from every marked item whose size, rating or
+ * connections the edit changed: the owner has decided that one. Measuring a length, renaming or
+ * moving it on the canvas does not count.
  */
 export function clearTouchedMarks(before: Design, after: Design): void {
-  const was = new Map<string, string>();
-  for (const n of before.nodes) if (n.fixMark) was.set(`n:${n.id}`, substance(n));
-  for (const w of before.wires) if (w.fixMark) was.set(`w:${w.id}`, substance(w));
-  if (!was.size) return;
-  for (const n of after.nodes) if (n.fixMark && was.has(`n:${n.id}`) && was.get(`n:${n.id}`) !== substance(n)) delete n.fixMark;
-  for (const w of after.wires) if (w.fixMark && was.has(`w:${w.id}`) && was.get(`w:${w.id}`) !== substance(w)) delete w.fixMark;
+  const nodes = new Map(before.nodes.filter((n) => n.fixMark).map((n) => [n.id, n]));
+  const wires = new Map(before.wires.filter((w) => w.fixMark).map((w) => [w.id, w]));
+  if (!nodes.size && !wires.size) return;
+  for (const n of after.nodes) {
+    const b = n.fixMark && nodes.get(n.id);
+    if (!b) continue;
+    const terms = new Set(b.terminals.map((t) => t.id));
+    if (nodeSubstance(b, terms) !== nodeSubstance(n, terms)) delete n.fixMark;
+  }
+  for (const w of after.wires) {
+    const b = w.fixMark && wires.get(w.id);
+    if (b && wireSubstance(b) !== wireSubstance(w)) delete w.fixMark;
+  }
 }
